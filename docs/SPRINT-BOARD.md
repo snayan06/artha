@@ -22,8 +22,8 @@ Sprint 1 dependency.
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | In progress | Magic-link callback and reopen behavior still need final-domain acceptance |
 | Server-owned onboarding/profile | Done locally | Profile, household and members now hydrate from the server; final-domain acceptance remains |
-| ₹25k self-transfer flow | Done locally | Parser, review UI, atomic backend and complete local regression pass; history/deploy remain |
-| First-request reliability | Done locally | Mumbai region, longer timeout and safe retry pass tests; deployment measurement remains |
+| ₹25k self-transfer flow | Deployed | Parser, review UI, atomic backend and history projection are live; authenticated smoke remains |
+| First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
 | Structured Qwen capture | Done locally | Strict schema and allow-list grounding pass tests; provider key and benchmark remain |
 | Parser evaluation dataset | Done | 50 fictional cases plus an automated contract checker are in the repository |
 | Family email invitations | Next | Permission model is defined; schema, RLS, email acceptance and limited UI remain |
@@ -65,6 +65,7 @@ Sprint 1 dependency.
 - [x] Retry transient reads and explicitly idempotent writes once.
 - [x] Never retry an unsafe onboarding write automatically.
 - [ ] Deploy and measure cold plus warm authenticated requests.
+- [x] Verify the deployed API executes in Mumbai (`bom1`) beside Supabase.
 - [ ] Add sanitized latency evidence and a user-friendly network-state UI.
 
 ### Structured LLM parsing and evaluation

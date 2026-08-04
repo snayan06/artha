@@ -36,6 +36,7 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [Transfer and parser test gate](qa/2026-08-04-transfer-parser-gate.md)
 - [First-request reliability diagnosis](qa/2026-08-04-first-request-reliability.md)
 - [Sprint 1 manual QA pass](qa/2026-08-05-sprint-1-manual-pass.md)
+- [Sprint 1 deployment verification](qa/2026-08-05-sprint-1-deployment.md)
 - [V1 QA scenario matrix](qa/v1-scenario-matrix.md)
 - [V1 public-release verification](qa/v1-public-release.md)
 - [Production staging verification](qa/production-staging-verification.md)
