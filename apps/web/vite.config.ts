@@ -3,6 +3,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  // Keep one root-level environment file for both the web app and API.
+  envDir: '../..',
   build: {
     rollupOptions: {
       output: {

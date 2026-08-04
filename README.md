@@ -116,8 +116,8 @@ Start the web application in a second terminal:
 make dev-web
 ```
 
-Open <http://localhost:5173>. Interactive API documentation is available at
-<http://localhost:8000/docs>.
+Open <http://127.0.0.1:5173>. Interactive API documentation is available at
+<http://127.0.0.1:8000/docs>.
 
 ### Optional experimental open-weight assistant
 

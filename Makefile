@@ -5,10 +5,10 @@ setup:
 	cd apps/api && uv sync --locked --all-groups
 
 dev-web:
-	npm run dev:web
+	npm --prefix apps/web run dev -- --host 127.0.0.1
 
 dev-api:
-	cd apps/api && uv run uvicorn artha_api.app:app --reload --port 8000
+	cd apps/api && uv run uvicorn artha_api.app:app --reload --port 8000 --env-file ../../.env
 
 test:
 	npm run test:web
