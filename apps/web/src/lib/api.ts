@@ -6,6 +6,13 @@ const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'
 const TIMEOUT_MS = 3500
 
+type AccessTokenProvider = () => Promise<string | null>
+let accessTokenProvider: AccessTokenProvider = async () => null
+
+export function configureApiAccessTokenProvider(provider: AccessTokenProvider): void {
+  accessTokenProvider = provider
+}
+
 type JsonObject = Record<string, unknown>
 
 class ApiError extends Error {
@@ -19,9 +26,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
+    const accessToken = await accessTokenProvider()
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> | undefined) }
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`
     const response = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers,
       signal: controller.signal
     })
     if (!response.ok) throw new ApiError(response.status, `API request failed (${response.status})`)
@@ -96,17 +106,28 @@ function mapAssistantWidgets(raw: unknown): AssistantWidget[] {
   })
 }
 
-function mapSplits(raw: unknown, memberNames: Map<number, string>): Transaction['memberSplits'] {
+function entityId(value: unknown): string | number | undefined {
+  if (typeof value === 'string' && value) return value
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return value
+  return undefined
+}
+
+function apiEntityId(value: string): string | number {
+  return /^\d+$/.test(value) ? Number(value) : value
+}
+
+function mapSplits(raw: unknown, memberNames: Map<string, string>): Transaction['memberSplits'] {
   if (!Array.isArray(raw)) return []
   return raw.flatMap((item) => {
     const split = item as JsonObject
-    const memberId = numberValue(split.member_id, -1)
-    if (memberId < 0) return []
-    return [{ memberId: String(memberId), memberName: memberNames.get(memberId) ?? 'Household member', amountPaise: numberValue(split.amount_paise) }]
+    const rawMemberId = entityId(split.member_id)
+    if (rawMemberId === undefined) return []
+    const memberId = String(rawMemberId)
+    return [{ memberId, memberName: memberNames.get(memberId) ?? 'Household member', amountPaise: numberValue(split.amount_paise) }]
   })
 }
 
-function mapTransaction(raw: JsonObject, accountNames: Map<number, string> = new Map(), memberNames: Map<number, string> = new Map()): Transaction {
+function mapTransaction(raw: JsonObject, accountNames: Map<string, string> = new Map(), memberNames: Map<string, string> = new Map()): Transaction {
   const apiKind = stringValue(raw.kind, 'expense')
   const amountPaise = numberValue(raw.amount_paise ?? raw.amountPaise)
   const memberSplits = mapSplits(raw.splits, memberNames)
@@ -118,8 +139,8 @@ function mapTransaction(raw: JsonObject, accountNames: Map<number, string> = new
     personalSharePaise: numberValue(raw.personal_share_paise ?? raw.personalSharePaise, amountPaise - memberTotalPaise),
     merchant: stringValue(raw.description ?? raw.merchant, 'Transaction'),
     category: stringValue(raw.category, 'Other'),
-    account: stringValue(raw.account_name ?? raw.account, accountNames.get(numberValue(raw.source_account_id)) ?? (raw.source_account_id ? 'Primary account' : 'Account')),
-    sourceAccountId: typeof raw.source_account_id === 'number' ? raw.source_account_id : undefined,
+    account: stringValue(raw.account_name ?? raw.account, accountNames.get(String(entityId(raw.source_account_id) ?? '')) ?? (raw.source_account_id ? 'Primary account' : 'Account')),
+    sourceAccountId: entityId(raw.source_account_id),
     occurredAt: stringValue(raw.occurred_at ?? raw.occurredAt, new Date().toISOString()).slice(0, 10),
     note: typeof (raw.notes ?? raw.note) === 'string' ? String(raw.notes ?? raw.note) : undefined,
     memberSplits,
@@ -127,7 +148,7 @@ function mapTransaction(raw: JsonObject, accountNames: Map<number, string> = new
   }
 }
 
-function mapDraft(raw: JsonObject, text: string, memberNames: Map<number, string>, confidence?: unknown): TransactionDraft {
+function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string>, confidence?: unknown): TransactionDraft {
   const amountPaise = numberValue(raw.amount_paise ?? raw.amountPaise)
   const apiKind = stringValue(raw.kind, 'expense')
   return {
@@ -136,7 +157,7 @@ function mapDraft(raw: JsonObject, text: string, memberNames: Map<number, string
     merchant: stringValue(raw.description ?? raw.merchant, 'New transaction'),
     category: stringValue(raw.category, 'Other'),
     account: stringValue(raw.account_name ?? raw.account, 'HDFC UPI'),
-    sourceAccountId: typeof raw.source_account_id === 'number' ? raw.source_account_id : undefined,
+    sourceAccountId: entityId(raw.source_account_id),
     occurredAt: stringValue(raw.occurred_at ?? raw.occurredAt, new Date().toISOString()).slice(0, 10),
     note: stringValue(raw.notes ?? raw.note, ''),
     memberSplits: mapSplits(raw.splits, memberNames),
@@ -154,27 +175,29 @@ function toApiDraft(draft: TransactionDraft): JsonObject {
     category: draft.category,
     paid_by_member_id: null,
     personal_share_paise: draft.amountPaise - memberTotalPaise,
-    splits: draft.memberSplits.map((split) => ({ member_id: Number(split.memberId), amount_paise: split.amountPaise })),
+    splits: draft.memberSplits.map((split) => ({ member_id: apiEntityId(split.memberId), amount_paise: split.amountPaise })),
     occurred_at: `${draft.occurredAt}T12:00:00Z`,
     notes: draft.note || null,
     source_account_id: draft.sourceAccountId
   }
 }
 
-function accountNameMap(raw: unknown): Map<number, string> {
+function accountNameMap(raw: unknown): Map<string, string> {
   const rows = Array.isArray(raw) ? raw : []
   return new Map(rows.flatMap((item) => {
     const account = item as JsonObject
-    return typeof account.id === 'number' ? [[account.id, stringValue(account.name, 'Account')] as const] : []
+    const id = entityId(account.id)
+    return id !== undefined ? [[String(id), stringValue(account.name, 'Account')] as const] : []
   }))
 }
 
-function memberNameMap(raw: unknown): Map<number, string> {
+function memberNameMap(raw: unknown): Map<string, string> {
   const rows = Array.isArray(raw) ? raw : []
   return new Map(rows.flatMap((item) => {
     const member = item as JsonObject
     const id = member.id ?? member.member_id
-    return typeof id === 'number' ? [[id, stringValue(member.name ?? member.member_name, 'Household member')] as const] : []
+    const normalizedId = entityId(id)
+    return normalizedId !== undefined ? [[String(normalizedId), stringValue(member.name ?? member.member_name, 'Household member')] as const] : []
   }))
 }
 
@@ -202,10 +225,10 @@ export async function bootstrapDemo(): Promise<void> {
   await request('/api/v1/demo/bootstrap', { method: 'POST' })
 }
 
-export async function setupOnboarding(accounts: AccountSetupInput[], members: Array<{ name: string }>): Promise<HouseholdMember[]> {
+export async function setupOnboarding(accounts: AccountSetupInput[], members: Array<{ name: string }>, displayName = 'You', householdName = 'My household'): Promise<HouseholdMember[]> {
   const response = await request<JsonObject>('/api/v1/onboarding/setup', {
     method: 'POST',
-    body: JSON.stringify({ accounts, members })
+    body: JSON.stringify({ accounts, members, display_name: displayName, household_name: householdName })
   })
   return mapMembers(response.members)
 }
@@ -220,10 +243,11 @@ export async function getAccounts(): Promise<LedgerAccount[]> {
     const rows = Array.isArray(raw) ? raw : Array.isArray((raw as JsonObject)?.items) ? (raw as JsonObject).items as unknown[] : []
     return rows.flatMap((item) => {
       const account = item as JsonObject
-      if (typeof account.id !== 'number') return []
+      const id = entityId(account.id)
+      if (!id) return []
       const rawKind = stringValue(account.kind ?? account.type, 'bank')
       const kind: LedgerAccount['kind'] = rawKind === 'cash' || rawKind === 'wallet' || rawKind === 'credit_card' ? rawKind : 'bank'
-      return [{ id: account.id, name: stringValue(account.name, 'Account'), kind }]
+      return [{ id, name: stringValue(account.name, 'Account'), kind }]
     })
   } catch {
     return [
@@ -273,8 +297,8 @@ export async function getDashboard(): Promise<{ data: Dashboard; demo: boolean }
     const memberNames = memberNameMap(membersRaw)
     const memberBalances: MemberBalance[] = membersRaw.map((item) => {
       const balance = item as JsonObject
-      const id = numberValue(balance.member_id)
-      return { id: String(id), name: stringValue(balance.member_name, memberNames.get(id) ?? 'Household member'), balancePaise: numberValue(balance.balance_paise), status: stringValue(balance.status, '') }
+      const id = String(entityId(balance.member_id) ?? '')
+      return { id, name: stringValue(balance.member_name, memberNames.get(id) ?? 'Household member'), balancePaise: numberValue(balance.balance_paise), status: stringValue(balance.status, '') }
     })
     const monthlyRaw = Array.isArray(raw.monthly) ? raw.monthly : []
     const monthly: MonthlyPoint[] = monthlyRaw.map((item) => {
@@ -335,13 +359,27 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
     return {
       data: {
         ...draft,
-        account: draft.sourceAccountId ? names.get(draft.sourceAccountId) ?? draft.account : draft.account
+        account: draft.sourceAccountId !== undefined ? names.get(String(draft.sourceAccountId)) ?? draft.account : draft.account
       },
       demo: false
     }
   } catch (error) {
     if (error instanceof ApiError && error.status >= 400 && error.status < 500) throw error
-    return { data: parseCaptureLocally(text, membersForFallback), demo: true }
+    const fallback = parseCaptureLocally(text, membersForFallback)
+    if (!DEMO_MODE) {
+      const accounts = await getAccounts()
+      const firstAccount = accounts[0]
+      if (!firstAccount?.id) throw new Error('Create an account before adding a transaction')
+      return {
+        data: {
+          ...fallback,
+          account: firstAccount.name,
+          sourceAccountId: firstAccount.id
+        },
+        demo: false
+      }
+    }
+    return { data: fallback, demo: true }
   }
 }
 

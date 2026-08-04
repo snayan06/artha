@@ -70,6 +70,19 @@ describe('FastAPI adapter', () => {
     expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/v1/demo/bootstrap', expect.objectContaining({ method: 'POST' }))
   })
 
+  it('injects the current bearer token into FastAPI requests', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const fetchMock = vi.fn().mockResolvedValue(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { configureApiAccessTokenProvider, getMembers } = await import('./api')
+    configureApiAccessTokenProvider(async () => 'current-access-token')
+
+    await getMembers()
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(request.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer current-access-token' }))
+  })
+
   it('posts reviewed setup accounts with card metadata', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }))
@@ -83,7 +96,12 @@ describe('FastAPI adapter', () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ accounts: [], members: [{ id: 7, name: 'Sam' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     await setupOnboarding(accounts, [{ name: 'Sam' }])
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit
-    expect(JSON.parse(String(request.body))).toEqual({ accounts, members: [{ name: 'Sam' }] })
+    expect(JSON.parse(String(request.body))).toEqual({
+      accounts,
+      members: [{ name: 'Sam' }],
+      display_name: 'You',
+      household_name: 'My household'
+    })
   })
 
   it('maps only approved assistant widgets from the strict API response', async () => {

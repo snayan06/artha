@@ -30,20 +30,20 @@ async def app_client(database_path: Path) -> AsyncIterator[tuple[AsyncClient, Fa
             yield client, app
 
 
-def test_production_storage_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_production_storage_never_uses_demo_database(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HISAB_ENV", "production")
     monkeypatch.delenv("HISAB_DATABASE_URL", raising=False)
     monkeypatch.delenv("HISAB_ALLOW_DEMO_STORAGE", raising=False)
 
-    with pytest.raises(RuntimeError, match="Production mode is intentionally disabled"):
+    with pytest.raises(RuntimeError, match="uses Supabase REST/RPC"):
         resolve_database_url()
-    with pytest.raises(RuntimeError, match="Production mode is intentionally disabled"):
-        create_app()
-    with pytest.raises(RuntimeError, match="Production mode is intentionally disabled"):
+    app = create_app()
+    assert app.state.is_production is True
+    with pytest.raises(RuntimeError, match="uses Supabase REST/RPC"):
         resolve_database_url("sqlite+aiosqlite:///unsafe.db")
 
     monkeypatch.setenv("HISAB_ALLOW_DEMO_STORAGE", "true")
-    with pytest.raises(RuntimeError, match="Production mode is intentionally disabled"):
+    with pytest.raises(RuntimeError, match="uses Supabase REST/RPC"):
         resolve_database_url("sqlite+aiosqlite:///explicit-demo.db")
 
 

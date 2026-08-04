@@ -31,6 +31,6 @@ Use lowercase kebab-case and include the milestone or date when useful:
 ## Current artifacts
 
 - [V1 public-release verification](qa/v1-public-release.md)
+- [Production staging verification](qa/production-staging-verification.md)
 - [UI artifact guide](ui/README.md)
 - [Architecture artifact guide](architecture/README.md)
-

@@ -5,29 +5,30 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from os import getenv
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .assistant_routes import router as assistant_router
 from .database import build_engine, create_schema, default_database_url
+from .production_routes import router as production_router
 from .routes import router
+from .supabase_rest import SupabaseRestSettings
 
 
 def resolve_database_url(database_url: str | None = None) -> str:
     environment = getenv("HISAB_ENV", "development").casefold()
     if environment == "production":
-        raise RuntimeError(
-            "Production mode is intentionally disabled until Supabase JWT verification "
-            "and the Supabase repository adapter are connected and live RLS tests pass"
-        )
+        raise RuntimeError("production mode uses Supabase REST/RPC, not the demo database")
     configured_url = database_url or getenv("HISAB_DATABASE_URL")
     return configured_url or default_database_url()
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
     environment = getenv("HISAB_ENV", "development").casefold()
-    engine = build_engine(resolve_database_url(database_url))
+    is_production = environment == "production"
+    engine = None if is_production else build_engine(resolve_database_url(database_url))
     cors_origins = [
         origin.strip()
         for origin in getenv(
@@ -39,10 +40,20 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        await create_schema(engine)
-        app.state.session_factory = async_sessionmaker(engine, expire_on_commit=False)
-        yield
-        await engine.dispose()
+        if is_production:
+            app.state.supabase_rest_settings = SupabaseRestSettings.from_env()
+            app.state.supabase_http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+            yield
+            verifier = getattr(app.state, "supabase_jwt_verifier", None)
+            if verifier is not None:
+                await verifier.aclose()
+            await app.state.supabase_http_client.aclose()
+        else:
+            assert engine is not None
+            await create_schema(engine)
+            app.state.session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            yield
+            await engine.dispose()
 
     app = FastAPI(
         title="Hisab API",
@@ -50,7 +61,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         description="Private V1 ledger API. All amounts are integer paise.",
         lifespan=lifespan,
     )
-    app.state.is_production = environment == "production"
+    app.state.is_production = is_production
     app.state.demo_user_id = getenv("HISAB_DEMO_USER_ID", "demo-user")
     app.state.demo_bootstrap_lock = Lock()
     app.add_middleware(
@@ -60,8 +71,11 @@ def create_app(database_url: str | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.include_router(router)
-    app.include_router(assistant_router)
+    if is_production:
+        app.include_router(production_router)
+    else:
+        app.include_router(router)
+        app.include_router(assistant_router)
     return app
 
 

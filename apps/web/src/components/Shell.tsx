@@ -1,4 +1,4 @@
-import { Bot, CircleUserRound, Home, List, Plus, UsersRound } from 'lucide-react'
+import { Bot, Home, List, LogOut, Plus, UsersRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { type AppPath, useRouter } from '../lib/router'
 import { ThemeControl } from './ThemeControl'
@@ -10,7 +10,7 @@ const navigation = [
   { to: '/assistant' as AppPath, label: 'Assistant', icon: Bot }
 ]
 
-export function Shell({ children }: { children: ReactNode }) {
+export function Shell({ children, userEmail, onSignOut }: { children: ReactNode; userEmail?: string; onSignOut?: () => Promise<void> }) {
   const { path, navigate } = useRouter()
   const isQuickAdd = path === '/add'
 
@@ -22,7 +22,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-moss-900 font-display text-lg font-bold text-white dark:bg-[#27604e]">H</span>
             <div className="text-left"><p className="font-display text-lg font-bold leading-none tracking-[-0.03em]">Hisab</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
           </button>
-          <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">August overview</span><ThemeControl /><button className="grid h-11 w-11 place-items-center rounded-full border border-line bg-white text-[#66736d] tone-muted" aria-label="Open profile"><CircleUserRound className="h-5 w-5" /></button></div>
+          <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">August overview</span><ThemeControl />{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Sign out"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span></button>}</div>
         </div>
       </header>
 

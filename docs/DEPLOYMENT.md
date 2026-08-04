@@ -4,6 +4,11 @@ The repository is designed to run locally without cloud credentials. Production 
 
 ## 1. Supabase
 
+The free `hisab-production` project is active under reference
+`jjkxbfbirsxulelgprxb`. Five migrations and the live two-household RLS exercise
+have passed. The selected general Asia-Pacific placement resolved to
+`ap-southeast-2`.
+
 1. Create a new Supabase project in the Mumbai region when available.
 2. Link the local project with the Supabase CLI.
 3. Review migrations under `supabase/migrations` before applying them.
@@ -13,7 +18,7 @@ The repository is designed to run locally without cloud credentials. Production 
 
 Never expose the service-role key in the browser. Normal FastAPI requests should preserve the signed-in user's authorization context so RLS remains effective.
 
-## 2. FastAPI disposable preview on Render Free
+## 2. FastAPI private pilot on Render Free
 
 Create a Python Web Service rooted at `apps/api`.
 
@@ -24,10 +29,11 @@ Create a Python Web Service rooted at `apps/api`.
 
 Set server-side environment variables from `.env.example`. Never enable automatic paid upgrades. Render Free sleeps after idle time, so its first request may be slow.
 
-The checked-in `render.yaml` uses `HISAB_ENV=preview` and ephemeral SQLite. It is
-only for UI/API evaluation: data can disappear after a restart or redeploy. Do
-not enter real financial data. `HISAB_ENV=production` intentionally refuses to
-start until the Supabase repository and verified JWT authentication are wired.
+The checked-in `render.yaml` uses `HISAB_ENV=production`. Production mode never
+creates or connects to the SQLite demo database: it verifies Supabase JWTs and
+forwards the same user bearer through the separate REST/RPC repository so RLS
+remains active. Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` only; never add
+the service-role key to the Render application.
 
 For a production upgrade, use a paid Render instance or Google Cloud Run with a billing budget and hard alerts. Do not switch simply to hide cold starts without adding cost controls.
 
@@ -40,21 +46,28 @@ Create a Pages project from the public GitHub repository.
 - Output directory: `dist`
 - `VITE_API_URL`: deployed FastAPI origin
 - `VITE_DEMO_MODE`: `false`
+- `VITE_SUPABASE_URL`: Supabase project URL
+- `VITE_SUPABASE_ANON_KEY`: Supabase publishable/anon key
 
 Static deployments contain no secrets. Supabase's publishable key is acceptable in the client only when RLS policies are correct.
+Add the final Pages origin to Supabase Auth's site URL and allowed redirect URLs.
+The browser persists the Supabase session, refreshes short-lived access tokens,
+and sends the current bearer token to FastAPI; never place a service-role key in
+any `VITE_` variable.
 
 ## Acceptance before calling production green
 
-Current status: **not production green**. Local V1 behavior is verified; the
-remaining authentication, production repository and live-RLS gates below are
-deliberately blocking a real-data deployment.
+Current status: **staging data path green, final domains pending**. Production
+JWT verification, repository access, anonymous denial and two-household live RLS
+isolation pass. Do not enter real finance data until the remaining final-domain
+and recovery gates below pass.
 
 - Magic-link login works on the final Pages domain.
-- A user cannot read another household through the API or direct Supabase calls.
+- [x] A user cannot read another household through the API or direct Supabase calls.
 - Quick Add creates a draft and does not write before confirmation.
 - A confirmed shared transaction updates account movement, personal spend and every selected member's receivable correctly.
 - Reload preserves the authenticated session and confirmed transaction.
 - CSV export reconstructs the ledger.
-- Mobile widths 320 px and 390 px have no overflow.
+- [x] Mobile widths 320 px and 390 px have no overflow.
 - API and browser logs contain no tokens or financial payloads.
 - A manual encrypted export is downloaded and restoration is tested.

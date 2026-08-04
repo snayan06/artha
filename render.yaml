@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: hisab-api-preview
+    name: hisab-api
     runtime: python
     plan: free
     rootDir: apps/api
@@ -11,9 +11,15 @@ services:
       - key: PYTHON_VERSION
         value: 3.13.2
       - key: HISAB_ENV
-        value: preview
+        value: production
       - key: HISAB_CORS_ORIGINS
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
       - key: HISAB_LLM_PROVIDER
         value: disabled
       - key: HISAB_GROQ_API_KEY

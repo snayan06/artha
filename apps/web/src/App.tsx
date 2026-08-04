@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Shell } from './components/Shell'
 import { demoDashboard, demoTransactions } from './data/demo'
 import { bootstrapDemo, confirmDraft, getDashboard, getMembers, getTransactions, setupOnboarding } from './lib/api'
+import { isDemoMode, useAuth } from './lib/auth'
 import { useRouter } from './lib/router'
 import { HomePage } from './pages/HomePage'
 import { OnboardingPage } from './pages/OnboardingPage'
+import { LoginPage, SessionLoadingPage } from './pages/LoginPage'
 import { QuickAddPage } from './pages/QuickAddPage'
 import { SharedPage } from './pages/SharedPage'
 import { TransactionsPage } from './pages/TransactionsPage'
@@ -15,9 +17,9 @@ const SETUP_KEY = 'hisab.setup.complete'
 const PROFILE_KEY = 'hisab.profile'
 const defaultProfile: UserProfile = { displayName: 'You', householdName: 'My household', members: [] }
 
-function loadProfile(): UserProfile {
+function loadProfile(profileKey: string): UserProfile {
   try {
-    const parsed = JSON.parse(localStorage.getItem(PROFILE_KEY) ?? '{}') as Partial<UserProfile>
+    const parsed = JSON.parse(localStorage.getItem(profileKey) ?? '{}') as Partial<UserProfile>
     return {
       displayName: parsed.displayName?.trim() || defaultProfile.displayName,
       householdName: parsed.householdName?.trim() || defaultProfile.householdName,
@@ -28,15 +30,27 @@ function loadProfile(): UserProfile {
   }
 }
 
-function persistSetup(profile: UserProfile) {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
-  localStorage.setItem(SETUP_KEY, 'true')
+function persistSetup(profile: UserProfile, profileKey: string, setupKey: string) {
+  localStorage.setItem(profileKey, JSON.stringify(profile))
+  localStorage.setItem(setupKey, 'true')
 }
 
 export default function App() {
+  const auth = useAuth()
+  if (auth.status === 'loading') return <SessionLoadingPage />
+  if (auth.status === 'unauthenticated' || auth.status === 'error') {
+    return <LoginPage configurationError={auth.status === 'error' ? auth.error : null} onSendLink={auth.signInWithMagicLink} />
+  }
+  const userKey = auth.user?.id
+  return <LedgerApp key={userKey ?? 'demo'} userKey={userKey} userEmail={auth.user?.email} onSignOut={auth.status === 'authenticated' ? auth.signOut : undefined} />
+}
+
+function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEmail?: string; onSignOut?: () => Promise<void> }) {
   const { path } = useRouter()
-  const [setupComplete, setSetupComplete] = useState(() => localStorage.getItem(SETUP_KEY) === 'true')
-  const [profile, setProfile] = useState<UserProfile>(loadProfile)
+  const setupKey = userKey ? `${SETUP_KEY}.${userKey}` : SETUP_KEY
+  const profileKey = userKey ? `${PROFILE_KEY}.${userKey}` : PROFILE_KEY
+  const [setupComplete, setSetupComplete] = useState(() => localStorage.getItem(setupKey) === 'true')
+  const [profile, setProfile] = useState<UserProfile>(() => loadProfile(profileKey))
   const [dashboard, setDashboard] = useState<Dashboard>(demoDashboard)
   const [transactions, setTransactions] = useState<Transaction[]>(demoTransactions)
   const [demoMode, setDemoMode] = useState(true)
@@ -53,9 +67,14 @@ export default function App() {
   }, [refreshLedger, setupComplete])
 
   async function finishSetup(accounts: AccountSetupInput[], nextProfile: UserProfile) {
-    const savedMembers = await setupOnboarding(accounts, nextProfile.members.map(({ name }) => ({ name })))
+    const savedMembers = await setupOnboarding(
+      accounts,
+      nextProfile.members.map(({ name }) => ({ name })),
+      nextProfile.displayName,
+      nextProfile.householdName
+    )
     const savedProfile = { ...nextProfile, members: savedMembers }
-    persistSetup(savedProfile)
+    persistSetup(savedProfile, profileKey, setupKey)
     setProfile(savedProfile)
     setSetupComplete(true)
   }
@@ -64,7 +83,7 @@ export default function App() {
     await bootstrapDemo()
     const demoMembers = await getMembers().catch(() => nextProfile.members)
     const demoProfile = { ...nextProfile, members: demoMembers }
-    persistSetup(demoProfile)
+    persistSetup(demoProfile, profileKey, setupKey)
     setProfile(demoProfile)
     setSetupComplete(true)
   }
@@ -83,7 +102,7 @@ export default function App() {
     return transaction
   }
 
-  if (!setupComplete) return <OnboardingPage onSave={finishSetup} onExploreDemo={exploreDemo} />
+  if (!setupComplete) return <OnboardingPage onSave={finishSetup} onExploreDemo={exploreDemo} allowDemo={isDemoMode()} />
 
   let page = <HomePage dashboard={dashboard} demoMode={demoMode} profile={profile} />
   if (path === '/transactions') page = <TransactionsPage transactions={transactions} demoMode={demoMode} />
@@ -91,5 +110,5 @@ export default function App() {
   if (path === '/add') page = <QuickAddPage onConfirm={addTransaction} members={profile.members} />
   if (path === '/assistant') page = <AssistantPage />
 
-  return <Shell>{page}</Shell>
+  return <Shell userEmail={userEmail} onSignOut={onSignOut}>{page}</Shell>
 }

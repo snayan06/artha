@@ -28,7 +28,7 @@ const newMoneyRow = (): MoneyRow => ({ id: nextRowId++, name: '', kind: 'bank', 
 const newCardRow = (): CardRow => ({ id: nextRowId++, name: '', outstanding: '', limit: '', statementDay: '', paymentDueDay: '' })
 const newMemberRow = (): MemberRow => ({ id: nextRowId++, name: '' })
 
-export function OnboardingPage({ onSave, onExploreDemo }: { onSave: (accounts: AccountSetupInput[], profile: UserProfile) => Promise<void>; onExploreDemo: (profile: UserProfile) => Promise<void> }) {
+export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { onSave: (accounts: AccountSetupInput[], profile: UserProfile) => Promise<void>; onExploreDemo: (profile: UserProfile) => Promise<void>; allowDemo?: boolean }) {
   const [step, setStep] = useState<'accounts' | 'review'>('accounts')
   const [moneyRows, setMoneyRows] = useState<MoneyRow[]>(() => [newMoneyRow()])
   const [cardRows, setCardRows] = useState<CardRow[]>([])
@@ -205,11 +205,11 @@ export function OnboardingPage({ onSave, onExploreDemo }: { onSave: (accounts: A
             </section>
 
             {error && <ErrorMessage message={error} />}
-            <div className="mt-8 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-              <Button variant="ghost" loading={demoLoading} onClick={() => void exploreDemo()} className="order-2 sm:order-1 sm:justify-self-start">Explore fictional demo</Button>
+            <div className={`mt-8 grid gap-3 sm:items-center ${allowDemo ? 'sm:grid-cols-[1fr_auto]' : 'sm:justify-end'}`}>
+              {allowDemo && <Button variant="ghost" loading={demoLoading} onClick={() => void exploreDemo()} className="order-2 sm:order-1 sm:justify-self-start">Explore fictional demo</Button>}
               <Button onClick={continueToReview} className="order-1 sm:order-2 sm:px-7">Review setup <ArrowRight className="h-4 w-4" /></Button>
             </div>
-            <p className="mt-3 text-center text-[11px] text-[#87928c] tone-subtle sm:text-right">Demo data is fictional and can be cleared later.</p>
+            {allowDemo && <p className="mt-3 text-center text-[11px] text-[#87928c] tone-subtle sm:text-right">Demo data is fictional and can be cleared later.</p>}
           </>
         ) : (
           <div className="mt-10 sm:mt-14">

@@ -21,7 +21,7 @@ Updated: 4 August 2026
 - [x] Implement shared expenses: full cash movement, member splits and receivables.
 - [x] Implement correction and soft deletion in the local API.
 - [x] Add idempotency protection for confirmed writes and concurrent demo startup.
-- [ ] Add demo SQLite repository and production Supabase repository boundary.
+- [x] Add demo SQLite repository and production Supabase REST/RPC repository boundary.
 - [x] Test balance, transfer, credit-card and split invariants in the local API.
 
 ## Milestone 2 — five-second capture

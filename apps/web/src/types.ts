@@ -1,4 +1,5 @@
 export type Paise = number
+export type EntityId = string | number
 
 export type SetupAccountKind = 'bank' | 'cash' | 'wallet' | 'credit_card'
 
@@ -12,7 +13,7 @@ export interface AccountSetupInput {
 }
 
 export interface LedgerAccount {
-  id?: number
+  id?: EntityId
   name: string
   kind: SetupAccountKind
 }
@@ -49,7 +50,7 @@ export interface Transaction {
   merchant: string
   category: string
   account: string
-  sourceAccountId?: number
+  sourceAccountId?: EntityId
   occurredAt: string
   note?: string
   memberSplits: TransactionSplit[]
@@ -62,7 +63,7 @@ export interface TransactionDraft {
   merchant: string
   category: string
   account: string
-  sourceAccountId?: number
+  sourceAccountId?: EntityId
   occurredAt: string
   note: string
   memberSplits: TransactionSplit[]

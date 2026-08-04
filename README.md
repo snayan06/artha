@@ -10,10 +10,10 @@ in natural language, understanding spending, and correctly accounting for
 shared household expenses.
 
 > [!IMPORTANT]
-> Hisab V1 is a verified local/private-pilot build, not a production release.
-> Production mode intentionally fails closed until Supabase JWT verification,
-> the production repository adapter, and live RLS isolation tests are complete.
-> Use fictional data in the current preview.
+> Hisab V1 has a verified local build and a live Supabase staging data path.
+> Production JWT verification, the REST/RPC repository and two-household RLS
+> isolation pass. Final hosting, magic-link and recovery acceptance is still
+> pending, so use fictional data until the deployment runbook is fully green.
 
 ## Why Hisab?
 
@@ -52,7 +52,7 @@ flowchart LR
     API --> PARSER["Deterministic capture parser"]
     API --> LEDGER["Ledger service"]
     LEDGER --> LOCAL["SQLite local demo"]
-    LEDGER -. "production adapter pending" .-> DB["Supabase Postgres and RLS"]
+    LEDGER --> DB["Supabase Postgres and RLS"]
     API --> ASSISTANT["Validated assistant UI"]
     ASSISTANT -. "hosted default" .-> GROQ["Groq and Qwen3.6-27B"]
     ASSISTANT -. "local fallback" .-> OLLAMA["Ollama and Qwen3 4B"]
@@ -63,7 +63,7 @@ flowchart LR
 | Web | React 19, TypeScript, Vite, Tailwind CSS, Recharts |
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async |
 | Local data | SQLite and aiosqlite |
-| Production data design | Supabase Postgres, Auth and RLS |
+| Production data | Supabase Postgres, Auth, RLS and REST/RPC adapter |
 | Optional AI | Open-weight Qwen via Groq or local Ollama; deterministic fallback |
 | Quality | Vitest, pytest, ESLint, Ruff and strict mypy |
 | CI | GitHub Actions |
@@ -84,7 +84,7 @@ hisab/
 │   └── tests/            # SQL catalog assertions
 ├── docs/                 # PRD, architecture, deployment and decisions
 ├── .github/workflows/    # CI
-└── render.yaml           # Disposable preview blueprint
+└── render.yaml           # Production-mode private-pilot blueprint
 ```
 
 ## Run locally
@@ -168,23 +168,21 @@ Ruff, strict mypy and pytest.
 ## Deployment status
 
 The intended ₹0 private-pilot topology is Cloudflare Pages for the PWA, Render
-Free for FastAPI, and Supabase Free for authentication and Postgres. The
-checked-in Render blueprint uses ephemeral SQLite and is strictly a disposable
-preview. It must not be used for real financial records.
+Free for FastAPI, and Supabase Free for authentication and Postgres. The live
+Supabase staging schema, authenticated repository and RLS isolation exercise
+are green. The checked-in Render blueprint now starts only in production mode.
 
 Before production can be called green:
 
-- verify Supabase access tokens using issuer, audience, expiry and JWKS;
-- connect FastAPI to the versioned Supabase schema and atomic functions;
-- execute migrations and cross-household RLS tests against real Postgres;
+- deploy and verify the final Render and Pages URLs;
+- verify magic-link login, refresh and sign-out on the final domain;
 - verify final-domain authentication, export and restore behavior.
 
 See [the deployment runbook](docs/DEPLOYMENT.md) for the complete acceptance gate.
 
 ## Roadmap
 
-- Real Supabase authentication and production persistence.
-- Account onboarding and encrypted export/restore.
+- Encrypted export/restore and final-domain recovery drills.
 - Member invitations and collaborative household access.
 - Optional WhatsApp or Telegram draft capture.
 - Read-only analytics agent with validated inline metric, chart and table UI.
