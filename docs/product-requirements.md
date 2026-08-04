@@ -1,4 +1,4 @@
-# Hisab — MVP Product Requirements Document
+# Artha — MVP Product Requirements Document
 
 Status: Draft v1
 Date: 4 August 2026
@@ -10,7 +10,7 @@ Build a mobile-first installable web app first. Its main interaction should feel
 
 Do not make WhatsApp the only interface. It cannot be guaranteed to remain free, it adds Meta setup and policy dependency, and it makes detailed review and correction harder. Add WhatsApp later as an optional capture channel. A Telegram bot can be the truly free chat-channel experiment if needed.
 
-Working name: **Hisab**
+Working name: **Artha**
 Promise: **“Track money in five seconds, understand it anytime.”**
 
 ## 2. Problem
@@ -99,7 +99,7 @@ Money trackers fail because recording every payment feels like work. They also c
 
 1. User opens the app directly to a persistent “What happened?” field.
 2. User types or speaks one sentence.
-3. Hisab displays a compact draft in under two seconds.
+3. Artha displays a compact draft in under two seconds.
 4. High-confidence fields are prefilled; uncertain fields are visibly marked.
 5. User taps **Confirm**. The dashboard and shared balance update together.
 
@@ -169,7 +169,7 @@ A card purchase increases card liability. Paying the card is an account transfer
 
 Edits preserve an audit record. Deletes are soft deletes. Recalculations happen transactionally so balances, splits, and settlements cannot diverge.
 
-## 9. V2 Ask Hisab design
+## 9. V2 Ask Artha design
 
 Supported V2 intents:
 
@@ -214,7 +214,7 @@ All money values use integer paise, never floating-point numbers.
 |---|---|---|
 | Product design | Figma Starter | Free personal drafts, components, Auto Layout, clickable prototype |
 | Client | React + TypeScript + Vite PWA | Fast, installable, familiar ecosystem |
-| UI | Tailwind CSS + shadcn/ui | Accessible primitives and quick iteration |
+| UI | Tailwind CSS + repository UI components | Accessible controls and quick iteration without an unused framework dependency |
 | Hosting | Cloudflare Pages | Free static hosting and preview deployments |
 | Auth + database | Supabase Free | Managed Postgres, magic links, row-level security, realtime, storage |
 | API | Python 3.13 + FastAPI + Pydantic v2 on Render Free | Typed APIs and a clean path to the V2 agent |
@@ -256,7 +256,7 @@ WhatsApp Business Platform pricing and policies are changing and cannot be treat
 
 ## 13. Figma prototype plan
 
-Use one Figma Draft file named `Hisab — MVP`. Starter is suitable for a personal prototype, but View-seat MCP automation is heavily rate-limited; design work may need to continue manually or after quota renewal.
+Use one Figma Draft file named `Artha — MVP`. Starter is suitable for a personal prototype, but View-seat MCP automation is heavily rate-limited; design work may need to continue manually or after quota renewal.
 
 ### Page 1 — Foundation
 
@@ -294,7 +294,7 @@ Prototype these tasks:
 
 ### Ready-to-paste Figma Make prompt
 
-> Design a mobile-first personal and shared money tracker named Hisab for a configurable household with zero or more family members. Use a calm, trustworthy green-neutral visual system, INR formatting, 390x844 mobile frames, accessible contrast, and bottom navigation: Home, Add, Insights, Family. The primary action is a conversational field labeled “What happened?” that turns “Paid 1840 for groceries from HDFC UPI, split equally with two family members, 3 days ago” into a review card showing debit, amount, groceries, HDFC UPI, date, selected members, account movement, personal expense, and per-member receivables. Never auto-save; include a clear Confirm button and uncertainty states. Create Home with a six-month spending chart, onboarding/opening balances, quick-add text and form modes, parsed review, transactions, family settlement, and correction screens. Also show a read-only assistant chat that can render approved inline charts, cards and transaction tables. Keep the interface compact, friendly, and data-first; avoid crypto visuals and dense finance dashboards.
+> Design a mobile-first personal and shared money tracker named Artha for a configurable household with zero or more family members. Use a calm, trustworthy green-neutral visual system, INR formatting, 390x844 mobile frames, accessible contrast, and bottom navigation: Home, Add, Insights, Family. The primary action is a conversational field labeled “What happened?” that turns “Paid 1840 for groceries from HDFC UPI, split equally with two family members, 3 days ago” into a review card showing debit, amount, groceries, HDFC UPI, date, selected members, account movement, personal expense, and per-member receivables. Never auto-save; include a clear Confirm button and uncertainty states. Create Home with a six-month spending chart, onboarding/opening balances, quick-add text and form modes, parsed review, transactions, family settlement, and correction screens. Also show a read-only assistant chat that can render approved inline charts, cards and transaction tables. Keep the interface compact, friendly, and data-first; avoid crypto visuals and dense finance dashboards.
 
 ## 14. Framer’s role
 
@@ -364,7 +364,7 @@ The MVP is ready only when:
 - Percentage of drafts confirmed without edits.
 - Parser correction rate by field.
 - Transactions recorded per active week.
-- Imported statement transactions missing from Hisab.
+- Imported statement transactions missing from Artha.
 - Shared-balance disputes/corrections.
 - Ask answers opened into source transactions.
 

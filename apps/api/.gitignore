@@ -4,6 +4,6 @@
 .ruff_cache/
 __pycache__/
 *.pyc
-hisab.db
+artha.db
 *.db-shm
 *.db-wal

@@ -25,7 +25,7 @@ describe('OnboardingPage', () => {
     await user.type(screen.getByLabelText('Credit card 1 statement day'), '5')
     await user.type(screen.getByLabelText('Credit card 1 payment due day'), '25')
     await user.click(screen.getByRole('button', { name: 'Review setup' }))
-    await user.click(screen.getByRole('button', { name: 'Save setup and open Hisab' }))
+    await user.click(screen.getByRole('button', { name: 'Save setup and open Artha' }))
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
     expect(onSave).toHaveBeenCalledWith([

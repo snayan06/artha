@@ -61,6 +61,6 @@ and confirmation workflow.
 The experimental private-pilot default is Qwen3.6-27B through Groq. Local/private
 use can select Qwen3 4B through Ollama. Both providers implement the same
 internal interface and strict response schema. When a provider is missing,
-rate-limited, unavailable or returns invalid output, Hisab falls back to manual
+rate-limited, unavailable or returns invalid output, Artha falls back to manual
 category selection without blocking transaction entry. A representative model
 comparison is tracked in the backlog before any production model is locked.

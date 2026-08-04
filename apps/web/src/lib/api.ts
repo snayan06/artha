@@ -266,7 +266,7 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
     })
     const result = response.result && typeof response.result === 'object' ? response.result as JsonObject : response
     const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
-    const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Hisab assistant', 80)
+    const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
     const model = safeText(response.model, '', 80)
     const intent = safeText(result.intent, 'ledger', 40).replaceAll('_', ' ')
     return {

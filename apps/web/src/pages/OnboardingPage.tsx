@@ -125,7 +125,7 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
         <header className="flex items-center justify-between">
           <div className="flex min-h-11 items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-moss-900 font-display text-xl font-bold text-white dark:bg-[#27604e]">H</span>
-            <div><p className="font-display text-lg font-bold leading-none">Hisab</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
+            <div><p className="font-display text-lg font-bold leading-none">Artha</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
           </div>
           <div className="flex items-center gap-2"><ThemeControl /><Badge tone="green">Step {step === 'accounts' ? '1' : '2'} of 2</Badge></div>
         </header>
@@ -135,7 +135,7 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
             <div className="mt-10 sm:mt-14">
               <div className="flex items-center gap-2 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" /> Let’s set up your starting point</div>
               <h1 className="font-display mt-3 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Where does your money live?</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-[#6e7b74] tone-muted">Add today’s balances. Hisab stores them as opening entries, then keeps the total updated from confirmed transactions.</p>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-[#6e7b74] tone-muted">Add today’s balances. Artha stores them as opening entries, then keeps the total updated from confirmed transactions.</p>
             </div>
 
             <Card className="mt-7 p-4 sm:p-5">
@@ -148,7 +148,7 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
 
             <section className="mt-7" aria-labelledby="members-heading">
               <div className="mb-3 flex items-end justify-between gap-3"><div><div className="flex items-center gap-2"><h2 id="members-heading" className="font-display text-lg font-bold">Family members</h2><Badge>Optional</Badge></div><p className="mt-1 text-xs text-[#77837d] tone-muted">Add anyone you regularly split expenses with.</p></div><Button variant="secondary" className="shrink-0 px-3" onClick={() => setMemberRows((rows) => [...rows, newMemberRow()])} icon={<Plus className="h-4 w-4" />}>Add</Button></div>
-              {memberRows.length === 0 ? <button onClick={() => setMemberRows([newMemberRow()])} className="flex min-h-20 w-full items-center gap-3 rounded-[22px] border border-dashed border-moss-300 bg-moss-50/50 px-4 text-left transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-raised"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-moss-800"><UsersRound className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Add a family member</span><span className="mt-1 block text-xs text-[#748079] tone-muted">You can also keep Hisab completely personal.</span></span></button> : <div className="space-y-3">{memberRows.map((member, index) => <Card key={member.id} className="flex items-end gap-3 p-4"><div className="min-w-0 flex-1"><SetupField label={`Member ${index + 1}`} ariaLabel={`Family member ${index + 1} name`} placeholder="Name" value={member.name} onChange={(name) => setMemberRows((rows) => rows.map((item) => item.id === member.id ? { ...item, name } : item))} /></div><button onClick={() => setMemberRows((rows) => rows.filter((item) => item.id !== member.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove family member ${index + 1}`}><Trash2 className="h-4 w-4" /></button></Card>)}</div>}
+              {memberRows.length === 0 ? <button onClick={() => setMemberRows([newMemberRow()])} className="flex min-h-20 w-full items-center gap-3 rounded-[22px] border border-dashed border-moss-300 bg-moss-50/50 px-4 text-left transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-raised"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-moss-800"><UsersRound className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Add a family member</span><span className="mt-1 block text-xs text-[#748079] tone-muted">You can also keep Artha completely personal.</span></span></button> : <div className="space-y-3">{memberRows.map((member, index) => <Card key={member.id} className="flex items-end gap-3 p-4"><div className="min-w-0 flex-1"><SetupField label={`Member ${index + 1}`} ariaLabel={`Family member ${index + 1} name`} placeholder="Name" value={member.name} onChange={(name) => setMemberRows((rows) => rows.map((item) => item.id === member.id ? { ...item, name } : item))} /></div><button onClick={() => setMemberRows((rows) => rows.filter((item) => item.id !== member.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove family member ${index + 1}`}><Trash2 className="h-4 w-4" /></button></Card>)}</div>}
             </section>
 
             <section className="mt-7" aria-labelledby="money-accounts-heading">
@@ -235,9 +235,9 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
               </div>
             </Card>
 
-            <div className="mt-5 flex items-start gap-2 rounded-2xl border border-moss-200 bg-moss-50 p-4 text-xs leading-5 text-[#637069] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" /><p>Hisab stores money in integer paise and never posts a transaction from natural language until you explicitly confirm it.</p></div>
+            <div className="mt-5 flex items-start gap-2 rounded-2xl border border-moss-200 bg-moss-50 p-4 text-xs leading-5 text-[#637069] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" /><p>Artha stores money in integer paise and never posts a transaction from natural language until you explicitly confirm it.</p></div>
             {error && <ErrorMessage message={error} />}
-            <Button onClick={() => void save()} loading={saving} className="mt-6 w-full" icon={<Check className="h-4 w-4" />}>Save setup and open Hisab</Button>
+            <Button onClick={() => void save()} loading={saving} className="mt-6 w-full" icon={<Check className="h-4 w-4" />}>Save setup and open Artha</Button>
           </div>
         )}
       </div>

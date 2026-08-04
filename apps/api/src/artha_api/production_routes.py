@@ -355,7 +355,7 @@ async def confirm_transaction(
             "p_idempotency_key": idempotency_key,
             "p_merchant": payload.description,
             "p_note": payload.notes,
-            "p_metadata": {"source": "hisab-api"},
+            "p_metadata": {"source": "artha-api"},
         },
     )
     result["transaction_splits"] = splits

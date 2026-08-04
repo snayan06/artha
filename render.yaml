@@ -1,18 +1,18 @@
 services:
   - type: web
-    name: hisab-api
+    name: artha-api
     runtime: python
     plan: free
     rootDir: apps/api
     buildCommand: pip install uv && uv sync --frozen --no-dev
-    startCommand: uv run uvicorn hisab_api.app:app --host 0.0.0.0 --port $PORT
+    startCommand: uv run uvicorn artha_api.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.2
-      - key: HISAB_ENV
+      - key: ARTHA_ENV
         value: production
-      - key: HISAB_CORS_ORIGINS
+      - key: ARTHA_CORS_ORIGINS
         sync: false
       - key: SUPABASE_URL
         sync: false
@@ -20,7 +20,7 @@ services:
         sync: false
       - key: SUPABASE_JWT_AUDIENCE
         value: authenticated
-      - key: HISAB_LLM_PROVIDER
+      - key: ARTHA_LLM_PROVIDER
         value: disabled
-      - key: HISAB_GROQ_API_KEY
+      - key: ARTHA_GROQ_API_KEY
         sync: false

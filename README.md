@@ -1,23 +1,24 @@
-# Hisab
+# Artha
 
-[![CI](https://github.com/snayan06/hisab/actions/workflows/ci.yml/badge.svg)](https://github.com/snayan06/hisab/actions/workflows/ci.yml)
+[![CI](https://github.com/snayan06/artha/actions/workflows/ci.yml/badge.svg)](https://github.com/snayan06/artha/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB.svg)](https://www.python.org/)
 [![React 19](https://img.shields.io/badge/React-19-149ECA.svg)](https://react.dev/)
 
-Hisab is an open-source, mobile-first money tracker for recording transactions
+Artha is an open-source, mobile-first money tracker for recording transactions
 in natural language, understanding spending, and correctly accounting for
 shared household expenses.
 
 > [!IMPORTANT]
-> Hisab V1 has a verified local build and a live Supabase staging data path.
+> Artha V1 has a verified local build and a tested legacy Supabase staging path.
 > Production JWT verification, the REST/RPC repository and two-household RLS
-> isolation pass. Final hosting, magic-link and recovery acceptance is still
-> pending, so use fictional data until the deployment runbook is fully green.
+> isolation pass, but that staging project is under the wrong account and will
+> not be used for launch. Personal hosting, magic-link and recovery acceptance
+> are still pending, so use fictional data until the deployment runbook is green.
 
-## Why Hisab?
+## Why Artha?
 
-Most expense trackers make capture slower than the purchase itself. Hisab is
+Most expense trackers make capture slower than the purchase itself. Artha is
 built around a five-second workflow:
 
 1. Write `Paid 1840 for groceries from HDFC UPI, split with family, 3 days ago`.
@@ -75,7 +76,7 @@ income, and confirmed writes are idempotent.
 ## Repository layout
 
 ```text
-hisab/
+artha/
 ├── apps/
 │   ├── web/              # React PWA
 │   └── api/              # FastAPI service and ledger rules
@@ -97,8 +98,8 @@ Requirements:
 - GNU Make (optional; the underlying commands also work directly)
 
 ```bash
-git clone https://github.com/snayan06/hisab.git
-cd hisab
+git clone https://github.com/snayan06/artha.git
+cd artha
 cp .env.example .env
 make setup
 ```
@@ -126,13 +127,13 @@ adapter and is not trusted to write or calculate ledger values. To enable it,
 create a Groq API key and keep it only in the API environment:
 
 ```dotenv
-HISAB_LLM_PROVIDER=groq
-HISAB_GROQ_API_KEY=your-server-side-key
-HISAB_GROQ_MODEL=qwen/qwen3.6-27b
+ARTHA_LLM_PROVIDER=groq
+ARTHA_GROQ_API_KEY=your-server-side-key
+ARTHA_GROQ_MODEL=qwen/qwen3.6-27b
 ```
 
 For a private local fallback, install Ollama, pull `qwen3:4b-instruct`, and set
-`HISAB_LLM_PROVIDER=ollama`. Provider failure falls back to deterministic cards
+`ARTHA_LLM_PROVIDER=ollama`. Provider failure falls back to deterministic cards
 and manual tagging; it never blocks ledger capture.
 
 ## Quality gate
@@ -169,14 +170,17 @@ Ruff, strict mypy and pytest.
 
 ## Deployment status
 
-The intended ₹0 private-pilot topology is Cloudflare Pages for the PWA, Render
-Free for FastAPI, and Supabase Free for authentication and Postgres. The live
-Supabase staging schema, authenticated repository and RLS isolation exercise
-are green. The checked-in Render blueprint now starts only in production mode.
+The application and database contracts are ready, but the final personal-account
+hosting topology is intentionally not locked yet. The previous Cloudflare Pages,
+Render Free and Supabase Free topology remains a tested baseline; Vercel for the
+PWA and FastAPI plus Supabase is the leading simpler option under review. The
+legacy Supabase staging schema and RLS isolation exercise are green, but that
+project is not approved for real Artha data.
 
 Before production can be called green:
 
-- deploy and verify the final Render and Pages URLs;
+- create personal hosting and Supabase accounts with no legacy account ownership;
+- deploy and verify the final API and PWA URLs;
 - verify magic-link login, refresh and sign-out on the final domain;
 - verify final-domain authentication, export and restore behavior.
 

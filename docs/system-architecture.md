@@ -1,11 +1,11 @@
-# Hisab — Overall System Architecture and Deployment Plan
+# Artha — Overall System Architecture and Deployment Plan
 
-Status: Proposed for implementation
+Status: V1 implemented; personal-account deployment decision pending
 Date: 4 August 2026
 
 ## Architecture decision
 
-Build Hisab as an installable React PWA, styled with Tailwind CSS, backed by a Python FastAPI service and Supabase Postgres. Keep transaction capture deterministic and confirmation-based. Ship the agent behind a separate read-only, provider-independent boundary so the ledger remains usable when AI is unavailable.
+Build Artha as an installable React PWA, styled with Tailwind CSS, backed by a Python FastAPI service and Supabase Postgres. Keep transaction capture deterministic and confirmation-based. Ship the agent behind a separate read-only, provider-independent boundary so the ledger remains usable when AI is unavailable.
 
 This is the complete product architecture: user interface, API, authentication, database, agent, hosting, security and deployment. Python is only the backend and agent layer; it does not replace the React user interface.
 
@@ -14,7 +14,7 @@ This is the complete product architecture: user interface, API, authentication, 
 | Layer | Choice | Decision reason |
 |---|---|---|
 | Web application | React + TypeScript + Vite PWA | App screens, state, routing, forms, offline drafts and installation |
-| Styling and UI system | Tailwind CSS + Radix/shadcn primitives | Layout, colours, spacing and accessible reusable controls |
+| Styling and UI system | Tailwind CSS + repository UI components | Layout, colours, spacing and accessible reusable controls |
 | Charts | Recharts | Controlled dashboard and agent-generated charts |
 | API | Python 3.13, FastAPI, Pydantic v2, Uvicorn | Typed contracts, async APIs, automatic OpenAPI docs |
 | Assistant | Strict Pydantic schemas with a model-provider adapter | Typed tool schemas and structured output without coupling the ledger to a provider |
@@ -53,15 +53,16 @@ The browser signs in through Supabase and sends its short-lived access token to 
 
 ### V1 endpoints
 
-- `POST /v1/capture/parse`: turn natural language into an unsaved `TransactionDraft`.
-- `POST /v1/transactions`: confirm and atomically save a reviewed draft.
-- `GET /v1/dashboard`: balances, monthly totals, category mix and spend trend.
-- `GET /v1/transactions`: searchable and filterable ledger.
-- `PATCH /v1/transactions/{id}`: audited correction with balance recalculation.
-- `DELETE /v1/transactions/{id}`: soft delete only.
-- `GET /v1/shared`: calculated balances and unsettled items for every household member.
-- `POST /v1/settlements`: record a settlement without creating false income.
-- `GET /v1/export.csv`: complete user-owned data export.
+- `POST /api/v1/drafts/parse`: turn natural language into an unsaved `TransactionDraft`.
+- `POST /api/v1/transactions/confirm`: confirm and atomically save a reviewed draft.
+- `GET /api/v1/dashboard`: balances, monthly totals, category mix and spend trend.
+- `GET /api/v1/transactions`: searchable and filterable ledger.
+- `PATCH /api/v1/transactions/{id}`: audited correction with balance recalculation.
+- `DELETE /api/v1/transactions/{id}`: soft delete only.
+- `GET /api/v1/shared-balances`: calculated balances for every household member.
+
+Settlement and complete user-owned export endpoints remain launch-gate work and
+must not be represented as complete production APIs.
 
 Every write accepts an idempotency key. Amounts are integer paise. Shared expense creation, edit and settlement run in database transactions.
 
@@ -132,7 +133,7 @@ This is genuinely usable at ₹0 for the user's private pilot. The limitations a
 - Render spins a free API down after 15 idle minutes and the next request can take about a minute.
 - Supabase can pause a free project after one inactive week and does not include managed backups.
 - Free hosted AI capacity is capped and provider policies can change; capture still works through rules and manual review.
-- Qwen3.6-27B is an experimental pilot choice; a Hisab-specific model evaluation is required before production lock-in.
+- Qwen3.6-27B is an experimental pilot choice; a Artha-specific model evaluation is required before production lock-in.
 - A custom domain and WhatsApp Business messaging are not included in the ₹0 promise.
 
 If Render cold starts make capture feel slow, the next host is Google Cloud Run with request-based scaling. Its free tier is generous, but it requires a billing account and can charge after quotas, so it is not the default for a strict no-billing MVP.
@@ -142,7 +143,7 @@ Current official references: [Render Free](https://render.com/docs/free), [Rende
 ## Repository shape
 
 ```text
-hisab/
+artha/
   apps/
     web/                 # React PWA
     api/                 # FastAPI application

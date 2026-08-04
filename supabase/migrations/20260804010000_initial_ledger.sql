@@ -1,4 +1,4 @@
--- Hisab V1 production ledger schema.
+-- Artha V1 production ledger schema.
 -- Security boundary: clients use the authenticated role and RLS. The service_role
 -- is intentionally reserved for trusted server operations and Supabase maintenance.
 
@@ -314,7 +314,7 @@ begin
     coalesce(
       nullif(trim(new.raw_user_meta_data ->> 'display_name'), ''),
       nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
-      split_part(coalesce(new.email, 'Hisab user'), '@', 1)
+      split_part(coalesce(new.email, 'Artha user'), '@', 1)
     )
   )
   on conflict (id) do nothing;

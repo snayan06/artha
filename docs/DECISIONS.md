@@ -27,6 +27,6 @@ hosted model because it supports text, images, reasoning, tool use and structure
 JSON through one provider. Deterministic parsing and merchant rules still run
 first, and the model cannot write transactions or calculate ledger totals.
 
-A representative Hisab evaluation and comparison against other hosted models is
+A representative Artha evaluation and comparison against other hosted models is
 required before a production model is locked. That evaluation is backlog work
 and does not block the V1 private pilot.

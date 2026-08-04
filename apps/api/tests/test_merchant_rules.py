@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from hisab_api.models import MerchantMatchType, MerchantRule
+from artha_api.models import MerchantMatchType, MerchantRule
 
 
 def account_id(data: dict[str, Any], name: str) -> int:

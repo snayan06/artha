@@ -7,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from hisab_api.app import create_app
+from artha_api.app import create_app
 
 
 @pytest.fixture

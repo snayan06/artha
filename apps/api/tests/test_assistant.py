@@ -5,7 +5,7 @@ import json
 import httpx
 import pytest
 
-from hisab_api.assistant import (
+from artha_api.assistant import (
     AssistantFinancialContext,
     AssistantSettings,
     ContextCategory,
@@ -297,7 +297,7 @@ async def test_assistant_endpoints_are_read_only_when_provider_is_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert bootstrapped["created"] is True
-    monkeypatch.setenv("HISAB_LLM_PROVIDER", "disabled")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "disabled")
     before = (await client.get("/api/v1/transactions")).json()
 
     status_response = await client.get("/api/v1/assistant/status")

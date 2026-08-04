@@ -1,4 +1,4 @@
-# Hisab repository guidance
+# Artha repository guidance
 
 ## Product invariants
 

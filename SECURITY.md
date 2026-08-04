@@ -1,6 +1,6 @@
 # Security policy
 
-Hisab handles private financial records. Do not open public issues containing transaction data, access tokens, account labels, database URLs or screenshots of real balances.
+Artha handles private financial records. Do not open public issues containing transaction data, access tokens, account labels, database URLs or screenshots of real balances.
 
 ## Design controls
 
@@ -14,7 +14,7 @@ Hisab handles private financial records. Do not open public issues containing tr
 ## Reporting a problem
 
 Do not open a public issue for a suspected vulnerability. Use GitHub's
-[private vulnerability reporting](https://github.com/snayan06/hisab/security/advisories/new)
+[private vulnerability reporting](https://github.com/snayan06/artha/security/advisories/new)
 or contact the repository owner privately. Include reproduction steps using
 fictional data only.
 

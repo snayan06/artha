@@ -1,4 +1,4 @@
-# Hisab task list
+# Artha task list
 
 Updated: 4 August 2026
 
@@ -68,6 +68,20 @@ Updated: 4 August 2026
 - [x] Document deployment steps for Pages, Render and Supabase.
 - [x] Record remaining V1 limitations explicitly.
 
+## Milestone 6 — Artha private-pilot launch
+
+- [x] Rename the product, packages, environment variables and documentation from Artha's former working name.
+- [ ] Select the final ₹0 hosting topology; compare the Vercel + Supabase recommendation against the documented container-hosting alternatives.
+- [ ] Create personal hosting and Supabase accounts with no legacy account ownership.
+- [ ] Create a fresh Artha Supabase project and apply all versioned migrations.
+- [ ] Repeat anonymous-denial and two-household RLS isolation against the fresh project.
+- [ ] Deploy the FastAPI API and React PWA, then configure exact CORS and magic-link redirect origins.
+- [ ] Add the server-side Groq key and enable experimental Qwen3.6-27B without exposing it to the browser.
+- [ ] Test login, onboarding, four bank accounts, multiple cards, backdated capture and family splits on the final domain.
+- [ ] Verify mobile layouts at 320 px and 390 px plus desktop, including light and dark modes.
+- [ ] Implement encrypted export/restore and complete a recovery drill before entering real financial data.
+- [ ] Record final URLs, ownership, environment inventory and acceptance evidence in `docs/artifacts/qa/`.
+
 ## Assistant preview and V2
 
 - [ ] Invite selected participants as authenticated household members.
@@ -76,6 +90,6 @@ Updated: 4 August 2026
 - [x] Return validated metric, chart and transaction-table schemas.
 - [ ] Show evidence date range, source count and matching transactions.
 - [ ] Add evaluation cases for totals, comparisons and affordability questions.
-- [ ] Build a representative 50-case Hisab model benchmark covering Indian merchants, backdated entries, account selection, family splits, categories, tool choice and structured UI; compare Qwen3.6-27B with at least two current hosted alternatives before production lock-in.
+- [ ] Build a representative 50-case Artha model benchmark covering Indian merchants, backdated entries, account selection, family splits, categories, tool choice and structured UI; compare Qwen3.6-27B with at least two current hosted alternatives before production lock-in.
 - [ ] Add optional Telegram/WhatsApp capture adapter.
 - [ ] Add investments, liabilities and net-worth model.

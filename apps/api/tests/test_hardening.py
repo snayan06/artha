@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import BigInteger, insert, select
 
-from hisab_api.app import create_app, resolve_database_url
-from hisab_api.models import (
+from artha_api.app import create_app, resolve_database_url
+from artha_api.models import (
     Account,
     HouseholdMember,
     LedgerEntry,
@@ -31,9 +31,9 @@ async def app_client(database_path: Path) -> AsyncIterator[tuple[AsyncClient, Fa
 
 
 def test_production_storage_never_uses_demo_database(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("HISAB_ENV", "production")
-    monkeypatch.delenv("HISAB_DATABASE_URL", raising=False)
-    monkeypatch.delenv("HISAB_ALLOW_DEMO_STORAGE", raising=False)
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.delenv("ARTHA_DATABASE_URL", raising=False)
+    monkeypatch.delenv("ARTHA_ALLOW_DEMO_STORAGE", raising=False)
 
     with pytest.raises(RuntimeError, match="uses Supabase REST/RPC"):
         resolve_database_url()
@@ -42,7 +42,7 @@ def test_production_storage_never_uses_demo_database(monkeypatch: pytest.MonkeyP
     with pytest.raises(RuntimeError, match="uses Supabase REST/RPC"):
         resolve_database_url("sqlite+aiosqlite:///unsafe.db")
 
-    monkeypatch.setenv("HISAB_ALLOW_DEMO_STORAGE", "true")
+    monkeypatch.setenv("ARTHA_ALLOW_DEMO_STORAGE", "true")
     with pytest.raises(RuntimeError, match="uses Supabase REST/RPC"):
         resolve_database_url("sqlite+aiosqlite:///explicit-demo.db")
 
@@ -50,7 +50,7 @@ def test_production_storage_never_uses_demo_database(monkeypatch: pytest.MonkeyP
 def test_preview_mode_explicitly_allows_disposable_sqlite(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("HISAB_ENV", "preview")
+    monkeypatch.setenv("ARTHA_ENV", "preview")
 
     assert resolve_database_url("sqlite+aiosqlite:///preview.db").endswith("preview.db")
 
@@ -58,8 +58,8 @@ def test_preview_mode_explicitly_allows_disposable_sqlite(
 async def test_demo_user_id_is_environment_driven(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("HISAB_ENV", "development")
-    monkeypatch.setenv("HISAB_DEMO_USER_ID", "local-demo-owner")
+    monkeypatch.setenv("ARTHA_ENV", "development")
+    monkeypatch.setenv("ARTHA_DEMO_USER_ID", "local-demo-owner")
 
     async with app_client(tmp_path / "demo-user.db") as (client, app):
         response = await client.post("/api/v1/demo/bootstrap")

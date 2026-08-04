@@ -2,7 +2,7 @@
 
 ## Our commitment
 
-We are committed to making participation in Hisab respectful, inclusive and
+We are committed to making participation in Artha respectful, inclusive and
 harassment-free for everyone, regardless of background, identity, experience
 or personal characteristics.
 

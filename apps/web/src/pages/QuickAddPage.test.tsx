@@ -27,7 +27,7 @@ describe('QuickAddPage', () => {
 
     await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
-    expect(await screen.findByText(/added to your hisab/i)).toBeInTheDocument()
+    expect(await screen.findByText(/added to your artha/i)).toBeInTheDocument()
   })
 
   it('offers a form-first entry with an explicit date picker', async () => {

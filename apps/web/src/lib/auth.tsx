@@ -48,7 +48,7 @@ function getSupabaseClient(): SupabaseClient | null {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         flowType: 'pkce',
-        storageKey: 'hisab.auth'
+        storageKey: 'artha.auth'
       }
     })
   }

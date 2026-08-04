@@ -15,7 +15,7 @@ from .models import Base
 
 
 def default_database_url() -> str:
-    database_path = Path(__file__).resolve().parents[2] / "hisab.db"
+    database_path = Path(__file__).resolve().parents[2] / "artha.db"
     return f"sqlite+aiosqlite:///{database_path}"
 
 

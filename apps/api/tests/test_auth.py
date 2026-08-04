@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from starlette.requests import Request
 
-from hisab_api.auth import (
+from artha_api.auth import (
     AuthContext,
     JwksUnavailableError,
     JwtVerificationError,

@@ -1,6 +1,6 @@
 export type ThemePreference = 'light' | 'dark' | 'system'
 
-export const THEME_STORAGE_KEY = 'hisab.theme'
+export const THEME_STORAGE_KEY = 'artha.theme'
 
 export function getThemePreference(): ThemePreference {
   const stored = localStorage.getItem(THEME_STORAGE_KEY)

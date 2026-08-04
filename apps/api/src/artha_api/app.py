@@ -18,21 +18,21 @@ from .supabase_rest import SupabaseRestSettings
 
 
 def resolve_database_url(database_url: str | None = None) -> str:
-    environment = getenv("HISAB_ENV", "development").casefold()
+    environment = getenv("ARTHA_ENV", "development").casefold()
     if environment == "production":
         raise RuntimeError("production mode uses Supabase REST/RPC, not the demo database")
-    configured_url = database_url or getenv("HISAB_DATABASE_URL")
+    configured_url = database_url or getenv("ARTHA_DATABASE_URL")
     return configured_url or default_database_url()
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
-    environment = getenv("HISAB_ENV", "development").casefold()
+    environment = getenv("ARTHA_ENV", "development").casefold()
     is_production = environment == "production"
     engine = None if is_production else build_engine(resolve_database_url(database_url))
     cors_origins = [
         origin.strip()
         for origin in getenv(
-            "HISAB_CORS_ORIGINS",
+            "ARTHA_CORS_ORIGINS",
             "http://localhost:5173,http://127.0.0.1:5173",
         ).split(",")
         if origin.strip()
@@ -56,13 +56,13 @@ def create_app(database_url: str | None = None) -> FastAPI:
             await engine.dispose()
 
     app = FastAPI(
-        title="Hisab API",
+        title="Artha API",
         version="1.0.0",
         description="Private V1 ledger API. All amounts are integer paise.",
         lifespan=lifespan,
     )
     app.state.is_production = is_production
-    app.state.demo_user_id = getenv("HISAB_DEMO_USER_ID", "demo-user")
+    app.state.demo_user_id = getenv("ARTHA_DEMO_USER_ID", "demo-user")
     app.state.demo_bootstrap_lock = Lock()
     app.add_middleware(
         CORSMiddleware,

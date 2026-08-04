@@ -13,8 +13,8 @@ import { TransactionsPage } from './pages/TransactionsPage'
 import { AssistantPage } from './pages/AssistantPage'
 import type { AccountSetupInput, Dashboard, Transaction, TransactionDraft, UserProfile } from './types'
 
-const SETUP_KEY = 'hisab.setup.complete'
-const PROFILE_KEY = 'hisab.profile'
+const SETUP_KEY = 'artha.setup.complete'
+const PROFILE_KEY = 'artha.profile'
 const defaultProfile: UserProfile = { displayName: 'You', householdName: 'My household', members: [] }
 
 function loadProfile(profileKey: string): UserProfile {

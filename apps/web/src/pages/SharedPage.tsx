@@ -43,7 +43,7 @@ export function SharedPage({ transactions, sharedBalancePaise, memberBalances, d
       </Card>
 
       <div className="mt-4 rounded-2xl border border-line bg-white/50 p-4 text-xs leading-5 text-[#6e7a74] tone-muted dark:bg-night-surface/80">
-        <strong className="text-ink">How this works:</strong> Hisab tracks the full amount leaving your account separately from the amount that is actually your spending. A settlement clears this balance without counting as new income.
+        <strong className="text-ink">How this works:</strong> Artha tracks the full amount leaving your account separately from the amount that is actually your spending. A settlement clears this balance without counting as new income.
       </div>
     </div>
   )

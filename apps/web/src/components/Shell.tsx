@@ -20,7 +20,7 @@ export function Shell({ children, userEmail, onSignOut }: { children: ReactNode;
         <div className="mx-auto flex h-[72px] max-w-6xl items-center justify-between px-5 sm:px-8">
           <button onClick={() => navigate('/')} className="flex min-h-11 items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Go home">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-moss-900 font-display text-lg font-bold text-white dark:bg-[#27604e]">H</span>
-            <div className="text-left"><p className="font-display text-lg font-bold leading-none tracking-[-0.03em]">Hisab</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
+            <div className="text-left"><p className="font-display text-lg font-bold leading-none tracking-[-0.03em]">Artha</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
           </button>
           <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">August overview</span><ThemeControl />{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Sign out"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span></button>}</div>
         </div>

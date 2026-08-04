@@ -18,8 +18,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Hisab',
-        short_name: 'Hisab',
+        name: 'Artha',
+        short_name: 'Artha',
         description: 'Track money in five seconds, understand it anytime.',
         theme_color: '#173f35',
         background_color: '#f5f7f2',

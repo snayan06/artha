@@ -5,14 +5,14 @@ from typing import Any, cast
 import pytest
 from pydantic import ValidationError
 
-from hisab_api.auth import AuthContext
-from hisab_api.production_routes import (
+from artha_api.auth import AuthContext
+from artha_api.production_routes import (
     ProductionDraft,
     ProductionSplit,
     confirm_transaction,
     member_balances,
 )
-from hisab_api.supabase_rest import SupabaseRestClient
+from artha_api.supabase_rest import SupabaseRestClient
 
 HOUSEHOLD_ID = "00000000-0000-0000-0000-000000000100"
 OWNER_ID = "00000000-0000-0000-0000-000000000101"

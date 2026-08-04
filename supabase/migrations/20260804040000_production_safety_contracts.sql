@@ -197,7 +197,7 @@ begin
   end if;
 
   perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended('hisab:setup:' || v_user_id::text, 0)
+    pg_catalog.hashtextextended('artha:setup:' || v_user_id::text, 0)
   );
 
   insert into public.profiles (id, display_name)
@@ -523,7 +523,7 @@ begin
   end if;
 
   perform pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended('hisab:owners:' || old.household_id::text, 0)
+    pg_catalog.hashtextextended('artha:owners:' || old.household_id::text, 0)
   );
   if not exists (
     select 1

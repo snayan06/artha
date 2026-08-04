@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from hisab_api.models import Account, AccountKind, HouseholdMember
-from hisab_api.parser import ParseError, parse_transaction
+from artha_api.models import Account, AccountKind, HouseholdMember
+from artha_api.parser import ParseError, parse_transaction
 
 FIXED_NOW = datetime(2026, 8, 4, 18, 30, tzinfo=UTC)
 ACCOUNT = Account(id=1, user_id="demo-user", name="HDFC UPI", kind=AccountKind.BANK)

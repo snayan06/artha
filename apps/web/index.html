@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#173f35" />
-    <meta name="description" content="Hisab — track money in five seconds." />
+    <meta name="description" content="Artha — track money in five seconds." />
     <script>
       (() => {
         try {
-          const preference = localStorage.getItem('hisab.theme') || 'system';
+          const preference = localStorage.getItem('artha.theme') || 'system';
           const dark = preference === 'dark' || (preference === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.classList.toggle('dark', dark);
           document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -17,7 +17,7 @@
       })();
     </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Hisab</title>
+    <title>Artha</title>
   </head>
   <body>
     <div id="root"></div>

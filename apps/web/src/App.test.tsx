@@ -38,7 +38,7 @@ describe('first-run gate', () => {
 
     await user.click(screen.getByRole('button', { name: 'Explore fictional demo' }))
     await waitFor(() => expect(api.bootstrapDemo).toHaveBeenCalledTimes(1))
-    expect(localStorage.getItem('hisab.setup.complete')).toBe('true')
+    expect(localStorage.getItem('artha.setup.complete')).toBe('true')
     expect(await screen.findByRole('heading', { name: 'Your money, made clear.' })).toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 # Database structure
 
-Hisab uses PostgreSQL on Supabase in production. The local FastAPI demo uses a
+Artha uses PostgreSQL on Supabase in production. The local FastAPI demo uses a
 smaller SQLite projection of the same ledger concepts. Every monetary value is
 stored as an integer number of paise; floating-point money is never persisted.
 
@@ -128,7 +128,7 @@ erDiagram
 ## How a shared expense is stored
 
 For an expense of Rs 1,200 paid from a bank account and shared by three family
-members, Hisab writes one `transactions` row and up to three
+members, Artha writes one `transactions` row and up to three
 `transaction_splits` rows. The split rows must add up exactly to the transaction
 amount. A database function performs the transaction, splits, and audit event in
 one atomic operation and uses an idempotency key so retries cannot duplicate the

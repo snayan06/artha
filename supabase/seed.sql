@@ -8,10 +8,10 @@ declare
 begin
   select id into v_profile_id
   from auth.users
-  where email = 'demo@hisab.local';
+  where email = 'demo@artha.local';
 
   if v_profile_id is null then
-    raise notice 'Skipping fictional seed: create demo@hisab.local in local Auth first';
+    raise notice 'Skipping fictional seed: create demo@artha.local in local Auth first';
     return;
   end if;
 

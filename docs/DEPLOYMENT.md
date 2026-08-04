@@ -1,13 +1,13 @@
-# Hisab deployment runbook
+# Artha deployment runbook
 
 The repository is designed to run locally without cloud credentials. Production deployment has three separately controlled surfaces.
 
 ## 1. Supabase
 
-The free `hisab-production` project is active under reference
-`jjkxbfbirsxulelgprxb`. Five migrations and the live two-household RLS exercise
-have passed. The selected general Asia-Pacific placement resolved to
-`ap-southeast-2`.
+Five migrations and the live two-household RLS exercise passed against a legacy
+staging project. That project is under the wrong account and is not approved for
+real Artha data. Create a fresh project under the user's personal account and
+repeat the complete exercise before launch.
 
 1. Create a new Supabase project in the Mumbai region when available.
 2. Link the local project with the Supabase CLI.
@@ -23,13 +23,13 @@ Never expose the service-role key in the browser. Normal FastAPI requests should
 Create a Python Web Service rooted at `apps/api`.
 
 - Build command: `pip install uv && uv sync --frozen --no-dev`
-- Start command: `uv run uvicorn hisab_api.app:app --host 0.0.0.0 --port $PORT`
+- Start command: `uv run uvicorn artha_api.app:app --host 0.0.0.0 --port $PORT`
 - Health check: `/health`
 - Python: `3.13`
 
 Set server-side environment variables from `.env.example`. Never enable automatic paid upgrades. Render Free sleeps after idle time, so its first request may be slow.
 
-The checked-in `render.yaml` uses `HISAB_ENV=production`. Production mode never
+The checked-in `render.yaml` uses `ARTHA_ENV=production`. Production mode never
 creates or connects to the SQLite demo database: it verifies Supabase JWTs and
 forwards the same user bearer through the separate REST/RPC repository so RLS
 remains active. Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` only; never add
@@ -57,7 +57,7 @@ any `VITE_` variable.
 
 ## Acceptance before calling production green
 
-Current status: **staging data path green, final domains pending**. Production
+Current status: **legacy staging data path green, personal deployment pending**. Production
 JWT verification, repository access, anonymous denial and two-household live RLS
 isolation pass. Do not enter real finance data until the remaining final-domain
 and recovery gates below pass.

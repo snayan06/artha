@@ -37,7 +37,7 @@ export function LoginPage({
         <header className="mb-8 flex items-center justify-between">
           <div className="flex min-h-11 items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-moss-900 font-display text-xl font-bold text-white dark:bg-[#27604e]">H</span>
-            <div><p className="font-display text-lg font-bold leading-none">Hisab</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
+            <div><p className="font-display text-lg font-bold leading-none">Artha</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
           </div>
           <ThemeControl />
         </header>
@@ -45,7 +45,7 @@ export function LoginPage({
         <Card className="p-6 sm:p-8">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-moss-100 text-moss-800"><ShieldCheck className="h-6 w-6" /></span>
           <h1 className="font-display mt-5 text-3xl font-bold tracking-[-0.05em]">Sign in to your ledger</h1>
-          <p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">We’ll email you a secure magic link. No password is stored by Hisab.</p>
+          <p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">We’ll email you a secure magic link. No password is stored by Artha.</p>
 
           <form className="mt-7" onSubmit={(event) => void submit(event)}>
             <label className="block" htmlFor="login-email">

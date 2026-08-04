@@ -1,7 +1,8 @@
 # Production staging verification
 
 Date: 4 August 2026  
-Supabase project: `hisab-production` (`jjkxbfbirsxulelgprxb`)
+Supabase project: legacy staging only; the tested project is under the wrong
+account and must not receive real Artha data.
 
 ## Applied database contracts
 
@@ -36,4 +37,3 @@ fictional-test-data-cleaned
 - Configure exact CORS and Supabase magic-link redirect URLs.
 - Verify email login, session reload and sign-out on the final domain.
 - Complete encrypted export and restoration testing before entering real finance data.
-

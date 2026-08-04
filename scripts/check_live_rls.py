@@ -1,8 +1,8 @@
 """Run destructive-only-to-fixtures live Supabase household-isolation checks.
 
 Required environment variables are intentionally not loaded from repository files:
-HISAB_SUPABASE_URL, HISAB_SUPABASE_ANON_KEY, HISAB_SUPABASE_SERVICE_KEY,
-HISAB_DATABASE_HOST, HISAB_DATABASE_USER, and HISAB_DB_PASSWORD.
+ARTHA_SUPABASE_URL, ARTHA_SUPABASE_ANON_KEY, ARTHA_SUPABASE_SERVICE_KEY,
+ARTHA_DATABASE_HOST, ARTHA_DATABASE_USER, and ARTHA_DB_PASSWORD.
 """
 
 from __future__ import annotations
@@ -14,17 +14,17 @@ import uuid
 
 import asyncpg
 import httpx
-from hisab_api.app import create_app
+from artha_api.app import create_app
 from httpx import ASGITransport
 
-BASE_URL = os.environ["HISAB_SUPABASE_URL"].rstrip("/")
-ANON_KEY = os.environ["HISAB_SUPABASE_ANON_KEY"]
-SERVICE_KEY = os.environ["HISAB_SUPABASE_SERVICE_KEY"]
+BASE_URL = os.environ["ARTHA_SUPABASE_URL"].rstrip("/")
+ANON_KEY = os.environ["ARTHA_SUPABASE_ANON_KEY"]
+SERVICE_KEY = os.environ["ARTHA_SUPABASE_SERVICE_KEY"]
 created_user_ids: list[str] = []
 
 
 async def create_user(client: httpx.AsyncClient, label: str) -> str:
-    email = f"hisab-rls-{label}-{uuid.uuid4().hex}@example.com"
+    email = f"artha-rls-{label}-{uuid.uuid4().hex}@example.com"
     password = secrets.token_urlsafe(32)
     response = await client.post(
         f"{BASE_URL}/auth/v1/admin/users",
@@ -69,10 +69,10 @@ async def rest(
 
 async def cleanup() -> None:
     connection = await asyncpg.connect(
-        host=os.environ["HISAB_DATABASE_HOST"],
+        host=os.environ["ARTHA_DATABASE_HOST"],
         port=5432,
-        user=os.environ["HISAB_DATABASE_USER"],
-        password=os.environ["HISAB_DB_PASSWORD"],
+        user=os.environ["ARTHA_DATABASE_USER"],
+        password=os.environ["ARTHA_DB_PASSWORD"],
         database="postgres",
         ssl="require",
         timeout=20,
@@ -109,7 +109,7 @@ async def main() -> None:
             async with (
                 api_app.router.lifespan_context(api_app),
                 httpx.AsyncClient(
-                    transport=ASGITransport(app=api_app), base_url="http://hisab.test"
+                    transport=ASGITransport(app=api_app), base_url="http://artha.test"
                 ) as api_client,
             ):
                     authorization = {"Authorization": f"Bearer {token_a}"}

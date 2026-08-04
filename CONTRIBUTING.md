@@ -1,4 +1,4 @@
-# Contributing to Hisab
+# Contributing to Artha
 
 Thank you for helping make personal money tracking simpler and more trustworthy.
 
@@ -13,8 +13,8 @@ database URLs or screenshots containing personal balances.
 ## Development setup
 
 ```bash
-git clone https://github.com/snayan06/hisab.git
-cd hisab
+git clone https://github.com/snayan06/artha.git
+cd artha
 cp .env.example .env
 make setup
 make dev-api

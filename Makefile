@@ -8,7 +8,7 @@ dev-web:
 	npm run dev:web
 
 dev-api:
-	cd apps/api && uv run uvicorn hisab_api.app:app --reload --port 8000
+	cd apps/api && uv run uvicorn artha_api.app:app --reload --port 8000
 
 test:
 	npm run test:web

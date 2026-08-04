@@ -84,7 +84,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
         <Card className="p-6 text-center sm:p-10">
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-moss-100 text-moss-800"><Check className="h-8 w-8" strokeWidth={2.5} /></div>
           <Badge tone="green"><span className="mr-1">●</span> Confirmed</Badge>
-          <h1 className="font-display mt-4 text-2xl font-bold tracking-[-0.04em]">Added to your Hisab</h1>
+          <h1 className="font-display mt-4 text-2xl font-bold tracking-[-0.04em]">Added to your Artha</h1>
           <p className="font-display mt-3 text-4xl font-bold tracking-[-0.05em]">{formatMoney(success.amountPaise)}</p>
           <p className="mt-2 text-sm text-[#718078] tone-muted">{success.merchant} · {success.account}</p>
           {success.memberSplits.length > 0 && <div className="mt-4 flex flex-wrap justify-center gap-2">{success.memberSplits.map((split) => <p key={split.memberId} className="inline-flex items-center gap-1.5 rounded-xl bg-moss-50 px-3 py-2 text-xs font-semibold text-moss-800"><UsersRound className="h-4 w-4" /> {split.memberName}: {formatMoney(split.amountPaise)}</p>)}</div>}
