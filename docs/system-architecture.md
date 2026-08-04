@@ -23,7 +23,7 @@ This is the complete product architecture: user interface, API, authentication, 
 | Migrations | Supabase CLI SQL migrations | Keeps policies, functions and schema versioned together |
 | Frontend hosting | Cloudflare Pages Free | Static PWA hosting with generous free limits |
 | Python hosting | Render Free Web Service | Simple FastAPI deployment with no paid instance required for the pilot |
-| AI inference | Hosted Qwen3.6-27B on Groq; local Qwen3 4B on Ollama fallback | Strong open-weight hosted model for mobile use, private local option, no OpenAI dependency |
+| AI inference | Experimental Qwen3.6-27B on Groq; local Qwen3 4B on Ollama fallback | Multimodal open-weight pilot model, private local option, no required AI dependency |
 | Files | Supabase Storage Free | Receipt images later, protected by household policy |
 | CI | GitHub Actions Free | Lint, types, tests and migration checks |
 
@@ -132,6 +132,7 @@ This is genuinely usable at ₹0 for the user's private pilot. The limitations a
 - Render spins a free API down after 15 idle minutes and the next request can take about a minute.
 - Supabase can pause a free project after one inactive week and does not include managed backups.
 - Free hosted AI capacity is capped and provider policies can change; capture still works through rules and manual review.
+- Qwen3.6-27B is an experimental pilot choice; a Hisab-specific model evaluation is required before production lock-in.
 - A custom domain and WhatsApp Business messaging are not included in the ₹0 promise.
 
 If Render cold starts make capture feel slow, the next host is Google Cloud Run with request-based scaling. Its free tier is generous, but it requires a billing account and can charge after quotas, so it is not the default for a strict no-billing MVP.

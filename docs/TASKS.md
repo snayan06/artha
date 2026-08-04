@@ -76,5 +76,6 @@ Updated: 4 August 2026
 - [x] Return validated metric, chart and transaction-table schemas.
 - [ ] Show evidence date range, source count and matching transactions.
 - [ ] Add evaluation cases for totals, comparisons and affordability questions.
+- [ ] Build a representative 50-case Hisab model benchmark covering Indian merchants, backdated entries, account selection, family splits, categories, tool choice and structured UI; compare Qwen3.6-27B with at least two current hosted alternatives before production lock-in.
 - [ ] Add optional Telegram/WhatsApp capture adapter.
 - [ ] Add investments, liabilities and net-worth model.

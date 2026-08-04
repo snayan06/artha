@@ -54,7 +54,7 @@ flowchart LR
     LEDGER --> LOCAL["SQLite local demo"]
     LEDGER --> DB["Supabase Postgres and RLS"]
     API --> ASSISTANT["Validated assistant UI"]
-    ASSISTANT -. "hosted default" .-> GROQ["Groq and Qwen3.6-27B"]
+    ASSISTANT -. "experimental hosted default" .-> GROQ["Groq and Qwen3.6-27B"]
     ASSISTANT -. "local fallback" .-> OLLAMA["Ollama and Qwen3 4B"]
 ```
 
@@ -118,9 +118,11 @@ make dev-web
 Open <http://localhost:5173>. Interactive API documentation is available at
 <http://localhost:8000/docs>.
 
-### Optional open-weight assistant
+### Optional experimental open-weight assistant
 
-Capture and manual analytics work without an LLM. To enable the hosted assistant,
+Capture and manual analytics work without an LLM. The private pilot uses
+Qwen3.6-27B as an experimental hosted default; it remains behind the provider
+adapter and is not trusted to write or calculate ledger values. To enable it,
 create a Groq API key and keep it only in the API environment:
 
 ```dotenv

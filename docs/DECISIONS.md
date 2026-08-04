@@ -19,3 +19,14 @@ Account balances, spending and shared receivables are derived from immutable-sty
 ## ADR-005: constrained V2 agent
 
 The V2 agent receives only predefined read-only analytics tools. It cannot execute SQL or render arbitrary code. Its structured output maps to reviewed React components.
+
+## ADR-006: experimental Qwen default and deferred model benchmark
+
+The private pilot uses `qwen/qwen3.6-27b` through Groq as its experimental
+hosted model because it supports text, images, reasoning, tool use and structured
+JSON through one provider. Deterministic parsing and merchant rules still run
+first, and the model cannot write transactions or calculate ledger totals.
+
+A representative Hisab evaluation and comparison against other hosted models is
+required before a production model is locked. That evaluation is backlog work
+and does not block the V1 private pilot.

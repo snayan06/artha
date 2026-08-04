@@ -219,7 +219,7 @@ All money values use integer paise, never floating-point numbers.
 | Auth + database | Supabase Free | Managed Postgres, magic links, row-level security, realtime, storage |
 | API | Python 3.13 + FastAPI + Pydantic v2 on Render Free | Typed APIs and a clean path to the V2 agent |
 | Assistant | Strict Pydantic schemas and approved read-only tools | Structured UI output without giving the model write access |
-| AI parsing | Merchant rules, then hosted Qwen3.6-27B via Groq; local Qwen3 4B fallback | Open-weight models, provider portability, and manual fallback at quota |
+| AI parsing | Merchant rules, then experimental Qwen3.6-27B via Groq; local Qwen3 4B fallback | One multimodal open-weight pilot model, provider portability, and manual fallback at quota |
 | Voice | Cloudflare Workers AI Whisper, capped | Free allocation is sufficient for a private pilot |
 | OCR | Client-side OCR first | Keeps screenshots private and avoids API cost |
 | Source + CI | GitHub Free + GitHub Actions | Version control and automated checks |
