@@ -2,6 +2,9 @@
 
 Updated: 4 August 2026
 
+For the current ordered delivery view, blockers and user actions, see
+[`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
+
 ## Live launch status
 
 **Current stage:** application-complete V1 moving through production setup. Do not enter real financial data until every P0 item below is complete.
@@ -52,6 +55,8 @@ Updated: 4 August 2026
 
 ### P1 — private-pilot improvements
 
+- [x] Add a versioned 50-case fictional capture/parser dataset and CI contract checker.
+- [ ] Add deterministic and hosted-Qwen scoring runners and publish accuracy/error slices.
 - [ ] Add edit, correction and soft-delete controls to the UI for the existing API operations.
 - [ ] Show assistant evidence date range, source count and matching transactions.
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.

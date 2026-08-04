@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Shell } from './components/Shell'
 import { demoDashboard, demoTransactions } from './data/demo'
-import { bootstrapDemo, confirmDraft, getDashboard, getMembers, getTransactions, isOnboardingComplete, setupOnboarding } from './lib/api'
+import { bootstrapDemo, confirmDraft, getDashboard, getMembers, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding } from './lib/api'
 import { isDemoMode, useAuth } from './lib/auth'
 import { useRouter } from './lib/router'
 import { HomePage } from './pages/HomePage'
@@ -74,14 +74,19 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
     setSetupError('')
     try {
       const complete = await isOnboardingComplete()
-      if (complete) setLoadingLedger(true)
+      if (complete) {
+        setLoadingLedger(true)
+        const serverProfile = await getUserProfile()
+        setProfile(serverProfile)
+        localStorage.setItem(profileKey, JSON.stringify(serverProfile))
+      }
       setSetupComplete(complete)
     } catch {
       setSetupError('Artha could not verify your household setup. Check the connection and try again.')
     } finally {
       setCheckingSetup(false)
     }
-  }, [])
+  }, [profileKey])
 
   const refreshLedger = useCallback(async () => {
     setLoadingLedger(true)
@@ -129,12 +134,12 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
     setSetupComplete(true)
   }
 
-  async function addTransaction(draft: TransactionDraft): Promise<Transaction> {
-    const transaction = await confirmDraft(draft)
+  async function addTransaction(draft: TransactionDraft, idempotencyKey?: string): Promise<Transaction> {
+    const transaction = await confirmDraft(draft, idempotencyKey)
     setTransactions((current) => [transaction, ...current])
     setDashboard((current) => ({
       ...current,
-      availablePaise: current.availablePaise + (transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise),
+      availablePaise: current.availablePaise + (transaction.kind === 'transfer' ? 0 : transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise),
       incomePaise: current.incomePaise + (transaction.kind === 'credit' ? transaction.amountPaise : 0),
       spendPaise: current.spendPaise + (transaction.kind === 'debit' ? transaction.personalSharePaise : 0),
       sharedBalancePaise: current.sharedBalancePaise + transaction.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0),

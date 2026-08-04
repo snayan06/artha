@@ -8,6 +8,9 @@ import pytest
 from artha_api.assistant import (
     AssistantFinancialContext,
     AssistantSettings,
+    CaptureAccount,
+    CaptureCategory,
+    CaptureContext,
     ContextCategory,
     ContextMemberBalance,
     ContextMonth,
@@ -110,6 +113,124 @@ async def test_groq_uses_strict_structured_output_without_tools_or_raw_rows(
     assert "account_id" not in prompt
     assert "description" not in prompt
     assert "notes" not in prompt
+
+
+@pytest.mark.asyncio
+async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_accounts() -> None:
+    context = CaptureContext(
+        today="2026-08-04",
+        timezone="Asia/Kolkata",
+        accounts=[
+            CaptureAccount(id="icici-id", name="ICICI Bank", kind="bank"),
+            CaptureAccount(id="hdfc-id", name="HDFC Bank", kind="bank"),
+        ],
+        categories=[CaptureCategory(id="other-id", name="Other", kind="both")],
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert "25k means 25,000 rupees" in body["messages"][0]["content"]
+        interpretation = {
+            "outcome": "draft",
+            "kind": "transfer",
+            "amount_paise": 2_500_000,
+            "description": "Self transfer",
+            "category_id": None,
+            "category_name": None,
+            "source_account_id": "icici-id",
+            "destination_account_id": "hdfc-id",
+            "member_ids": [],
+            "split_equally": False,
+            "occurred_on": "2026-08-04",
+            "confidence": 0.99,
+            "warnings": [],
+        }
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(interpretation)}}]},
+        )
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        transport=httpx.MockTransport(handler),
+    )
+    response = await assistant.interpret_capture(
+        "self transfer 25k ICICI -> HDFC", context
+    )
+
+    assert response is not None
+    assert response.mode == "model"
+    assert response.result.amount_paise == 2_500_000
+    assert response.result.source_account_id == "icici-id"
+    assert response.result.destination_account_id == "hdfc-id"
+
+
+@pytest.mark.asyncio
+async def test_capture_interpretation_rejects_invented_account_id() -> None:
+    context = CaptureContext(
+        today="2026-08-04",
+        timezone="Asia/Kolkata",
+        accounts=[CaptureAccount(id="known-id", name="Known Bank", kind="bank")],
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        interpretation = {
+            "outcome": "draft",
+            "kind": "expense",
+            "amount_paise": 10_000,
+            "description": "Coffee",
+            "category_id": None,
+            "category_name": None,
+            "source_account_id": "invented-id",
+            "destination_account_id": None,
+            "member_ids": [],
+            "split_equally": False,
+            "occurred_on": None,
+            "confidence": 0.9,
+            "warnings": [],
+        }
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(interpretation)}}]},
+        )
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert await assistant.interpret_capture("coffee 100", context) is None
+
+
+@pytest.mark.asyncio
+async def test_capture_interpretation_can_request_clarification_without_a_draft() -> None:
+    context = CaptureContext(
+        today="2026-08-04",
+        timezone="Asia/Kolkata",
+        accounts=[CaptureAccount(id="known-id", name="Known Bank", kind="bank")],
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        result = {
+            "outcome": "clarify",
+            "question": "Which account should this use?",
+            "missing": ["source_account_id"],
+            "warnings": [],
+        }
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(result)}}]},
+        )
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        transport=httpx.MockTransport(handler),
+    )
+    response = await assistant.interpret_capture("25k", context)
+
+    assert response is not None
+    assert response.result.outcome == "clarify"
+    assert response.result.question == "Which account should this use?"
 
 
 @pytest.mark.asyncio

@@ -40,7 +40,7 @@ export interface TransactionSplit {
   amountPaise: Paise
 }
 
-export type TransactionKind = 'debit' | 'credit'
+export type TransactionKind = 'debit' | 'credit' | 'transfer'
 
 export interface Transaction {
   id: string
@@ -51,6 +51,8 @@ export interface Transaction {
   category: string
   account: string
   sourceAccountId?: EntityId
+  destinationAccount?: string
+  destinationAccountId?: EntityId
   occurredAt: string
   note?: string
   memberSplits: TransactionSplit[]
@@ -64,10 +66,13 @@ export interface TransactionDraft {
   category: string
   account: string
   sourceAccountId?: EntityId
+  destinationAccount?: string
+  destinationAccountId?: EntityId
   occurredAt: string
   note: string
   memberSplits: TransactionSplit[]
   confidence: 'high' | 'review'
+  warnings?: string[]
   sourceText: string
 }
 

@@ -65,6 +65,31 @@ describe('QuickAddPage', () => {
     expect(await screen.findByText(/added to your artha/i)).toBeInTheDocument()
   })
 
+  it('reuses the reviewed draft idempotency key after a lost response', async () => {
+    const user = userEvent.setup()
+    const confirmed: Transaction = {
+      id: 'replayed', kind: 'debit', amountPaise: 12_300, personalSharePaise: 12_300,
+      merchant: 'Coffee', category: 'Other', account: 'HDFC UPI', occurredAt: localDateOffset(0),
+      memberSplits: [], status: 'confirmed'
+    }
+    const onConfirm = vi.fn()
+      .mockRejectedValueOnce(new Error('Artha took too long to respond. Please try again.'))
+      .mockResolvedValueOnce(confirmed)
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '123')
+    await user.type(screen.getByLabelText('Description'), 'Coffee')
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    await user.click(confirmButton)
+    expect(await screen.findByText(/nothing was saved/i)).toBeInTheDocument()
+    await user.click(confirmButton)
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(2))
+    expect(onConfirm.mock.calls[0][1]).toBe(onConfirm.mock.calls[1][1])
+    expect(await screen.findByText(/added to your artha/i)).toBeInTheDocument()
+  })
+
   it('keeps confirmation disabled for zero or negative amounts', async () => {
     const user = userEvent.setup()
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
@@ -77,5 +102,18 @@ describe('QuickAddPage', () => {
 
     fireEvent.change(amount, { target: { value: '-10' } })
     expect(confirmButton).toBeDisabled()
+  })
+
+  it('shows a real destination placeholder for an incomplete transfer', async () => {
+    const user = userEvent.setup()
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), 'transfer 5000 from ICICI')
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+
+    expect(await screen.findByRole('option', { name: 'Select an account' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Transfer to account' })).toHaveValue('')
+    expect(screen.getByText(/choose a destination account/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm and add transaction/i })).toBeDisabled()
   })
 })

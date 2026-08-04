@@ -25,14 +25,18 @@ built around a five-second workflow:
 3. Confirm explicitly.
 4. See account movement, personal spending and the shared balance update.
 
-Parsing never writes directly to the ledger. The application remains usable
-without an AI provider because common capture is deterministic and rules-first.
+Parsing never writes directly to the ledger. Common capture remains usable
+without an AI provider through a deterministic parser. When enabled, Qwen may
+propose a strict structured draft grounded only in the user's existing accounts,
+categories and family participants; the user still reviews it before any write.
 
 ## V1 features
 
 - Installable React and TypeScript PWA with responsive bottom navigation.
 - Dashboard balances, six-month cash-flow chart and recent activity.
 - Natural-language INR capture with a review-before-write workflow.
+- Indian amount shorthand and account-to-account transfer capture such as
+  `self transfer 25k ICICI -> HDFC`.
 - First-run setup for multiple bank, cash, wallet and credit-card accounts.
 - Configurable household members and exact per-member expense splits.
 - Light, dark and system theme support.
@@ -50,6 +54,7 @@ without an AI provider because common capture is deterministic and rules-first.
 flowchart LR
     PWA["React PWA"] -->|"validated draft and confirmation"| API["FastAPI"]
     API --> PARSER["Deterministic capture parser"]
+    API -. "optional structured interpretation" .-> QWEN["Qwen via provider adapter"]
     API --> LEDGER["Ledger service"]
     LEDGER --> LOCAL["SQLite local demo"]
     LEDGER --> DB["Supabase Postgres and RLS"]
@@ -64,7 +69,7 @@ flowchart LR
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async |
 | Local data | SQLite and aiosqlite |
 | Production data | Supabase Postgres, Auth, RLS and REST/RPC adapter |
-| Optional AI | Open-weight Qwen via Groq or local Ollama; deterministic fallback |
+| Optional AI | Open-weight Qwen via Groq or local Ollama; strict schema and deterministic fallback |
 | Quality | Vitest, pytest, ESLint, Ruff and strict mypy |
 | CI | GitHub Actions |
 
@@ -83,6 +88,8 @@ artha/
 │   ├── migrations/       # Schema, constraints, RLS and RPC functions
 │   └── tests/            # SQL catalog assertions
 ├── docs/                 # PRD, architecture, deployment and decisions
+├── evals/                # Versioned fictional model/parser evaluation data
+├── scripts/              # Repository contract and evaluation helpers
 ├── .github/workflows/    # CI
 └── render.yaml           # Optional container-hosting fallback
 ```
@@ -144,7 +151,7 @@ make check
 ```
 
 This runs web linting, TypeScript checks, Vitest, the production PWA build,
-Ruff, strict mypy and pytest.
+Ruff, strict mypy, pytest and the 50-case capture-dataset contract checker.
 
 ## API surface
 
@@ -154,6 +161,7 @@ Ruff, strict mypy and pytest.
 | `POST` | `/api/v1/demo/bootstrap` | Create fictional local demo data |
 | `GET/POST` | `/api/v1/accounts` | List or create accounts |
 | `POST` | `/api/v1/onboarding/setup` | Atomically create accounts and household members |
+| `GET` | `/api/v1/profile` | Load the authenticated user's server-owned profile and household |
 | `GET/POST` | `/api/v1/members` | List or create household participants |
 | `GET/POST` | `/api/v1/merchant-rules` | Manage deterministic household auto-tag rules |
 | `POST` | `/api/v1/merchant-rules/learn` | Explicitly remember a prospective merchant rule |
@@ -184,6 +192,8 @@ Before production can be called green:
 - verify final-domain authentication, export and restore behavior.
 
 See [the deployment runbook](docs/DEPLOYMENT.md) for the complete acceptance gate.
+The current ordered status and named blockers are in the
+[sprint board](docs/SPRINT-BOARD.md).
 
 ## Roadmap
 
@@ -194,6 +204,8 @@ See [the deployment runbook](docs/DEPLOYMENT.md) for the complete acceptance gat
 - Investments, liabilities and net-worth tracking.
 
 The implementation checklist is maintained in [docs/TASKS.md](docs/TASKS.md).
+The current, user-readable delivery status is maintained in
+[docs/SPRINT-BOARD.md](docs/SPRINT-BOARD.md).
 
 ## Contributing and security
 
@@ -204,13 +216,16 @@ screenshots. Report vulnerabilities according to [SECURITY.md](SECURITY.md).
 ## Documentation
 
 - [Product requirements](docs/product-requirements.md)
+- [Private-pilot product audit and priority reset](docs/product-audit-2026-08-04.md)
 - [System architecture](docs/system-architecture.md)
 - [Database structure](docs/database-schema.md)
 - [Auto-tagging design](docs/auto-tagging.md)
 - [Architecture decisions](docs/DECISIONS.md)
 - [Deployment runbook](docs/DEPLOYMENT.md)
 - [Implementation checklist](docs/TASKS.md)
+- [Current sprint board](docs/SPRINT-BOARD.md)
 - [Documentation artifacts and release evidence](docs/artifacts/)
+- [Capture-parser evaluation dataset](evals/README.md)
 
 ## License
 

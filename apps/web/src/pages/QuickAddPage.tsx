@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, ChevronRight, Info, RotateCcw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
 import { getAccounts, parseDraft } from '../lib/api'
 import { formatMoney, rupeesToPaise } from '../lib/money'
@@ -7,7 +7,7 @@ import { localDateOffset } from '../lib/date'
 import { useRouter } from '../lib/router'
 import type { HouseholdMember, LedgerAccount, Transaction, TransactionDraft } from '../types'
 
-export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: TransactionDraft) => Promise<Transaction>; members: HouseholdMember[] }) {
+export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: TransactionDraft, idempotencyKey?: string) => Promise<Transaction>; members: HouseholdMember[] }) {
   const { state, navigate, back } = useRouter()
   const initialCapture = (state as { capture?: string } | null)?.capture ?? ''
   const [capture, setCapture] = useState(initialCapture)
@@ -18,6 +18,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   const [error, setError] = useState('')
   const [usedFallback, setUsedFallback] = useState(false)
   const [accounts, setAccounts] = useState<LedgerAccount[]>([])
+  const confirmationAttempt = useRef<{ fingerprint: string; key: string } | null>(null)
   const starterPrompts = [members[0] ? `Paid 850 for dinner yesterday, split with ${members[0].name}` : 'Paid 850 for dinner yesterday', 'Received 45,000 salary today in ICICI Bank', 'Spent 320 on Uber from HDFC Card']
 
   useEffect(() => {
@@ -43,8 +44,8 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
       const response = await parseDraft(text.trim(), members)
       setDraft(response.data)
       setUsedFallback(response.demo)
-    } catch {
-      setError('We could not read that. Try including an amount and what it was for.')
+    } catch (caught) {
+      setError(userFacingFailure(caught, 'We could not read that. Try including an amount and what it was for.'))
     } finally {
       setParsing(false)
     }
@@ -55,10 +56,14 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     setSaving(true)
     setError('')
     try {
-      const transaction = await onConfirm(draft)
+      const fingerprint = JSON.stringify(draft)
+      if (confirmationAttempt.current?.fingerprint !== fingerprint) {
+        confirmationAttempt.current = { fingerprint, key: crypto.randomUUID() }
+      }
+      const transaction = await onConfirm(draft, confirmationAttempt.current.key)
       setSuccess(transaction)
-    } catch {
-      setError('This draft was not saved. Please try again.')
+    } catch (caught) {
+      setError(userFacingFailure(caught, 'This draft was not saved. Please try again.'))
     } finally {
       setSaving(false)
     }
@@ -68,6 +73,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     setCapture('')
     setDraft(null)
     setSuccess(null)
+    confirmationAttempt.current = null
     setError('')
   }
 
@@ -134,7 +140,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
           <Card className="overflow-hidden">
             <div className="bg-moss-50 p-5 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-moss-700">{draft.kind === 'credit' ? 'Money received' : 'Money spent'}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-moss-700">{draft.kind === 'transfer' ? 'Money transferred' : draft.kind === 'credit' ? 'Money received' : 'Money spent'}</p>
               <div className="mt-2 flex items-center justify-center text-4xl font-bold tracking-[-0.05em]">
                 <span className="mr-1 text-2xl text-moss-700">₹</span>
                 <input aria-label="Amount in rupees" inputMode="decimal" value={draft.amountPaise ? draft.amountPaise / 100 : ''} onChange={(event) => { const amountPaise = rupeesToPaise(Number(event.target.value) || 0); setDraft({ ...draft, amountPaise, memberSplits: equalSplits(amountPaise, draft.memberSplits.map((split) => split.memberId), members) }) }} className="min-h-11 w-40 border-0 bg-transparent text-center outline-none" />
@@ -144,11 +150,13 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
             <div className="grid gap-x-4 p-5 sm:grid-cols-2">
               <DraftField label="Description" value={draft.merchant} onChange={(value) => setDraft({ ...draft, merchant: value })} />
               <DraftField label="Category" value={draft.category} onChange={(value) => setDraft({ ...draft, category: value })} />
-              <AccountField accounts={accounts} draft={draft} onChange={(account) => setDraft({ ...draft, account: account.name, sourceAccountId: account.id })} />
+              <AccountField label={draft.kind === 'transfer' ? 'Transfer from' : 'Paid from'} ariaLabel={draft.kind === 'transfer' ? 'Transfer from account' : 'Paid from account'} accounts={accounts} selectedId={draft.sourceAccountId} selectedName={draft.account} onChange={(account) => setDraft({ ...draft, account: account.name, sourceAccountId: account.id })} />
+              {draft.kind === 'transfer' && <AccountField label="Transfer to" ariaLabel="Transfer to account" accounts={accounts} selectedId={draft.destinationAccountId} selectedName={draft.destinationAccount ?? ''} onChange={(account) => setDraft({ ...draft, destinationAccount: account.name, destinationAccountId: account.id })} />}
               <DateField value={draft.occurredAt} onChange={(value) => setDraft({ ...draft, occurredAt: value })} />
+              {draft.kind === 'transfer' && (!draft.destinationAccountId || draft.destinationAccountId === draft.sourceAccountId) && <p className="mb-4 text-xs text-amber-800 sm:col-span-2">Choose a destination account that is different from the source.</p>}
             </div>
 
-            {members.length > 0 && <div className="mx-5 mb-5 rounded-2xl border border-moss-200 bg-moss-50 p-4">
+            {draft.kind !== 'transfer' && members.length > 0 && <div className="mx-5 mb-5 rounded-2xl border border-moss-200 bg-moss-50 p-4">
               <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-moss-800"><UsersRound className="h-4 w-4" /></span><span><span className="block text-sm font-semibold">Share this expense</span><span className="mt-0.5 block text-xs text-[#748079] tone-muted">Choose anyone involved. Shares are equal in V1.</span></span></div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">{members.map((member) => { const checked = draft.memberSplits.some((split) => split.memberId === member.id); return <label key={member.id} className="flex min-h-11 cursor-pointer items-center justify-between rounded-xl border border-moss-200 bg-white px-3 text-sm font-semibold"><span className="truncate">{member.name}</span><input type="checkbox" aria-label={`Share with ${member.name}`} checked={checked} onChange={(event) => { const selected = event.target.checked ? [...draft.memberSplits.map((split) => split.memberId), member.id] : draft.memberSplits.map((split) => split.memberId).filter((id) => id !== member.id); setDraft({ ...draft, memberSplits: equalSplits(draft.amountPaise, selected, members) }) }} className="h-5 w-5 accent-moss-800" /></label> })}</div>
               {draft.memberSplits.length > 0 && (
@@ -162,14 +170,24 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
             <div className="border-t border-line bg-[#fbfcfa] p-5 dark:bg-night-raised">
               <div className="mb-4 flex items-start gap-2 text-xs text-[#6f7b75] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" /><p><strong className="text-ink">Nothing has been saved yet.</strong> Confirm only after these details look right.{usedFallback && ' Parsed safely on this device while the API is unavailable.'}</p></div>
-              <Button onClick={() => void confirm()} loading={saving} disabled={draft.amountPaise <= 0 || !draft.merchant.trim()} className="w-full" icon={<Check className="h-4 w-4" />}>Confirm and add transaction</Button>
+              <Button onClick={() => void confirm()} loading={saving} disabled={draft.amountPaise <= 0 || !draft.merchant.trim() || (draft.kind === 'transfer' && (!draft.destinationAccountId || draft.destinationAccountId === draft.sourceAccountId))} className="w-full" icon={<Check className="h-4 w-4" />}>Confirm and add transaction</Button>
             </div>
           </Card>
-          {draft.confidence === 'review' && <p className="mt-3 flex items-center gap-2 text-xs text-amber-800"><Info className="h-4 w-4" /> One or more fields were inferred with low confidence. Please check them carefully.</p>}
+          {draft.confidence === 'review' && <div className="mt-3 flex items-start gap-2 text-xs text-amber-800"><Info className="mt-0.5 h-4 w-4 shrink-0" /><div><p>One or more fields need review. Please check them carefully.</p>{draft.warnings && draft.warnings.length > 0 && <ul className="mt-1 list-disc pl-4">{draft.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}</div></div>}
         </section>
       )}
     </div>
   )
+}
+
+function userFacingFailure(error: unknown, fallback: string): string {
+  if (error instanceof Error && /Artha (?:took too long|could not reach the API)/i.test(error.message)) {
+    return `${error.message} Nothing was saved.`
+  }
+  if (error instanceof Error && error.message && !/^API request failed/i.test(error.message)) {
+    return error.message
+  }
+  return fallback
 }
 
 function equalSplits(amountPaise: number, selectedIds: string[], members: HouseholdMember[]): TransactionDraft['memberSplits'] {
@@ -190,13 +208,14 @@ function DraftField({ label, value, type = 'text', onChange }: { label: string; 
   )
 }
 
-function AccountField({ accounts, draft, onChange }: { accounts: LedgerAccount[]; draft: TransactionDraft; onChange: (account: LedgerAccount) => void }) {
-  const options = accounts.some((account) => account.id === draft.sourceAccountId && account.name === draft.account) ? accounts : [{ id: draft.sourceAccountId, name: draft.account, kind: 'bank' as const }, ...accounts]
-  const selectedIndex = Math.max(0, options.findIndex((account) => account.id === draft.sourceAccountId && account.name === draft.account))
+function AccountField({ label, ariaLabel, accounts, selectedId, selectedName, onChange }: { label: string; ariaLabel: string; accounts: LedgerAccount[]; selectedId?: LedgerAccount['id']; selectedName: string; onChange: (account: LedgerAccount) => void }) {
+  const options = accounts.some((account) => account.id === selectedId && account.name === selectedName) || !selectedName ? accounts : [{ id: selectedId, name: selectedName, kind: 'bank' as const }, ...accounts]
+  const selectedIndex = options.findIndex((account) => account.id === selectedId && account.name === selectedName)
   return (
     <label className="mb-4 block">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#87928c] tone-subtle">Paid from</span>
-      <select aria-label="Paid from account" value={String(selectedIndex)} onChange={(event) => onChange(options[Number(event.target.value)])} className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus:border-moss-400 focus:ring-3 focus:ring-moss-100">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#87928c] tone-subtle">{label}</span>
+      <select aria-label={ariaLabel} value={selectedIndex >= 0 ? String(selectedIndex) : ''} onChange={(event) => { const account = options[Number(event.target.value)]; if (account) onChange(account) }} className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus:border-moss-400 focus:ring-3 focus:ring-moss-100">
+        {selectedIndex < 0 && <option value="" disabled>Select an account</option>}
         {options.map((account, index) => <option key={`${account.id ?? 'demo'}-${account.name}-${index}`} value={String(index)}>{account.name}</option>)}
       </select>
     </label>

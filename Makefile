@@ -24,3 +24,4 @@ build:
 	npm run build:web
 
 check: lint test build
+	python scripts/check_capture_evals.py

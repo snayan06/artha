@@ -148,7 +148,7 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
                 <SetupField label="Your display name" ariaLabel="Your display name" placeholder="You" value={displayName} onChange={setDisplayName} />
                 <SetupField label="Household name" ariaLabel="Household name" placeholder="My household" value={householdName} onChange={setHouseholdName} />
               </div>
-              <p className="mt-3 text-xs leading-5 text-[#748079] tone-muted">Your display and household names stay on this device.</p>
+              <p className="mt-3 text-xs leading-5 text-[#748079] tone-muted">These names are saved with your private ledger and return after you sign in.</p>
             </Card>
 
             <section className="mt-7" aria-labelledby="members-heading">

@@ -5,7 +5,7 @@ import { Card, Badge } from '../components/ui'
 import { formatMoney } from '../lib/money'
 import type { Transaction } from '../types'
 
-type Filter = 'all' | 'spend' | 'income' | 'shared'
+type Filter = 'all' | 'spend' | 'income' | 'transfers' | 'shared'
 
 export function TransactionsPage({ transactions, demoMode }: { transactions: Transaction[]; demoMode: boolean }) {
   const [search, setSearch] = useState('')
@@ -13,10 +13,10 @@ export function TransactionsPage({ transactions, demoMode }: { transactions: Tra
   const filtered = useMemo(() => transactions.filter((transaction) => {
     const haystack = `${transaction.merchant} ${transaction.category} ${transaction.account}`.toLowerCase()
     const matchesSearch = haystack.includes(search.toLowerCase())
-    const matchesFilter = filter === 'all' || (filter === 'income' && transaction.kind === 'credit') || (filter === 'spend' && transaction.kind === 'debit') || (filter === 'shared' && transaction.memberSplits.length > 0)
+    const matchesFilter = filter === 'all' || (filter === 'income' && transaction.kind === 'credit') || (filter === 'spend' && transaction.kind === 'debit') || (filter === 'transfers' && transaction.kind === 'transfer') || (filter === 'shared' && transaction.memberSplits.length > 0)
     return matchesSearch && matchesFilter
   }), [filter, search, transactions])
-  const netPaise = filtered.reduce((total, transaction) => total + (transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise), 0)
+  const netPaise = filtered.reduce((total, transaction) => total + (transaction.kind === 'transfer' ? 0 : transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise), 0)
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -33,7 +33,7 @@ export function TransactionsPage({ transactions, demoMode }: { transactions: Tra
         </div>
         <div className="mt-3 flex items-center gap-2 overflow-x-auto scrollbar-none">
           <SlidersHorizontal className="mr-1 h-4 w-4 shrink-0 text-[#77837d] tone-muted" />
-          {(['all', 'spend', 'income', 'shared'] as Filter[]).map((item) => <button key={item} onClick={() => setFilter(item)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold capitalize transition ${filter === item ? 'bg-moss-900 text-white dark:bg-[#27604e]' : 'bg-[#f1f3ef] text-[#68746e] tone-muted hover:bg-moss-100 dark:bg-night-raised'}`}>{item}</button>)}
+          {(['all', 'spend', 'income', 'transfers', 'shared'] as Filter[]).map((item) => <button key={item} onClick={() => setFilter(item)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold capitalize transition ${filter === item ? 'bg-moss-900 text-white dark:bg-[#27604e]' : 'bg-[#f1f3ef] text-[#68746e] tone-muted hover:bg-moss-100 dark:bg-night-raised'}`}>{item}</button>)}
         </div>
       </Card>
 

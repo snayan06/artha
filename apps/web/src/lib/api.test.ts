@@ -129,6 +129,76 @@ describe('FastAPI adapter', () => {
     expect(request.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer current-access-token' }))
   })
 
+  it('hydrates the returning user profile from the server', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      display_name: 'Ari',
+      household_name: 'Ari household',
+      members: [{ id: 'member-1', name: 'Sam' }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { getUserProfile } = await import('./api')
+
+    await expect(getUserProfile()).resolves.toEqual({
+      displayName: 'Ari',
+      householdName: 'Ari household',
+      members: [{ id: 'member-1', name: 'Sam' }]
+    })
+  })
+
+  it('retries a transient first GET without requiring the user to try again', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 42, name: 'HDFC UPI', type: 'bank' }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { getAccounts } = await import('./api')
+
+    await expect(getAccounts()).resolves.toEqual([{ id: 42, name: 'HDFC UPI', kind: 'bank' }])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry a non-idempotent setup write', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { setupOnboarding } = await import('./api')
+
+    await expect(setupOnboarding([], [])).rejects.toThrow('Artha could not reach the API')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries a confirmed write with the same idempotency key', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 9, kind: 'expense', amount_paise: 10_000, personal_share_paise: 10_000,
+        description: 'Coffee', category: 'Dining', source_account_id: 42,
+        occurred_at: '2026-08-04T12:00:00Z', splits: []
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { confirmDraft } = await import('./api')
+    const draft: TransactionDraft = {
+      kind: 'debit', amountPaise: 10_000, merchant: 'Coffee', category: 'Dining', account: 'HDFC UPI',
+      sourceAccountId: 42, occurredAt: '2026-08-04', note: '', memberSplits: [],
+      confidence: 'high', sourceText: 'Paid 100 for coffee'
+    }
+
+    await expect(confirmDraft(draft)).resolves.toMatchObject({ id: '9', amountPaise: 10_000 })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const firstHeaders = (fetchMock.mock.calls[0]?.[1] as RequestInit).headers as Record<string, string>
+    const secondHeaders = (fetchMock.mock.calls[1]?.[1] as RequestInit).headers as Record<string, string>
+    expect(firstHeaders['Idempotency-Key']).toBeTruthy()
+    expect(secondHeaders['Idempotency-Key']).toBe(firstHeaders['Idempotency-Key'])
+  })
+
   it('posts reviewed setup accounts with card metadata', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }))

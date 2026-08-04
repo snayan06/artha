@@ -1,10 +1,16 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantWidget, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantWidget, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'
-const TIMEOUT_MS = 3500
+const TIMEOUT_MS = 10_000
+const RETRY_DELAY_MS = 250
+const TRANSIENT_STATUSES = new Set([502, 503, 504])
+const RETRYABLE_POST_PATHS = new Set([
+  '/api/v1/drafts/parse',
+  '/api/v1/assistant/chat'
+])
 
 type AccessTokenProvider = () => Promise<string | null>
 let accessTokenProvider: AccessTokenProvider = async () => null
@@ -23,22 +29,53 @@ class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error('Demo mode')
-  const controller = new AbortController()
-  const timer = window.setTimeout(() => controller.abort(), TIMEOUT_MS)
-  try {
-    const accessToken = await accessTokenProvider()
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> | undefined) }
-    if (accessToken) headers.Authorization = `Bearer ${accessToken}`
-    const response = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers,
-      signal: controller.signal
-    })
-    if (!response.ok) throw new ApiError(response.status, `API request failed (${response.status})`)
-    return await response.json() as T
-  } finally {
-    window.clearTimeout(timer)
+  const accessToken = await accessTokenProvider()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> | undefined) }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const canRetry = method === 'GET' || method === 'HEAD' || Boolean(headers['Idempotency-Key']) || RETRYABLE_POST_PATHS.has(path)
+  const attempts = canRetry ? 2 : 1
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => controller.abort(), TIMEOUT_MS)
+    try {
+      const response = await fetch(`${API_URL}${path}`, {
+        ...init,
+        headers,
+        signal: controller.signal
+      })
+      if (!response.ok) {
+        if (attempt + 1 < attempts && TRANSIENT_STATUSES.has(response.status)) {
+          await new Promise((resolve) => window.setTimeout(resolve, RETRY_DELAY_MS))
+          continue
+        }
+        let detail = ''
+        try {
+          const body = await response.clone().json() as JsonObject
+          detail = safeText(body.detail, '', 240)
+        } catch {
+          // Non-JSON provider errors use the stable fallback below.
+        }
+        throw new ApiError(response.status, detail || `API request failed (${response.status})`)
+      }
+      return await response.json() as T
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === 'AbortError'
+      const networkFailure = error instanceof TypeError
+      if (attempt + 1 < attempts && (timedOut || networkFailure)) {
+        await new Promise((resolve) => window.setTimeout(resolve, RETRY_DELAY_MS))
+        continue
+      }
+      if (timedOut) throw new ApiError(408, 'Artha took too long to respond. Please try again.')
+      if (networkFailure) throw new ApiError(503, 'Artha could not reach the API. Check your connection and try again.')
+      throw error
+    } finally {
+      window.clearTimeout(timer)
+    }
   }
+
+  throw new ApiError(503, 'Artha could not reach the API. Please try again.')
 }
 
 function numberValue(value: unknown, fallback = 0): number {
@@ -134,13 +171,15 @@ function mapTransaction(raw: JsonObject, accountNames: Map<string, string> = new
   const memberTotalPaise = memberSplits.reduce((sum, split) => sum + split.amountPaise, 0)
   return {
     id: typeof raw.id === 'number' ? String(raw.id) : stringValue(raw.id, crypto.randomUUID()),
-    kind: apiKind === 'income' || apiKind === 'credit' ? 'credit' : 'debit',
+    kind: apiKind === 'transfer' ? 'transfer' : apiKind === 'income' || apiKind === 'credit' ? 'credit' : 'debit',
     amountPaise,
     personalSharePaise: numberValue(raw.personal_share_paise ?? raw.personalSharePaise, amountPaise - memberTotalPaise),
     merchant: stringValue(raw.description ?? raw.merchant, 'Transaction'),
     category: stringValue(raw.category, 'Other'),
     account: stringValue(raw.account_name ?? raw.account, accountNames.get(String(entityId(raw.source_account_id) ?? '')) ?? (raw.source_account_id ? 'Primary account' : 'Account')),
     sourceAccountId: entityId(raw.source_account_id),
+    destinationAccount: stringValue(raw.destination_account_name, accountNames.get(String(entityId(raw.destination_account_id) ?? '')) ?? '') || undefined,
+    destinationAccountId: entityId(raw.destination_account_id),
     occurredAt: stringValue(raw.occurred_at ?? raw.occurredAt, new Date().toISOString()).slice(0, 10),
     note: typeof (raw.notes ?? raw.note) === 'string' ? String(raw.notes ?? raw.note) : undefined,
     memberSplits,
@@ -148,20 +187,26 @@ function mapTransaction(raw: JsonObject, accountNames: Map<string, string> = new
   }
 }
 
-function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string>, confidence?: unknown): TransactionDraft {
+function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string>, confidence?: unknown, warnings?: unknown): TransactionDraft {
   const amountPaise = numberValue(raw.amount_paise ?? raw.amountPaise)
   const apiKind = stringValue(raw.kind, 'expense')
+  const warningList = Array.isArray(warnings)
+    ? warnings.slice(0, 5).map((warning) => safeText(warning, '', 160)).filter(Boolean)
+    : []
   return {
-    kind: apiKind === 'income' || apiKind === 'credit' ? 'credit' : 'debit',
+    kind: apiKind === 'transfer' ? 'transfer' : apiKind === 'income' || apiKind === 'credit' ? 'credit' : 'debit',
     amountPaise,
     merchant: stringValue(raw.description ?? raw.merchant, 'New transaction'),
     category: stringValue(raw.category, 'Other'),
     account: stringValue(raw.account_name ?? raw.account, 'HDFC UPI'),
     sourceAccountId: entityId(raw.source_account_id),
+    destinationAccount: stringValue(raw.destination_account_name, '') || undefined,
+    destinationAccountId: entityId(raw.destination_account_id),
     occurredAt: stringValue(raw.occurred_at ?? raw.occurredAt, new Date().toISOString()).slice(0, 10),
     note: stringValue(raw.notes ?? raw.note, ''),
     memberSplits: mapSplits(raw.splits, memberNames),
-    confidence: confidence === 'high' || (typeof confidence === 'number' && confidence >= 0.8) ? 'high' : 'review',
+    confidence: warningList.length === 0 && (confidence === 'high' || (typeof confidence === 'number' && confidence >= 0.8)) ? 'high' : 'review',
+    warnings: warningList,
     sourceText: text
   }
 }
@@ -169,7 +214,7 @@ function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string
 function toApiDraft(draft: TransactionDraft): JsonObject {
   const memberTotalPaise = draft.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0)
   return {
-    kind: draft.kind === 'credit' ? 'income' : 'expense',
+    kind: draft.kind === 'transfer' ? 'transfer' : draft.kind === 'credit' ? 'income' : 'expense',
     amount_paise: draft.amountPaise,
     description: draft.merchant,
     category: draft.category,
@@ -178,7 +223,8 @@ function toApiDraft(draft: TransactionDraft): JsonObject {
     splits: draft.memberSplits.map((split) => ({ member_id: apiEntityId(split.memberId), amount_paise: split.amountPaise })),
     occurred_at: `${draft.occurredAt}T12:00:00Z`,
     notes: draft.note || null,
-    source_account_id: draft.sourceAccountId
+    source_account_id: draft.sourceAccountId,
+    destination_account_id: draft.destinationAccountId ?? null
   }
 }
 
@@ -248,6 +294,15 @@ export async function getMembers(): Promise<HouseholdMember[]> {
   return mapMembers(await request<unknown>('/api/v1/members'))
 }
 
+export async function getUserProfile(): Promise<UserProfile> {
+  const raw = await request<JsonObject>('/api/v1/profile')
+  return {
+    displayName: stringValue(raw.display_name, 'You'),
+    householdName: stringValue(raw.household_name, 'My household'),
+    members: mapMembers(raw.members)
+  }
+}
+
 export async function getAccounts(): Promise<LedgerAccount[]> {
   try {
     const raw = await request<unknown>('/api/v1/accounts')
@@ -263,9 +318,9 @@ export async function getAccounts(): Promise<LedgerAccount[]> {
   } catch (error) {
     if (!DEMO_MODE) throw error
     return [
-      { name: 'HDFC UPI', kind: 'bank' },
-      { name: 'ICICI Bank', kind: 'bank' },
-      { name: 'HDFC Card', kind: 'credit_card' }
+      { id: 'demo-hdfc-upi', name: 'HDFC UPI', kind: 'bank' },
+      { id: 'demo-icici-bank', name: 'ICICI Bank', kind: 'bank' },
+      { id: 'demo-hdfc-card', name: 'HDFC Card', kind: 'credit_card' }
     ]
   }
 }
@@ -369,7 +424,7 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
     ])
     const rawDraft = (response.draft ?? response) as JsonObject
     const memberNames = memberNameMap(members)
-    const draft = mapDraft(rawDraft, text, memberNames, response.confidence)
+    const draft = mapDraft(rawDraft, text, memberNames, response.confidence, response.warnings)
     const names = accountNameMap(accounts)
     return {
       data: {
@@ -383,14 +438,10 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
     const fallback = parseCaptureLocally(text, membersForFallback)
     if (!DEMO_MODE) {
       const accounts = await getAccounts()
-      const firstAccount = accounts[0]
-      if (!firstAccount?.id) throw new Error('Create an account before adding a transaction')
+      const parsed = parseCaptureLocally(text, membersForFallback, accounts)
+      if (!parsed.sourceAccountId) throw new Error('Create an account before adding a transaction')
       return {
-        data: {
-          ...fallback,
-          account: firstAccount.name,
-          sourceAccountId: firstAccount.id
-        },
+        data: parsed,
         demo: false
       }
     }
@@ -398,14 +449,20 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
   }
 }
 
-export async function confirmDraft(draft: TransactionDraft): Promise<Transaction> {
+export async function confirmDraft(draft: TransactionDraft, idempotencyKey: string = crypto.randomUUID()): Promise<Transaction> {
   try {
     const raw = await request<JsonObject>('/api/v1/transactions/confirm', {
       method: 'POST',
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
+      headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(toApiDraft(draft))
     })
-    return { ...mapTransaction(raw), account: draft.account, memberSplits: draft.memberSplits }
+    return {
+      ...mapTransaction(raw),
+      account: draft.account,
+      destinationAccount: draft.destinationAccount,
+      destinationAccountId: draft.destinationAccountId,
+      memberSplits: draft.memberSplits
+    }
   } catch (error) {
     if (API_URL && (error instanceof ApiError || !DEMO_MODE)) throw error
     return {
@@ -417,6 +474,8 @@ export async function confirmDraft(draft: TransactionDraft): Promise<Transaction
       category: draft.category,
       account: draft.account,
       sourceAccountId: draft.sourceAccountId,
+      destinationAccount: draft.destinationAccount,
+      destinationAccountId: draft.destinationAccountId,
       occurredAt: draft.occurredAt,
       note: draft.note || undefined,
       memberSplits: draft.memberSplits,

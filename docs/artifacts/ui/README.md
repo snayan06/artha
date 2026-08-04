@@ -13,3 +13,6 @@ grows. A useful V1 set should include:
 Screenshots must use fictional household members and accounts. Record the
 viewport and theme in the filename or adjacent Markdown note.
 
+Current interaction artifacts:
+
+- [Natural-language transfer review](v1-natural-language-transfer.md)

@@ -88,7 +88,7 @@ describe('Supabase auth provider', () => {
     const user = userEvent.setup()
     render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
 
-    expect(await screen.findByRole('heading', { name: 'Sign in to your ledger' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Sign in to Artha' })).toBeInTheDocument()
     await user.type(screen.getByLabelText('Email address'), 'ari@example.com')
     await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }))
 
@@ -96,7 +96,7 @@ describe('Supabase auth provider', () => {
       email: 'ari@example.com',
       options: { emailRedirectTo: window.location.origin }
     }))
-    expect(screen.getByRole('status')).toHaveTextContent('Check your email')
+    expect(screen.getByRole('status')).toHaveTextContent('sign-in is not complete yet')
   })
 
   it('loads, refreshes, observes and signs out of the persisted session', async () => {

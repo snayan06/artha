@@ -8,6 +8,10 @@ sources currently live in:
 - [Supabase migrations](../../../supabase/migrations/)
 - [Auto-tagging design](../../auto-tagging.md)
 
+Current feature artifacts:
+
+- [Atomic account-transfer contract](v1-atomic-transfer.md)
+- [LLM usage map and safety boundary](v1-llm-usage-map.md)
+
 Future generated OpenAPI snapshots, exported ER diagrams and deployment maps
 should be stored here with the source commit recorded in the artifact.
-

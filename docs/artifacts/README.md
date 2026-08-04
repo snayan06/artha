@@ -30,6 +30,12 @@ Use lowercase kebab-case and include the milestone or date when useful:
 
 ## Current artifacts
 
+- [Natural-language transfer review](ui/v1-natural-language-transfer.md)
+- [Atomic transfer contract](architecture/v1-atomic-transfer.md)
+- [LLM usage and safety map](architecture/v1-llm-usage-map.md)
+- [Transfer and parser test gate](qa/2026-08-04-transfer-parser-gate.md)
+- [First-request reliability diagnosis](qa/2026-08-04-first-request-reliability.md)
+- [Sprint 1 manual QA pass](qa/2026-08-05-sprint-1-manual-pass.md)
 - [V1 QA scenario matrix](qa/v1-scenario-matrix.md)
 - [V1 public-release verification](qa/v1-public-release.md)
 - [Production staging verification](qa/production-staging-verification.md)

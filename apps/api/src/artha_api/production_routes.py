@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, datetime
-from typing import Annotated, Any, Literal
+from datetime import UTC, date, datetime
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, model_validator
@@ -13,6 +14,13 @@ from .assistant import (
     AssistantChatResponse,
     AssistantFinancialContext,
     AssistantStatus,
+    CaptureAccount,
+    CaptureCategory,
+    CaptureClarification,
+    CaptureContext,
+    CaptureDraftInterpretation,
+    CaptureMember,
+    CaptureRejection,
     ContextCategory,
     ContextMemberBalance,
     ContextMonth,
@@ -51,14 +59,15 @@ class ProductionSplit(BaseModel):
 
 
 class ProductionDraft(BaseModel):
-    kind: Literal["expense", "income"]
+    kind: Literal["expense", "income", "transfer"]
     amount_paise: int = Field(gt=0)
     description: str = Field(min_length=1, max_length=240)
-    category: str = Field(min_length=1, max_length=80)
+    category: str | None = Field(default=None, min_length=1, max_length=80)
     paid_by_member_id: UUID | None = None
     personal_share_paise: int = Field(ge=0)
     splits: list[ProductionSplit] = Field(default_factory=list, max_length=20)
     source_account_id: UUID
+    destination_account_id: UUID | None = None
     occurred_at: datetime | None = None
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -70,6 +79,17 @@ class ProductionDraft(BaseModel):
             raise ValueError("personal and member splits must add up to the total")
         if self.kind == "income" and self.splits:
             raise ValueError("income cannot contain household splits")
+        if self.kind == "transfer":
+            if self.destination_account_id is None:
+                raise ValueError("transfer requires a destination account")
+            if self.destination_account_id == self.source_account_id:
+                raise ValueError("transfer accounts must be different")
+            if self.splits or self.paid_by_member_id is not None:
+                raise ValueError("transfer cannot contain household splits")
+        elif self.destination_account_id is not None:
+            raise ValueError("destination account is only valid for a transfer")
+        if self.kind != "transfer" and self.category is None:
+            raise ValueError("expense and income require a category")
         return self
 
 
@@ -169,6 +189,37 @@ async def list_members(client: ClientDependency) -> list[dict[str, Any]]:
     return [public_member(row) for row in await member_rows(client, household_id)]
 
 
+@router.get("/api/v1/profile", tags=["profile"])
+async def profile(
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    owner = await owner_member(client, household_id, auth.user_id)
+    households = await client.request(
+        "GET",
+        "households",
+        params={
+            "id": f"eq.{household_id}",
+            "select": "id,name",
+            "limit": "1",
+        },
+    )
+    if not households:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "household was not found")
+    members = await member_rows(client, household_id)
+    return {
+        "display_name": owner["display_name"],
+        "household_name": households[0]["name"],
+        "members": [
+            public_member(member)
+            for member in members
+            if str(member["id"]) != str(owner["id"])
+        ],
+    }
+
+
 @router.post(
     "/api/v1/onboarding/setup",
     status_code=status.HTTP_201_CREATED,
@@ -247,6 +298,24 @@ async def transaction_rows(
     return list(rows or [])
 
 
+async def transfer_link_rows(
+    client: SupabaseRestClient,
+    household_id: str,
+) -> list[dict[str, Any]]:
+    rows = await client.request(
+        "GET",
+        "transfer_links",
+        params={
+            "household_id": f"eq.{household_id}",
+            "select": (
+                "id,transfer_out_transaction_id,transfer_in_transaction_id,created_at"
+            ),
+            "order": "created_at.desc,id.desc",
+        },
+    )
+    return list(rows or [])
+
+
 def transaction_view(
     row: dict[str, Any],
     owner_id: str,
@@ -290,22 +359,78 @@ def transaction_view(
     }
 
 
+def ledger_views(
+    rows: list[dict[str, Any]],
+    links: list[dict[str, Any]],
+    owner_id: str,
+    categories: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collapse paired transfer rows into one user-facing ledger movement."""
+    rows_by_id = {str(row["id"]): row for row in rows}
+    links_by_out = {str(link["transfer_out_transaction_id"]): link for link in links}
+    views: list[dict[str, Any]] = []
+    for row in rows:
+        direction = str(row["direction"])
+        if direction in {"expense", "income"}:
+            views.append(transaction_view(row, owner_id, categories))
+            continue
+        if direction != "transfer_out":
+            continue
+        link = links_by_out.get(str(row["id"]))
+        if link is None:
+            continue
+        destination = rows_by_id.get(str(link["transfer_in_transaction_id"]))
+        if destination is None or destination.get("direction") != "transfer_in":
+            continue
+        amount_paise = int(row["amount_paise"])
+        views.append(
+            {
+                "id": link["id"],
+                "kind": "transfer",
+                "amount_paise": amount_paise,
+                "personal_share_paise": amount_paise,
+                "description": row.get("note") or "Account transfer",
+                "category": "Transfer",
+                "paid_by_member_id": None,
+                "source_account_id": row["account_id"],
+                "destination_account_id": destination["account_id"],
+                "settlement_member_id": None,
+                "settlement_direction": None,
+                "occurred_at": row["occurred_at"],
+                "notes": row.get("note"),
+                "splits": [],
+                "is_deleted": False,
+                "created_at": link.get("created_at") or row["created_at"],
+                "updated_at": link.get("created_at") or row["created_at"],
+                "account_delta_paise": 0,
+                "member_balance_deltas": [],
+            }
+        )
+    return views
+
+
 @router.get("/api/v1/transactions", tags=["transactions"])
 async def list_transactions(
     client: ClientDependency,
     auth: AuthDependency,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=2000)] = 0,
 ) -> list[dict[str, Any]]:
     household_id = await current_household(client)
     assert household_id is not None
     owner = await owner_member(client, household_id, auth.user_id)
     categories = await categories_by_id(client, household_id)
-    return [
-        transaction_view(row, str(owner["id"]), categories)
-        for row in await transaction_rows(client, household_id, limit=limit, offset=offset)
-        if row["direction"] in {"expense", "income"}
-    ]
+    # A transfer consumes two storage rows but one user-facing history row. Fetch
+    # enough raw activity to apply logical offset/limit after collapsing pairs.
+    rows = await transaction_rows(
+        client,
+        household_id,
+        limit=2 * (limit + offset),
+        offset=0,
+    )
+    links = await transfer_link_rows(client, household_id)
+    views = ledger_views(rows, links, str(owner["id"]), categories)
+    return views[offset : offset + limit]
 
 
 @router.post(
@@ -323,6 +448,38 @@ async def confirm_transaction(
     assert household_id is not None
     owner = await owner_member(client, household_id, auth.user_id)
     owner_id = str(owner["id"])
+    occurred_at = payload.occurred_at or datetime.now(UTC)
+    if payload.kind == "transfer":
+        transfer_result = await client.rpc(
+            "create_transfer",
+            {
+                "p_household_id": household_id,
+                "p_from_account_id": str(payload.source_account_id),
+                "p_to_account_id": str(payload.destination_account_id),
+                "p_amount_paise": payload.amount_paise,
+                "p_currency": "INR",
+                "p_occurred_at": occurred_at.isoformat(),
+                "p_idempotency_key": idempotency_key,
+                "p_note": payload.notes or payload.description,
+            },
+        )
+        transfer_row = transfer_result[0] if isinstance(transfer_result, list) else transfer_result
+        return {
+            "id": transfer_row["transfer_link_id"],
+            "kind": "transfer",
+            "amount_paise": payload.amount_paise,
+            "personal_share_paise": payload.amount_paise,
+            "description": payload.description,
+            "category": "Transfer",
+            "paid_by_member_id": None,
+            "source_account_id": str(payload.source_account_id),
+            "destination_account_id": str(payload.destination_account_id),
+            "occurred_at": occurred_at.isoformat(),
+            "notes": payload.notes,
+            "splits": [],
+            "is_deleted": False,
+        }
+    assert payload.category is not None
     category_rows = await client.request(
         "GET",
         "categories",
@@ -350,7 +507,7 @@ async def confirm_transaction(
             "p_direction": payload.kind,
             "p_amount_paise": payload.amount_paise,
             "p_currency": "INR",
-            "p_occurred_at": (payload.occurred_at or datetime.now(UTC)).isoformat(),
+            "p_occurred_at": occurred_at.isoformat(),
             "p_splits": splits,
             "p_idempotency_key": idempotency_key,
             "p_merchant": payload.description,
@@ -409,11 +566,8 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
     accounts = await account_rows(client, household_id)
     categories = await categories_by_id(client, household_id)
     rows = await transaction_rows(client, household_id, limit=1000)
-    views = [
-        transaction_view(row, owner_id, categories)
-        for row in rows
-        if row["direction"] in {"expense", "income"}
-    ]
+    links = await transfer_link_rows(client, household_id)
+    views = ledger_views(rows, links, owner_id, categories)
     now = datetime.now(UTC)
     month_key = now.strftime("%Y-%m")
     current = [view for view in views if str(view["occurred_at"]).startswith(month_key)]
@@ -453,7 +607,8 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
             if view["kind"] == "income"
         ),
         "net_cashflow_paise": sum(
-            int(view["amount_paise"]) * (1 if view["kind"] == "income" else -1)
+            int(view["amount_paise"])
+            * (1 if view["kind"] == "income" else -1 if view["kind"] == "expense" else 0)
             for view in views
         ),
         "member_balances": member_balances(rows, members, owner_id),
@@ -470,11 +625,119 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
 
 
 @router.post("/api/v1/drafts/parse", tags=["transactions"])
-async def parse_draft(_payload: ParseRequest, _auth: AuthDependency) -> None:
-    raise HTTPException(
-        status.HTTP_501_NOT_IMPLEMENTED,
-        "server-side production parsing is not enabled; use the validated client parser",
+async def parse_draft(
+    payload: ParseRequest,
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    accounts = await account_rows(client, household_id)
+    members = await member_rows(client, household_id)
+    owner = await owner_member(client, household_id, auth.user_id)
+    categories = list((await categories_by_id(client, household_id)).values())
+    try:
+        today = datetime.now(ZoneInfo(payload.timezone)).date().isoformat()
+    except ZoneInfoNotFoundError as error:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "timezone must be a valid IANA timezone",
+        ) from error
+    context = CaptureContext(
+        today=today,
+        timezone=payload.timezone,
+        accounts=[
+            CaptureAccount(
+                id=str(account["id"]),
+                name=str(account["name"]),
+                kind=cast(
+                    Literal["bank", "cash", "wallet", "credit_card", "other"],
+                    str(account["account_type"]),
+                ),
+            )
+            for account in accounts
+        ],
+        members=[
+            CaptureMember(id=str(member["id"]), name=str(member["display_name"]))
+            for member in members
+            if str(member["id"]) != str(owner["id"])
+        ],
+        categories=[
+            CaptureCategory(
+                id=str(category["id"]),
+                name=str(category["name"]),
+                kind=cast(
+                    Literal["expense", "income", "both"],
+                    str(category["category_type"]),
+                ),
+            )
+            for category in categories
+            if category["category_type"] in {"expense", "income", "both"}
+        ],
     )
+    interpreted = await LocalFinancialAssistant().interpret_capture(payload.text, context)
+    if interpreted is None:
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            "hosted capture interpretation is unavailable; use the validated client parser",
+        )
+    result = interpreted.result
+    if isinstance(result, CaptureClarification):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, result.question)
+    if isinstance(result, CaptureRejection):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason)
+    assert isinstance(result, CaptureDraftInterpretation)
+    if result.occurred_on is not None:
+        try:
+            occurred_at = datetime.combine(
+                date.fromisoformat(result.occurred_on),
+                datetime.min.time(),
+                tzinfo=UTC,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "interpreted date is invalid",
+            ) from error
+    else:
+        occurred_at = None
+    selected_members = list(result.member_ids) if result.kind == "expense" else []
+    if selected_members and result.split_equally:
+        base_share, remainder = divmod(result.amount_paise, len(selected_members) + 1)
+        personal_share = base_share + (1 if remainder else 0)
+        remaining_remainder = max(0, remainder - 1)
+        splits = [
+            {
+                "member_id": member_id,
+                "amount_paise": base_share + (1 if index < remaining_remainder else 0),
+            }
+            for index, member_id in enumerate(selected_members)
+        ]
+    else:
+        personal_share = result.amount_paise
+        splits = []
+    account_names = {str(account["id"]): str(account["name"]) for account in accounts}
+    return {
+        "draft": {
+            "kind": result.kind,
+            "amount_paise": result.amount_paise,
+            "description": result.description,
+            "category": result.category_name
+            or ("Transfer" if result.kind == "transfer" else "Other"),
+            "paid_by_member_id": None,
+            "personal_share_paise": personal_share,
+            "splits": splits,
+            "source_account_id": result.source_account_id,
+            "account_name": account_names[result.source_account_id],
+            "destination_account_id": result.destination_account_id,
+            "destination_account_name": account_names.get(result.destination_account_id or ""),
+            "occurred_at": occurred_at.isoformat() if occurred_at else None,
+            "notes": None,
+        },
+        "confidence": result.confidence,
+        "warnings": result.warnings,
+        "parser_source": f"{interpreted.provider}:{interpreted.model}",
+    }
 
 
 def safe_label(value: Any, fallback: str = "Uncategorized") -> str:
@@ -527,7 +790,10 @@ async def assistant_chat(
         recent_transactions=[
             ContextTransaction(
                 occurred_on=str(row["occurred_at"])[:10],
-                kind="income" if row["kind"] == "income" else "expense",
+                kind=cast(
+                    Literal["expense", "income", "transfer", "settlement"],
+                    str(row["kind"]),
+                ),
                 personal_share_paise=int(row["personal_share_paise"]),
                 category=safe_label(row.get("category")),
             )

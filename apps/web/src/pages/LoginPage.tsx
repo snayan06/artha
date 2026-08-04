@@ -44,8 +44,8 @@ export function LoginPage({
 
         <Card className="p-6 sm:p-8">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-moss-100 text-moss-800"><ShieldCheck className="h-6 w-6" /></span>
-          <h1 className="font-display mt-5 text-3xl font-bold tracking-[-0.05em]">Sign in to your ledger</h1>
-          <p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">We’ll email you a secure magic link. No password is stored by Artha.</p>
+          <h1 className="font-display mt-5 text-3xl font-bold tracking-[-0.05em]">Sign in to Artha</h1>
+          <p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">There is no separate sign-up. We’ll email one secure link: returning users open their existing ledger, while new users start setup.</p>
 
           <form className="mt-7" onSubmit={(event) => void submit(event)}>
             <label className="block" htmlFor="login-email">
@@ -60,7 +60,7 @@ export function LoginPage({
 
           {configurationError && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{configurationError}</p>}
           {error && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-          {sent && <p role="status" className="mt-4 rounded-xl border border-moss-200 bg-moss-50 px-4 py-3 text-sm text-moss-900">Check your email and open the link on this device to continue.</p>}
+          {sent && <p role="status" className="mt-4 rounded-xl border border-moss-200 bg-moss-50 px-4 py-3 text-sm leading-6 text-moss-900"><strong>Link sent—sign-in is not complete yet.</strong> Keep this tab open and open the email link in this same browser. Your existing onboarding and ledger will load automatically.</p>}
         </Card>
       </div>
     </main>
