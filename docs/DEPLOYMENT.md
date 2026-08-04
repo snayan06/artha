@@ -104,7 +104,7 @@ the production API is unavailable.
 
 ## Acceptance before calling production green
 
-Current status: **legacy staging data path green; personal deployment pending**.
+Current status: **personal Supabase schema green; Vercel deployment and final-domain acceptance pending**.
 Do not enter real financial data until every unchecked item passes.
 
 - [ ] Magic-link login works on the final PWA domain.

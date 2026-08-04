@@ -10,12 +10,13 @@ Updated: 4 August 2026
 - [x] React PWA, FastAPI API, database migrations, RLS policies and automated test suites are implemented.
 - [x] Personal Vercel account created under the intended owner.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
-- [ ] Create the fresh `artha-production` Supabase project in Mumbai.
-- [ ] Apply migrations and verify RLS isolation against the hosted database.
+- [x] Create the fresh `artha-production` Supabase project in Mumbai.
+- [x] Apply all migrations and pass hosted catalog/RLS schema assertions.
+- [ ] Complete anonymous-denial and two-household behavioural isolation on the hosted database.
 - [ ] Create and configure the `artha-api` and `artha-web` Vercel projects.
 - [ ] Pass final-domain authentication, financial-flow, responsive-layout and recovery acceptance.
 
-**Next action:** create `artha-production`. The owner must enter and safely store its database password; it must not be pasted into chat or committed to Git.
+**Next action:** complete Vercel account 2FA, then deploy `artha-api` and `artha-web`.
 
 ## Current execution queue
 
@@ -28,8 +29,9 @@ Updated: 4 August 2026
 2. **Create and secure the personal Supabase environment.**
    - [x] Confirm the personal Supabase account and organization are owned by the intended user.
    - [x] Permanently remove the two explicitly approved unrelated projects from that organization.
-   - [ ] Create a fresh Artha project under the correct personal account.
-   - [ ] Apply all versioned migrations from an empty database.
+   - [x] Create a fresh Artha project under the correct personal account.
+   - [x] Apply all versioned migrations from an empty database.
+   - [x] Pass hosted schema lint and catalog/RLS assertions.
    - [ ] Re-run anonymous-denial and two-household isolation tests.
    - Done when: sanitized RLS evidence is stored in `docs/artifacts/qa/`.
 3. **Deploy the API and PWA.**
@@ -142,7 +144,7 @@ Updated: 4 August 2026
 - [x] Rename the product, packages, environment variables and documentation from Artha's former working name.
 - [x] Select Vercel Hobby for the PWA/API plus Supabase Free; retain Render as a documented container fallback.
 - [x] Create personal hosting and Supabase accounts with no legacy account ownership.
-- [ ] Create a fresh Artha Supabase project and apply all versioned migrations.
+- [x] Create a fresh Artha Supabase project and apply all versioned migrations.
 - [ ] Repeat anonymous-denial and two-household RLS isolation against the fresh project.
 - [ ] Deploy the FastAPI API and React PWA, then configure exact CORS and magic-link redirect origins.
 - [ ] Add the server-side Groq key and enable experimental Qwen3.6-27B without exposing it to the browser.
