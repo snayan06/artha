@@ -7,7 +7,7 @@ Updated: 4 August 2026
 - [x] Create Desktop monorepo and local Git repository.
 - [x] Preserve product requirements and overall system architecture.
 - [x] Add environment template, repository rules and standard commands.
-- [ ] Publish a sanitized fresh-history public GitHub repository and verify `main`.
+- [x] Publish a sanitized fresh-history public GitHub repository and verify `main`.
 - [x] Add CI workflow for web and API checks.
 
 ## Milestone 1 — trustworthy ledger API
