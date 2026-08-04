@@ -1,5 +1,8 @@
 # Artha task list
 
+Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
+handoff and release guard.
+
 Updated: 5 August 2026
 
 For the current ordered delivery view, blockers and user actions, see

@@ -1,5 +1,8 @@
 # Artha sprint board
 
+Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
+handoff, release guard and exact resume sequence.
+
 Updated: 5 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 

@@ -1,5 +1,12 @@
 # Artha repository guidance
 
+## Start here
+
+Before planning or changing Artha, read `docs/PROJECT-CHECKPOINT.md`. Treat it as
+the current handoff, `docs/SPRINT-BOARD.md` as the ordered execution view and
+`docs/TASKS.md` as the complete backlog. Update the checkpoint after every
+meaningful work batch or release-state change.
+
 ## Product invariants
 
 - Money is stored as integer paise, never floating point.

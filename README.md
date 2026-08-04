@@ -218,6 +218,7 @@ screenshots. Report vulnerabilities according to [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
+- [Current project checkpoint](docs/PROJECT-CHECKPOINT.md)
 - [Product requirements](docs/product-requirements.md)
 - [Private-pilot product audit and priority reset](docs/product-audit-2026-08-04.md)
 - [System architecture](docs/system-architecture.md)
