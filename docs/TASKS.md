@@ -2,6 +2,57 @@
 
 Updated: 4 August 2026
 
+## Current execution queue
+
+### P0 — required before entering real financial data
+
+1. **Lock the free hosting architecture.**
+   - [ ] Record the final PWA, API and Supabase hosting choice in an architecture decision.
+   - [ ] Document account ownership, free-tier limits, sleep behavior and upgrade risks.
+   - Done when: every production surface has one named owner, provider and expected URL.
+2. **Create and secure the personal Supabase environment.**
+   - [ ] Create a fresh Artha project under the correct personal account.
+   - [ ] Apply all versioned migrations from an empty database.
+   - [ ] Re-run anonymous-denial and two-household isolation tests.
+   - Done when: sanitized RLS evidence is stored in `docs/artifacts/qa/`.
+3. **Deploy the API and PWA.**
+   - [ ] Deploy FastAPI with production mode and server-only secrets.
+   - [ ] Deploy the React PWA with the Supabase publishable key and exact API origin.
+   - [ ] Configure exact CORS origins and Supabase magic-link redirects.
+   - Done when: health, login, onboarding and confirmed capture work on final URLs.
+4. **Complete authentication acceptance.**
+   - [ ] Verify magic-link login, session refresh, reload persistence and sign-out.
+   - [ ] Verify two different users can independently onboard and see only their own households.
+   - [ ] Keep same-household member invitations disabled until the V2 authorization flow is complete.
+   - Done when: the final-domain isolation scenario passes with two real test identities.
+5. **Complete recovery and production QA.**
+   - [ ] Implement encrypted export and tested restore.
+   - [ ] Execute every production-pending row in the V1 QA matrix.
+   - [ ] Recheck 320 px, 390 px and desktop layouts in light and dark modes.
+   - Done when: recovery evidence, final URLs and the signed-off QA report are recorded.
+
+### P1 — private-pilot improvements
+
+- [ ] Add edit, correction and soft-delete controls to the UI for the existing API operations.
+- [ ] Show assistant evidence date range, source count and matching transactions.
+- [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
+- [ ] Run the 50-case hosted-model benchmark before locking the production model.
+- [ ] Configure the selected hosted Qwen provider only after the benchmark and privacy review.
+- [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
+
+### P2 — expansion after the private pilot
+
+- [ ] Add optional WhatsApp or Telegram capture.
+- [ ] Add investments, liabilities and net-worth tracking.
+
+### Definition of done for every task
+
+- The implementation, tests and relevant documentation are updated together.
+- `make check` and GitHub CI pass.
+- UI changes are checked on mobile and desktop in both themes.
+- No secrets or real financial data appear in source, logs, fixtures or screenshots.
+- Deployment or security work includes sanitized evidence under `docs/artifacts/qa/`.
+
 ## Milestone 0 — repository foundation
 
 - [x] Create Desktop monorepo and local Git repository.
