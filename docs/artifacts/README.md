@@ -34,5 +34,6 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [V1 public-release verification](qa/v1-public-release.md)
 - [Production staging verification](qa/production-staging-verification.md)
 - [Personal Supabase launch verification](qa/2026-08-04-personal-supabase.md)
+- [Personal Vercel launch verification](qa/2026-08-04-personal-vercel.md)
 - [UI artifact guide](ui/README.md)
 - [Architecture artifact guide](architecture/README.md)

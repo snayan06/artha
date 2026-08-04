@@ -13,10 +13,10 @@ Updated: 4 August 2026
 - [x] Create the fresh `artha-production` Supabase project in Mumbai.
 - [x] Apply all migrations and pass hosted catalog/RLS schema assertions.
 - [ ] Complete anonymous-denial and two-household behavioural isolation on the hosted database.
-- [ ] Create and configure the `artha-api` and `artha-web` Vercel projects.
+- [x] Create and configure the `artha-api` and `artha-web` Vercel projects.
 - [ ] Pass final-domain authentication, financial-flow, responsive-layout and recovery acceptance.
 
-**Next action:** complete Vercel account 2FA, then deploy `artha-api` and `artha-web`.
+**Next action:** verify magic-link authentication and two-household isolation on the final domain.
 
 ## Current execution queue
 
@@ -35,9 +35,9 @@ Updated: 4 August 2026
    - [ ] Re-run anonymous-denial and two-household isolation tests.
    - Done when: sanitized RLS evidence is stored in `docs/artifacts/qa/`.
 3. **Deploy the API and PWA.**
-   - [ ] Deploy FastAPI with production mode and server-only secrets.
-   - [ ] Deploy the React PWA with the Supabase publishable key and exact API origin.
-   - [ ] Configure exact CORS origins and Supabase magic-link redirects.
+   - [x] Deploy FastAPI with production mode and server-only secrets.
+   - [x] Deploy the React PWA with the Supabase publishable key and exact API origin.
+   - [x] Configure exact CORS origins and Supabase magic-link redirects.
    - Done when: health, login, onboarding and confirmed capture work on final URLs.
 4. **Complete authentication acceptance.**
    - [ ] Verify magic-link login, session refresh, reload persistence and sign-out.
@@ -146,12 +146,12 @@ Updated: 4 August 2026
 - [x] Create personal hosting and Supabase accounts with no legacy account ownership.
 - [x] Create a fresh Artha Supabase project and apply all versioned migrations.
 - [ ] Repeat anonymous-denial and two-household RLS isolation against the fresh project.
-- [ ] Deploy the FastAPI API and React PWA, then configure exact CORS and magic-link redirect origins.
+- [x] Deploy the FastAPI API and React PWA, then configure exact CORS and magic-link redirect origins.
 - [ ] Add the server-side Groq key and enable experimental Qwen3.6-27B without exposing it to the browser.
 - [ ] Test login, onboarding, four bank accounts, multiple cards, backdated capture and family splits on the final domain.
 - [ ] Verify mobile layouts at 320 px and 390 px plus desktop, including light and dark modes.
 - [ ] Implement encrypted export/restore and complete a recovery drill before entering real financial data.
-- [ ] Record final URLs, ownership, environment inventory and acceptance evidence in `docs/artifacts/qa/`.
+- [x] Record final URLs, ownership and environment inventory in `docs/artifacts/qa/`; keep adding acceptance evidence as tests pass.
 
 ## Assistant preview and V2
 

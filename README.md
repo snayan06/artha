@@ -10,11 +10,10 @@ in natural language, understanding spending, and correctly accounting for
 shared household expenses.
 
 > [!IMPORTANT]
-> Artha V1 has a verified local build and a tested legacy Supabase staging path.
-> Production JWT verification, the REST/RPC repository and two-household RLS
-> isolation pass, but that staging project is under the wrong account and will
-> not be used for launch. Personal hosting, magic-link and recovery acceptance
-> are still pending, so use fictional data until the deployment runbook is green.
+> Artha V1 is deployed on the intended personal Vercel and Supabase accounts.
+> The hosted schema, API health check and PWA route fallback are green. Magic-link,
+> two-identity isolation and recovery acceptance are still pending, so use
+> fictional data until the complete deployment runbook is green.
 
 ## Why Artha?
 
@@ -170,17 +169,18 @@ Ruff, strict mypy and pytest.
 
 ## Deployment status
 
-The private-pilot topology is locked: two Vercel Hobby projects (`apps/web` and
-`apps/api`) plus a fresh Supabase Free project. Deployment configuration is
-checked in. The previous Cloudflare Pages + Render path remains an optional
-container fallback. The legacy Supabase staging schema and RLS isolation
-exercise are green, but that project is not approved for real Artha data.
+The private-pilot topology is live: two Vercel Hobby projects (`apps/web` and
+`apps/api`) plus the fresh personal `artha-production` Supabase Free project.
+The previous Cloudflare Pages + Render path remains an optional container
+fallback.
+
+- PWA: <https://artha-web-one.vercel.app>
+- API health: <https://artha-api-mu.vercel.app/health>
 
 Before production can be called green:
 
-- create personal hosting and Supabase accounts with no legacy account ownership;
-- deploy and verify the final API and PWA URLs;
 - verify magic-link login, refresh and sign-out on the final domain;
+- repeat two-identity household isolation on the personal production database;
 - verify final-domain authentication, export and restore behavior.
 
 See [the deployment runbook](docs/DEPLOYMENT.md) for the complete acceptance gate.

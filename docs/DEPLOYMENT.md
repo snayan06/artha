@@ -9,9 +9,9 @@ project. All three must be owned by the user's personal account; the legacy
 | Surface | Target owner | Project | Expected URL |
 |---|---|---|---|
 | Source and CI | GitHub `snayan06` | `artha` | `github.com/snayan06/artha` |
-| PWA | Personal Vercel account | `artha-web` | `https://artha-web.vercel.app` or assigned equivalent |
-| API | Personal Vercel account | `artha-api` | `https://artha-api.vercel.app` or assigned equivalent |
-| Auth and data | Personal Supabase organization | `artha-production` | `https://<new-project-ref>.supabase.co` |
+| PWA | Personal Vercel account | `artha-web` | `https://artha-web-one.vercel.app` |
+| API | Personal Vercel account | `artha-api` | `https://artha-api-mu.vercel.app` |
+| Auth and data | Personal Supabase organization | `artha-production` | `https://vggvufukkkirlwxqkjhz.supabase.co` |
 
 Record the actual project IDs and URLs in `docs/artifacts/qa/` after creation.
 Do not record passwords, access tokens, JWTs or private keys.
@@ -44,7 +44,7 @@ project named `artha-api`.
 
 - Root directory: `apps/api`
 - Framework: FastAPI/Python auto-detection
-- Entrypoint: `artha_api.app:app` from `pyproject.toml`
+- Entrypoint: recognized `src/app.py` shim exporting `artha_api.app:app`
 - Build/output overrides: none
 - Health check after deployment: `GET /health`
 
@@ -52,8 +52,8 @@ Production environment variables:
 
 ```dotenv
 ARTHA_ENV=production
-ARTHA_CORS_ORIGINS=https://artha-web.vercel.app
-SUPABASE_URL=https://<new-project-ref>.supabase.co
+ARTHA_CORS_ORIGINS=https://artha-web-one.vercel.app
+SUPABASE_URL=https://vggvufukkkirlwxqkjhz.supabase.co
 SUPABASE_ANON_KEY=<publishable-or-anon-key>
 SUPABASE_JWT_AUDIENCE=authenticated
 ARTHA_LLM_PROVIDER=disabled
@@ -76,9 +76,9 @@ Import the same repository as a second project named `artha-web`.
 Production environment variables:
 
 ```dotenv
-VITE_API_URL=https://artha-api.vercel.app
+VITE_API_URL=https://artha-api-mu.vercel.app
 VITE_DEMO_MODE=false
-VITE_SUPABASE_URL=https://<new-project-ref>.supabase.co
+VITE_SUPABASE_URL=https://vggvufukkkirlwxqkjhz.supabase.co
 VITE_SUPABASE_ANON_KEY=<publishable-or-anon-key>
 ```
 
@@ -104,7 +104,7 @@ the production API is unavailable.
 
 ## Acceptance before calling production green
 
-Current status: **personal Supabase schema green; Vercel deployment and final-domain acceptance pending**.
+Current status: **personal infrastructure live; authenticated final-domain and recovery acceptance pending**.
 Do not enter real financial data until every unchecked item passes.
 
 - [ ] Magic-link login works on the final PWA domain.
@@ -115,9 +115,9 @@ Do not enter real financial data until every unchecked item passes.
 - [ ] A confirmed shared transaction updates account movement, personal spend and
   every selected member receivable correctly.
 - [ ] Four bank accounts, multiple cards and a backdated entry work end to end.
-- [ ] Direct loads of every PWA route return the application rather than 404.
+- [x] Direct loads of every PWA route return the application rather than 404.
 - [ ] Mobile widths 320 px and 390 px plus desktop pass in light and dark modes.
 - [ ] API and browser logs contain no tokens or financial payloads.
 - [ ] Encrypted export reconstructs the ledger and a restore drill succeeds.
-- [ ] Final URLs, owners, project IDs and sanitized evidence are stored under
+- [x] Final URLs, owners, project IDs and sanitized evidence are stored under
   `docs/artifacts/qa/`.
