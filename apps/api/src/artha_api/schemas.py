@@ -41,6 +41,12 @@ class AccountCreate(ApiModel):
             raise ValueError("credit limit and statement dates are only valid for credit cards")
         if self.kind is AccountKind.CREDIT_CARD and self.opening_balance_paise > 0:
             raise ValueError("credit-card outstanding must be a negative opening balance")
+        if (
+            self.kind is AccountKind.CREDIT_CARD
+            and self.credit_limit_paise is not None
+            and abs(self.opening_balance_paise) > self.credit_limit_paise
+        ):
+            raise ValueError("credit-card outstanding cannot exceed the credit limit")
         return self
 
 

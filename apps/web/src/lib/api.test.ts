@@ -59,6 +59,27 @@ describe('FastAPI adapter', () => {
     await expect(confirmDraft(draft)).rejects.toThrow('API request failed (422)')
   })
 
+  it('does not hide a parser validation error behind the local fallback', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 422 })))
+    const { parseDraft } = await import('./api')
+
+    await expect(parseDraft('split equally without an amount')).rejects.toThrow('API request failed (422)')
+  })
+
+  it('uses the local parser only for a transient API outage in demo mode', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 503 })))
+    const { parseDraft } = await import('./api')
+
+    const parsed = await parseDraft('Paid 250 for coffee yesterday from HDFC UPI')
+    expect(parsed.demo).toBe(true)
+    expect(parsed.data.amountPaise).toBe(25_000)
+    expect(parsed.data.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
   it('bootstraps the API in demo mode', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubEnv('VITE_DEMO_MODE', 'true')

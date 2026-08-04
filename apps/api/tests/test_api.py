@@ -180,6 +180,57 @@ async def test_transfer_changes_accounts_but_not_spend_or_total(
     assert after["net_cashflow_paise"] == before["net_cashflow_paise"]
 
 
+async def test_credit_card_payment_reduces_cash_and_outstanding_without_new_spend(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    card = await client.post(
+        "/api/v1/accounts",
+        json={
+            "name": "Travel Card",
+            "kind": "credit_card",
+            "opening_balance_paise": -50_000,
+            "credit_limit_paise": 500_000,
+        },
+    )
+    card_id = card.json()["id"]
+    bank_id = account_id(bootstrapped, "HDFC UPI")
+    before_dashboard = (await client.get("/api/v1/dashboard")).json()
+    before_accounts = {
+        account["id"]: account for account in (await client.get("/api/v1/accounts")).json()
+    }
+
+    payment = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "card-payment-0001"},
+        json={
+            "kind": "transfer",
+            "amount_paise": 20_000,
+            "description": "Credit card payment",
+            "category": None,
+            "paid_by_member_id": None,
+            "settlement_member_id": None,
+            "personal_share_paise": 20_000,
+            "splits": [],
+            "source_account_id": bank_id,
+            "destination_account_id": card_id,
+        },
+    )
+    after_dashboard = (await client.get("/api/v1/dashboard")).json()
+    after_accounts = {
+        account["id"]: account for account in (await client.get("/api/v1/accounts")).json()
+    }
+
+    assert payment.status_code == 201
+    assert payment.json()["account_delta_paise"] == 0
+    assert after_accounts[bank_id]["current_balance_paise"] == (
+        before_accounts[bank_id]["current_balance_paise"] - 20_000
+    )
+    assert after_accounts[card_id]["current_balance_paise"] == -30_000
+    assert after_dashboard["total_balance_paise"] == before_dashboard["total_balance_paise"]
+    assert after_dashboard["spend_paise"] == before_dashboard["spend_paise"]
+    assert after_dashboard["income_paise"] == before_dashboard["income_paise"]
+
+
 async def test_settlement_is_cash_movement_not_income_or_spend(
     client: AsyncClient, bootstrapped: dict[str, Any]
 ) -> None:
@@ -248,6 +299,56 @@ async def test_member_paid_expense_has_no_user_account_movement(
     ]
     assert after["total_balance_paise"] == before["total_balance_paise"]
     assert after["spend_paise"] == before["spend_paise"] + 25_000
+
+
+async def test_user_paid_settlement_clears_payable_without_new_spending(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    member = member_id(bootstrapped)
+    account = account_id(bootstrapped, "HDFC UPI")
+    member_paid = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "member-paid-before-settlement-0001"},
+        json={
+            "kind": "expense",
+            "amount_paise": 50_000,
+            "description": "Member paid dinner",
+            "category": "Food & Dining",
+            "paid_by_member_id": member,
+            "settlement_member_id": None,
+            "personal_share_paise": 25_000,
+            "splits": [{"member_id": member, "amount_paise": 25_000}],
+            "source_account_id": account,
+        },
+    )
+    before_settlement = (await client.get("/api/v1/dashboard")).json()
+    settlement = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "paid-settlement-0001"},
+        json={
+            "kind": "settlement",
+            "amount_paise": 25_000,
+            "description": "Paid Avery back",
+            "category": None,
+            "paid_by_member_id": None,
+            "settlement_member_id": member,
+            "personal_share_paise": 25_000,
+            "splits": [],
+            "source_account_id": account,
+            "settlement_direction": "paid",
+        },
+    )
+    after_settlement = (await client.get("/api/v1/dashboard")).json()
+
+    assert member_paid.status_code == 201
+    assert settlement.status_code == 201
+    assert settlement.json()["account_delta_paise"] == -25_000
+    assert settlement.json()["member_balance_deltas"] == [
+        {"member_id": member, "amount_paise": 25_000}
+    ]
+    assert after_settlement["member_balances"][0]["balance_paise"] == 92_000
+    assert after_settlement["spend_paise"] == before_settlement["spend_paise"]
+    assert after_settlement["income_paise"] == before_settlement["income_paise"]
 
 
 async def test_edit_rebuilds_ledger_and_soft_delete_removes_effects(
@@ -343,6 +444,42 @@ async def test_atomic_account_setup_supports_credit_cards(client: AsyncClient) -
     assert credit_card["payment_due_day"] == 30
 
 
+async def test_onboarding_supports_four_money_accounts_and_multiple_cards(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/api/v1/onboarding/setup",
+        json={
+            "accounts": [
+                {"name": "Salary Bank", "kind": "bank", "opening_balance_paise": 100_000},
+                {"name": "Savings Bank", "kind": "bank", "opening_balance_paise": 200_000},
+                {"name": "UPI Bank", "kind": "bank", "opening_balance_paise": 300_000},
+                {"name": "Cash", "kind": "cash", "opening_balance_paise": 10_000},
+                {
+                    "name": "Travel Card",
+                    "kind": "credit_card",
+                    "opening_balance_paise": -20_000,
+                    "credit_limit_paise": 500_000,
+                },
+                {
+                    "name": "Rewards Card",
+                    "kind": "credit_card",
+                    "opening_balance_paise": -30_000,
+                    "credit_limit_paise": 750_000,
+                },
+            ],
+            "members": [{"name": "Avery"}, {"name": "Jordan"}],
+        },
+    )
+
+    assert response.status_code == 201
+    assert len(response.json()["accounts"]) == 6
+    assert len(response.json()["members"]) == 2
+    assert sum(
+        account["current_balance_paise"] for account in response.json()["accounts"]
+    ) == 560_000
+
+
 async def test_account_setup_rejects_duplicates_atomically(client: AsyncClient) -> None:
     within_request = await client.post(
         "/api/v1/accounts/setup",
@@ -404,6 +541,15 @@ async def test_credit_card_fields_are_validated(client: AsyncClient) -> None:
             "statement_day": 32,
         },
     )
+    outstanding_above_limit = await client.post(
+        "/api/v1/accounts",
+        json={
+            "name": "Over Limit Card",
+            "kind": "credit_card",
+            "opening_balance_paise": -200_000,
+            "credit_limit_paise": 100_000,
+        },
+    )
     too_many_accounts = await client.post(
         "/api/v1/accounts/setup",
         json={
@@ -429,6 +575,7 @@ async def test_credit_card_fields_are_validated(client: AsyncClient) -> None:
     assert credit_limit_on_bank.status_code == 422
     assert positive_outstanding.status_code == 422
     assert invalid_statement_day.status_code == 422
+    assert outstanding_above_limit.status_code == 422
     assert too_many_accounts.status_code == 422
     assert invalid_balance_update.status_code == 422
 
@@ -580,3 +727,77 @@ async def test_invalid_share_sum_and_same_account_transfer_are_rejected(
 
     assert bad_split.status_code == 422
     assert bad_transfer.status_code == 422
+
+
+async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    account = account_id(bootstrapped, "HDFC UPI")
+    member = member_id(bootstrapped)
+    duplicate_splits = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "duplicate-splits-0001"},
+        json={
+            "kind": "expense",
+            "amount_paise": 1_000,
+            "description": "Duplicate split",
+            "personal_share_paise": 400,
+            "splits": [
+                {"member_id": member, "amount_paise": 300},
+                {"member_id": member, "amount_paise": 300},
+            ],
+            "source_account_id": account,
+        },
+    )
+    unknown_account = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "unknown-account-0001"},
+        json={
+            "kind": "expense",
+            "amount_paise": 1_000,
+            "description": "Unknown account",
+            "personal_share_paise": 1_000,
+            "splits": [],
+            "source_account_id": 999_999,
+        },
+    )
+    unknown_member = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "unknown-member-0001"},
+        json={
+            "kind": "expense",
+            "amount_paise": 1_000,
+            "description": "Unknown member",
+            "personal_share_paise": 500,
+            "splits": [{"member_id": 999_999, "amount_paise": 500}],
+            "source_account_id": account,
+        },
+    )
+
+    assert duplicate_splits.status_code == 422
+    assert unknown_account.status_code == 404
+    assert unknown_account.json()["detail"] == "account not found or archived"
+    assert unknown_member.status_code == 404
+    assert unknown_member.json()["detail"] == "household member not found or archived"
+
+
+async def test_concurrent_same_key_confirmation_never_duplicates_the_ledger(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    parsed = await client.post(
+        "/api/v1/drafts/parse",
+        json={"text": "Paid 250 for lunch from HDFC UPI"},
+    )
+    draft = parsed.json()["draft"]
+    headers = {"Idempotency-Key": "concurrent-confirm-0001"}
+
+    first, second = await asyncio.gather(
+        client.post("/api/v1/transactions/confirm", json=draft, headers=headers),
+        client.post("/api/v1/transactions/confirm", json=draft, headers=headers),
+    )
+    transactions = (await client.get("/api/v1/transactions")).json()
+    matching = [item for item in transactions if item["description"] == "Lunch"]
+
+    assert 201 in {first.status_code, second.status_code}
+    assert {first.status_code, second.status_code}.issubset({201, 409})
+    assert len(matching) == 1

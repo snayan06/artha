@@ -66,11 +66,16 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
       setError('Add at least one bank, cash, or wallet account.')
       return false
     }
-    if (moneyRows.some((row) => !row.name.trim() || row.balance === '' || Number(row.balance) < 0)) {
+    const accountNames = [...moneyRows, ...cardRows].map((row) => row.name.trim().toLowerCase()).filter(Boolean)
+    if (new Set(accountNames).size !== accountNames.length) {
+      setError('Give every account and card a unique name.')
+      return false
+    }
+    if (moneyRows.some((row) => !row.name.trim() || !isSupportedMoney(row.balance) || Number(row.balance) < 0)) {
       setError('Give every money account a name and a current balance of zero or more.')
       return false
     }
-    if (cardRows.some((row) => !row.name.trim() || row.outstanding === '' || row.limit === '' || Number(row.outstanding) < 0 || Number(row.limit) <= 0)) {
+    if (cardRows.some((row) => !row.name.trim() || !isSupportedMoney(row.outstanding) || !isSupportedMoney(row.limit) || Number(row.outstanding) < 0 || Number(row.limit) <= 0)) {
       setError('Give every card a name, current outstanding, and credit limit.')
       return false
     }
@@ -243,6 +248,12 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
       </div>
     </div>
   )
+}
+
+function isSupportedMoney(value: string): boolean {
+  if (value.trim() === '') return false
+  const rupees = Number(value)
+  return Number.isFinite(rupees) && Number.isSafeInteger(Math.round(rupees * 100))
 }
 
 function SetupField({ label, ariaLabel, prefix, ...inputProps }: { label: string; ariaLabel: string; prefix?: string; value: string; placeholder: string; inputMode?: 'decimal' | 'numeric'; onChange: (value: string) => void }) {

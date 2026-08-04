@@ -162,7 +162,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
             <div className="border-t border-line bg-[#fbfcfa] p-5 dark:bg-night-raised">
               <div className="mb-4 flex items-start gap-2 text-xs text-[#6f7b75] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" /><p><strong className="text-ink">Nothing has been saved yet.</strong> Confirm only after these details look right.{usedFallback && ' Parsed safely on this device while the API is unavailable.'}</p></div>
-              <Button onClick={() => void confirm()} loading={saving} disabled={!draft.amountPaise || !draft.merchant.trim()} className="w-full" icon={<Check className="h-4 w-4" />}>Confirm and add transaction</Button>
+              <Button onClick={() => void confirm()} loading={saving} disabled={draft.amountPaise <= 0 || !draft.merchant.trim()} className="w-full" icon={<Check className="h-4 w-4" />}>Confirm and add transaction</Button>
             </div>
           </Card>
           {draft.confidence === 'review' && <p className="mt-3 flex items-center gap-2 text-xs text-amber-800"><Info className="h-4 w-4" /> One or more fields were inferred with low confidence. Please check them carefully.</p>}

@@ -28,4 +28,10 @@ describe('money helpers', () => {
     expect(rupeesToPaise(1840.25)).toBe(184_025)
     expect(formatMoney(184_025)).toBe('₹1,840')
   })
+
+  it('rejects non-finite and unsafe browser amounts at the input boundary', () => {
+    expect(rupeesToPaise(Number.POSITIVE_INFINITY)).toBe(0)
+    expect(rupeesToPaise(Number.NaN)).toBe(0)
+    expect(rupeesToPaise(Number.MAX_SAFE_INTEGER)).toBe(0)
+  })
 })

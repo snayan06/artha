@@ -45,6 +45,18 @@ def test_parser_leaves_date_unset_when_absent() -> None:
     assert parsed.draft.occurred_at is None
 
 
+def test_yearless_date_uses_most_recent_past_occurrence() -> None:
+    january_now = datetime(2026, 1, 2, 18, 30, tzinfo=UTC)
+
+    parsed = parse_transaction(
+        "Paid 500 for groceries from HDFC UPI on 31 Dec",
+        [ACCOUNT],
+        now=january_now,
+    )
+
+    assert parsed.draft.occurred_at == datetime(2025, 12, 31, tzinfo=UTC)
+
+
 def test_relative_date_uses_callers_local_calendar_day() -> None:
     india_now = datetime(2026, 8, 5, 0, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
     parsed = parse_transaction(
@@ -69,6 +81,30 @@ def test_parser_recognizes_member_paid_shared_expense() -> None:
     assert [split.model_dump() for split in parsed.draft.splits] == [
         {"member_id": AVERY.id, "amount_paise": 50_000}
     ]
+
+
+def test_equal_split_distributes_odd_paise_without_losing_money() -> None:
+    parsed = parse_transaction(
+        "Paid 100.01 for dinner from HDFC UPI, split equally with Avery and Jordan",
+        [ACCOUNT],
+        [AVERY, JORDAN],
+        now=FIXED_NOW,
+    )
+
+    split_amounts = [split.amount_paise for split in parsed.draft.splits]
+    assert parsed.draft.personal_share_paise == 3_334
+    assert split_amounts == [3_334, 3_333]
+    assert parsed.draft.personal_share_paise + sum(split_amounts) == 10_001
+
+
+def test_equal_split_requires_a_recognized_household_member() -> None:
+    with pytest.raises(ParseError, match="recognized household member"):
+        parse_transaction(
+            "Paid 500 for dinner from HDFC UPI, split equally with Unknown Person",
+            [ACCOUNT],
+            [AVERY],
+            now=FIXED_NOW,
+        )
 
 
 def test_parser_recognizes_member_settlement() -> None:

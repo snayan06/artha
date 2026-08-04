@@ -14,5 +14,6 @@ export function formatMoney(paise: Paise, options?: { sign?: boolean }): string 
 }
 
 export function rupeesToPaise(rupees: number): Paise {
-  return Math.round(rupees * 100)
+  const paise = Math.round(rupees * 100)
+  return Number.isFinite(paise) && Number.isSafeInteger(paise) ? paise : 0
 }

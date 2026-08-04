@@ -1,12 +1,14 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RouterProvider } from '../lib/router'
 import type { Transaction } from '../types'
 import { localDateOffset } from '../lib/date'
 import { QuickAddPage } from './QuickAddPage'
 
 describe('QuickAddPage', () => {
+  afterEach(cleanup)
+
   it('keeps a parsed entry unsaved until explicit confirmation', async () => {
     const user = userEvent.setup()
     const confirmed: Transaction = {
@@ -36,5 +38,44 @@ describe('QuickAddPage', () => {
     await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
     expect(screen.getByLabelText('Transaction date')).toHaveValue(localDateOffset(0))
     expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
+  })
+
+  it('prevents rapid duplicate confirmation while the first write is pending', async () => {
+    const user = userEvent.setup()
+    let finishConfirmation: ((transaction: Transaction) => void) | undefined
+    const pendingConfirmation = new Promise<Transaction>((resolve) => {
+      finishConfirmation = resolve
+    })
+    const onConfirm = vi.fn().mockReturnValue(pendingConfirmation)
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '123')
+    await user.type(screen.getByLabelText('Description'), 'Coffee')
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    await user.dblClick(confirmButton)
+
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(confirmButton).toBeDisabled()
+    finishConfirmation?.({
+      id: 'only-once', kind: 'debit', amountPaise: 12_300, personalSharePaise: 12_300,
+      merchant: 'Coffee', category: 'Other', account: 'HDFC UPI', occurredAt: localDateOffset(0),
+      memberSplits: [], status: 'confirmed'
+    })
+    expect(await screen.findByText(/added to your artha/i)).toBeInTheDocument()
+  })
+
+  it('keeps confirmation disabled for zero or negative amounts', async () => {
+    const user = userEvent.setup()
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Description'), 'Invalid amount')
+    const amount = screen.getByLabelText('Amount in rupees')
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    expect(confirmButton).toBeDisabled()
+
+    fireEvent.change(amount, { target: { value: '-10' } })
+    expect(confirmButton).toBeDisabled()
   })
 })

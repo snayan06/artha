@@ -41,4 +41,56 @@ describe('OnboardingPage', () => {
     await user.click(screen.getByRole('button', { name: 'Explore fictional demo' }))
     await waitFor(() => expect(onExploreDemo).toHaveBeenCalledWith({ displayName: 'You', householdName: 'My household', members: [] }))
   })
+
+  it('rejects duplicate names across money accounts and credit cards before review', async () => {
+    const user = userEvent.setup()
+    render(<OnboardingPage onSave={vi.fn()} onExploreDemo={vi.fn()} />)
+
+    await user.type(screen.getByLabelText('Money account 1 name'), 'Shared name')
+    await user.type(screen.getByLabelText('Money account 1 current balance'), '1000')
+    await user.click(screen.getByRole('button', { name: /Add a credit card/ }))
+    await user.type(screen.getByLabelText('Credit card 1 name'), ' shared NAME ')
+    await user.type(screen.getByLabelText('Credit card 1 outstanding'), '100')
+    await user.type(screen.getByLabelText('Credit card 1 credit limit'), '1000')
+    await user.click(screen.getByRole('button', { name: 'Review setup' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('unique name')
+    expect(screen.getByRole('heading', { name: 'Where does your money live?' })).toBeInTheDocument()
+  })
+
+  it('rejects non-finite opening balances in the browser', async () => {
+    const user = userEvent.setup()
+    render(<OnboardingPage onSave={vi.fn()} onExploreDemo={vi.fn()} />)
+
+    await user.type(screen.getByLabelText('Money account 1 name'), 'Primary')
+    await user.type(screen.getByLabelText('Money account 1 current balance'), 'Infinity')
+    await user.click(screen.getByRole('button', { name: 'Review setup' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('current balance of zero or more')
+  })
+
+  it('does not advance with an empty required account row', async () => {
+    const user = userEvent.setup()
+    render(<OnboardingPage onSave={vi.fn()} onExploreDemo={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Review setup' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('current balance of zero or more')
+    expect(screen.getByRole('heading', { name: 'Where does your money live?' })).toBeInTheDocument()
+  })
+
+  it('rejects a credit-card outstanding amount above its limit', async () => {
+    const user = userEvent.setup()
+    render(<OnboardingPage onSave={vi.fn()} onExploreDemo={vi.fn()} />)
+
+    await user.type(screen.getByLabelText('Money account 1 name'), 'Primary')
+    await user.type(screen.getByLabelText('Money account 1 current balance'), '1000')
+    await user.click(screen.getByRole('button', { name: /Add a credit card/ }))
+    await user.type(screen.getByLabelText('Credit card 1 name'), 'Travel Card')
+    await user.type(screen.getByLabelText('Credit card 1 outstanding'), '2000')
+    await user.type(screen.getByLabelText('Credit card 1 credit limit'), '1000')
+    await user.click(screen.getByRole('button', { name: 'Review setup' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('cannot be higher than its credit limit')
+  })
 })

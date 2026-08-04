@@ -67,6 +67,7 @@ Updated: 4 August 2026
 - [x] Re-run responsive QA after onboarding/theme changes at narrow mobile, mobile and desktop widths.
 - [x] Document deployment steps for Pages, Render and Supabase.
 - [x] Record remaining V1 limitations explicitly.
+- [x] Maintain a V1 QA matrix covering happy paths, financial invariants and edge cases.
 
 ## Milestone 6 — Artha private-pilot launch
 

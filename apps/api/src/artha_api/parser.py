@@ -183,9 +183,16 @@ def _parse_occurred_at(text: str, now: datetime) -> datetime | None:
     )
     if named_date:
         try:
-            return _midnight_utc(
-                date(today.year, MONTHS[named_date.group(2)], int(named_date.group(1)))
+            parsed_date = date(
+                today.year,
+                MONTHS[named_date.group(2)],
+                int(named_date.group(1)),
             )
+            # Capture is for completed ledger events. A month/day without a year
+            # therefore means the most recent occurrence, never a future date.
+            if parsed_date > today:
+                parsed_date = parsed_date.replace(year=today.year - 1)
+            return _midnight_utc(parsed_date)
         except ValueError as error:
             raise ParseError("date is invalid") from error
     return None
