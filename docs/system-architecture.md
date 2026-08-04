@@ -1,6 +1,6 @@
 # Artha — Overall System Architecture and Deployment Plan
 
-Status: V1 implemented; personal-account deployment decision pending
+Status: V1 implemented; personal-account deployment pending
 Date: 4 August 2026
 
 ## Architecture decision
@@ -21,8 +21,8 @@ This is the complete product architecture: user interface, API, authentication, 
 | Auth | Supabase Auth magic link | Simple private pilot authentication |
 | Database | Supabase Postgres with RLS | Relational integrity, atomic split accounting and household isolation |
 | Migrations | Supabase CLI SQL migrations | Keeps policies, functions and schema versioned together |
-| Frontend hosting | Cloudflare Pages Free | Static PWA hosting with generous free limits |
-| Python hosting | Render Free Web Service | Simple FastAPI deployment with no paid instance required for the pilot |
+| Frontend hosting | Vercel Hobby | Static Vite PWA under the same personal provider as the API |
+| Python hosting | Vercel Python runtime | FastAPI function without Render's minute-long idle wake-up |
 | AI inference | Experimental Qwen3.6-27B on Groq; local Qwen3 4B on Ollama fallback | Multimodal open-weight pilot model, private local option, no required AI dependency |
 | Files | Supabase Storage Free | Receipt images later, protected by household policy |
 | CI | GitHub Actions Free | Lint, types, tests and migration checks |
@@ -122,23 +122,27 @@ The React app maps these types to reviewed components: `MetricCard`, `LineChart`
 
 ### Pilot deployment
 
-- PWA: Cloudflare Pages Free on a `pages.dev` URL.
-- API: Render Free Web Service on an `onrender.com` URL.
+- PWA: Vercel Hobby project rooted at `apps/web` on a `vercel.app` URL.
+- API: separate Vercel Hobby project rooted at `apps/api` on a `vercel.app` URL.
 - Auth/database/storage: Supabase Free.
 - AI: Groq's free-plan hosted Qwen allowance, with local Ollama and manual fallbacks.
 - Source/CI: public GitHub repository and GitHub Actions.
 
 This is genuinely usable at ₹0 for the user's private pilot. The limitations are explicit:
 
-- Render spins a free API down after 15 idle minutes and the next request can take about a minute.
+- Vercel Hobby is restricted to personal non-commercial use and its Python runtime is beta.
+- Vercel functions have usage, duration and bundle-size limits; the API must fail explicitly when unavailable.
 - Supabase can pause a free project after one inactive week and does not include managed backups.
 - Free hosted AI capacity is capped and provider policies can change; capture still works through rules and manual review.
 - Qwen3.6-27B is an experimental pilot choice; a Artha-specific model evaluation is required before production lock-in.
 - A custom domain and WhatsApp Business messaging are not included in the ₹0 promise.
 
-If Render cold starts make capture feel slow, the next host is Google Cloud Run with request-based scaling. Its free tier is generous, but it requires a billing account and can charge after quotas, so it is not the default for a strict no-billing MVP.
+The checked-in Render blueprint remains a container fallback, but its free service
+spins down after 15 idle minutes and can take about a minute to wake. Google Cloud
+Run is another later option, but it requires billing setup and can charge beyond
+quota, so neither is the strict no-billing default.
 
-Current official references: [Render Free](https://render.com/docs/free), [Render FastAPI](https://render.com/docs/deploy-fastapi), [Supabase pricing](https://supabase.com/pricing), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/), [Groq rate limits](https://console.groq.com/docs/rate-limits), [Qwen3.6-27B model card](https://huggingface.co/Qwen/Qwen3.6-27B), and [Ollama structured output](https://docs.ollama.com/capabilities/structured-outputs).
+Current official references: [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Vercel FastAPI](https://vercel.com/docs/frameworks/backend/fastapi), [Vercel monorepos](https://vercel.com/docs/monorepos), [Supabase pricing](https://supabase.com/pricing), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Render Free fallback](https://render.com/docs/free), [Groq rate limits](https://console.groq.com/docs/rate-limits), [Qwen3.6-27B model card](https://huggingface.co/Qwen/Qwen3.6-27B), and [Ollama structured output](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## Repository shape
 
@@ -162,7 +166,7 @@ artha/
 1. Week 1: repo, auth, RLS, accounts, opening balances and ledger invariants.
 2. Week 2: parse/review/confirm capture, dashboard charts and offline draft queue.
 3. Week 3: multi-member shared calculations, corrections, settlements and CSV export.
-4. Week 4: mobile QA, security tests, Render/Pages/Supabase deployment and private use.
+4. Week 4: mobile QA, security tests, Vercel/Supabase deployment and private use.
 5. V2: read-only agent tools, inline UI schema, evaluation set and source-linked answers.
 
 The first implementation milestone is not the chatbot. It is a ledger whose balances, transfers, credit cards and shared splits remain correct under edits and retries.

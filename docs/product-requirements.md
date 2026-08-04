@@ -215,21 +215,23 @@ All money values use integer paise, never floating-point numbers.
 | Product design | Figma Starter | Free personal drafts, components, Auto Layout, clickable prototype |
 | Client | React + TypeScript + Vite PWA | Fast, installable, familiar ecosystem |
 | UI | Tailwind CSS + repository UI components | Accessible controls and quick iteration without an unused framework dependency |
-| Hosting | Cloudflare Pages | Free static hosting and preview deployments |
+| Hosting | Vercel Hobby | Two personal projects for the Vite PWA and FastAPI monorepo roots |
 | Auth + database | Supabase Free | Managed Postgres, magic links, row-level security, realtime, storage |
-| API | Python 3.13 + FastAPI + Pydantic v2 on Render Free | Typed APIs and a clean path to the V2 agent |
+| API | Python 3.13 + FastAPI + Pydantic v2 on Vercel | Typed APIs without a minute-long container wake-up |
 | Assistant | Strict Pydantic schemas and approved read-only tools | Structured UI output without giving the model write access |
 | AI parsing | Merchant rules, then experimental Qwen3.6-27B via Groq; local Qwen3 4B fallback | One multimodal open-weight pilot model, provider portability, and manual fallback at quota |
 | Voice | Cloudflare Workers AI Whisper, capped | Free allocation is sufficient for a private pilot |
 | OCR | Client-side OCR first | Keeps screenshots private and avoids API cost |
 | Source + CI | GitHub Free + GitHub Actions | Version control and automated checks |
 | Monitoring | Sentry free tier or structured server logs | Enough for an MVP |
-| Domain | `*.pages.dev` initially | ₹0; a custom domain is optional and normally paid |
+| Domain | `*.vercel.app` initially | ₹0; a custom domain is optional and normally paid |
 
 Current free-tier evidence:
 
 - [Supabase Free](https://supabase.com/pricing) currently includes 500 MB database, 1 GB storage, 50,000 MAU, and two active free projects; inactive free projects may pause after a week.
-- [Render Free](https://render.com/docs/free) currently supports Python web services, but spins them down after 15 idle minutes and may take about a minute to restart.
+- [Vercel Hobby](https://vercel.com/docs/plans/hobby) supports personal non-commercial projects within included usage limits.
+- [Vercel FastAPI](https://vercel.com/docs/frameworks/backend/fastapi) supports a Python FastAPI application as one function; the Python runtime remains beta.
+- [Render Free](https://render.com/docs/free) remains a fallback, but spins Python web services down after 15 idle minutes and may take about a minute to restart.
 - [Cloudflare Workers Free](https://developers.cloudflare.com/workers/platform/pricing/) currently includes 100,000 requests/day, while static asset requests are free.
 - [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/) currently has a 10,000-neuron/day free allocation.
 - [Cloudflare Pages Free](https://developers.cloudflare.com/pages/platform/limits/) currently includes 500 builds/month.
@@ -339,7 +341,7 @@ The application itself needs database transactions, authentication, offline beha
 
 - Mobile QA, accessibility, error states, audit trail, rate limits.
 - Security review and backup/export test.
-- Deploy the PWA to Cloudflare Pages and FastAPI to Render Free; onboard the user.
+- Deploy the PWA and FastAPI as separate Vercel projects; connect the fresh Supabase project and onboard the user.
 - Observe capture time and missing-transaction rate for two weeks.
 
 ## 16. MVP acceptance gate

@@ -233,6 +233,17 @@ export async function setupOnboarding(accounts: AccountSetupInput[], members: Ar
   return mapMembers(response.members)
 }
 
+export async function isOnboardingComplete(): Promise<boolean> {
+  if (DEMO_MODE) return true
+  try {
+    await request<unknown>('/api/v1/accounts')
+    return true
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) return false
+    throw error
+  }
+}
+
 export async function getMembers(): Promise<HouseholdMember[]> {
   return mapMembers(await request<unknown>('/api/v1/members'))
 }
@@ -249,7 +260,8 @@ export async function getAccounts(): Promise<LedgerAccount[]> {
       const kind: LedgerAccount['kind'] = rawKind === 'cash' || rawKind === 'wallet' || rawKind === 'credit_card' ? rawKind : 'bank'
       return [{ id, name: stringValue(account.name, 'Account'), kind }]
     })
-  } catch {
+  } catch (error) {
+    if (!DEMO_MODE) throw error
     return [
       { name: 'HDFC UPI', kind: 'bank' },
       { name: 'ICICI Bank', kind: 'bank' },
@@ -275,7 +287,8 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
       provider: model ? `${provider} · ${model}` : provider,
       deterministicFallback: response.mode === 'deterministic_fallback' || response.deterministic_fallback === true || providerRaw.deterministic_fallback === true || providerRaw.status === 'fallback'
     }
-  } catch {
+  } catch (error) {
+    if (!DEMO_MODE) throw error
     return {
       message: 'The AI provider is unavailable, so this is a deterministic preview using local demo totals.',
       provider: 'Deterministic local preview',
@@ -321,7 +334,8 @@ export async function getDashboard(): Promise<{ data: Dashboard; demo: boolean }
       },
       demo: false
     }
-  } catch {
+  } catch (error) {
+    if (!DEMO_MODE) throw error
     return { data: demoDashboard, demo: true }
   }
 }
@@ -337,7 +351,8 @@ export async function getTransactions(): Promise<{ data: Transaction[]; demo: bo
     const names = accountNameMap(accounts)
     const memberNames = memberNameMap(members)
     return { data: rows.map((item) => mapTransaction(item as JsonObject, names, memberNames)), demo: false }
-  } catch {
+  } catch (error) {
+    if (!DEMO_MODE) throw error
     return { data: demoTransactions, demo: true }
   }
 }

@@ -7,8 +7,8 @@ Updated: 4 August 2026
 ### P0 — required before entering real financial data
 
 1. **Lock the free hosting architecture.**
-   - [ ] Record the final PWA, API and Supabase hosting choice in an architecture decision.
-   - [ ] Document account ownership, free-tier limits, sleep behavior and upgrade risks.
+   - [x] Record the final PWA, API and Supabase hosting choice in an architecture decision.
+   - [x] Document target account ownership, free-tier limits, sleep behavior and upgrade risks.
    - Done when: every production surface has one named owner, provider and expected URL.
 2. **Create and secure the personal Supabase environment.**
    - [ ] Create a fresh Artha project under the correct personal account.
@@ -123,7 +123,7 @@ Updated: 4 August 2026
 ## Milestone 6 — Artha private-pilot launch
 
 - [x] Rename the product, packages, environment variables and documentation from Artha's former working name.
-- [ ] Select the final ₹0 hosting topology; compare the Vercel + Supabase recommendation against the documented container-hosting alternatives.
+- [x] Select Vercel Hobby for the PWA/API plus Supabase Free; retain Render as a documented container fallback.
 - [ ] Create personal hosting and Supabase accounts with no legacy account ownership.
 - [ ] Create a fresh Artha Supabase project and apply all versioned migrations.
 - [ ] Repeat anonymous-denial and two-household RLS isolation against the fresh project.

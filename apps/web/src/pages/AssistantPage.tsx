@@ -17,6 +17,7 @@ export function AssistantPage() {
   const [message, setMessage] = useState('')
   const [history, setHistory] = useState<Exchange[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function send(event?: FormEvent) {
     event?.preventDefault()
@@ -24,9 +25,16 @@ export function AssistantPage() {
     if (!question || loading) return
     setLoading(true)
     setMessage('')
-    const reply = await chatAssistant(question)
-    setHistory((current) => [...current, { id: crypto.randomUUID(), question, reply }])
-    setLoading(false)
+    setError('')
+    try {
+      const reply = await chatAssistant(question)
+      setHistory((current) => [...current, { id: crypto.randomUUID(), question, reply }])
+    } catch {
+      setError('Artha could not reach the assistant. Your ledger was not changed; please try again.')
+      setMessage(question)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,6 +53,7 @@ export function AssistantPage() {
           {history.length === 0 && <EmptyState onPick={setMessage} />}
           {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} />)}
           {loading && <div className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600" /> Reviewing your ledger…</div>}
+          {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
         </div>
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
           <label htmlFor="assistant-message" className="sr-only">Ask Artha</label>

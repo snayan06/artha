@@ -30,3 +30,20 @@ first, and the model cannot write transactions or calculate ledger totals.
 A representative Artha evaluation and comparison against other hosted models is
 required before a production model is locked. That evaluation is backlog work
 and does not block the V1 private pilot.
+
+## ADR-007: Vercel Hobby and Supabase Free for the private pilot
+
+Deploy the public monorepo as two Vercel projects owned by the user's personal
+account: `apps/web` for the Vite PWA and `apps/api` for the FastAPI function.
+Use a fresh Supabase Free project under the same personal ownership for Auth,
+Postgres and RLS.
+
+This replaces Cloudflare Pages plus Render as the default because it removes one
+provider and avoids Render Free's approximately one-minute wake-up after idle,
+which conflicts with five-second capture. Render remains a documented container
+fallback through `render.yaml`.
+
+The trade-offs are explicit: Vercel's Python runtime is beta, Hobby is for
+personal non-commercial use and has usage caps; Supabase Free can pause after
+low activity and has no managed backups. Artha therefore fails closed at API
+errors and requires encrypted export/restore before real financial data.

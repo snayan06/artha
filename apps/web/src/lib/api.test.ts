@@ -80,6 +80,31 @@ describe('FastAPI adapter', () => {
     expect(parsed.data.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
+  it('never substitutes fictional ledger data during a production API outage', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 503 })))
+    const { chatAssistant, getAccounts, getDashboard, getTransactions } = await import('./api')
+
+    await expect(getDashboard()).rejects.toThrow('API request failed (503)')
+    await expect(getTransactions()).rejects.toThrow('API request failed (503)')
+    await expect(getAccounts()).rejects.toThrow('API request failed (503)')
+    await expect(chatAssistant('What is my balance?')).rejects.toThrow('API request failed (503)')
+  })
+
+  it('derives production onboarding state from the authenticated household', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response('{}', { status: 409 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { isOnboardingComplete } = await import('./api')
+
+    await expect(isOnboardingComplete()).resolves.toBe(true)
+    await expect(isOnboardingComplete()).resolves.toBe(false)
+  })
+
   it('bootstraps the API in demo mode', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubEnv('VITE_DEMO_MODE', 'true')

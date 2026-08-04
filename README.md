@@ -85,7 +85,7 @@ artha/
 │   └── tests/            # SQL catalog assertions
 ├── docs/                 # PRD, architecture, deployment and decisions
 ├── .github/workflows/    # CI
-└── render.yaml           # Production-mode private-pilot blueprint
+└── render.yaml           # Optional container-hosting fallback
 ```
 
 ## Run locally
@@ -170,12 +170,11 @@ Ruff, strict mypy and pytest.
 
 ## Deployment status
 
-The application and database contracts are ready, but the final personal-account
-hosting topology is intentionally not locked yet. The previous Cloudflare Pages,
-Render Free and Supabase Free topology remains a tested baseline; Vercel for the
-PWA and FastAPI plus Supabase is the leading simpler option under review. The
-legacy Supabase staging schema and RLS isolation exercise are green, but that
-project is not approved for real Artha data.
+The private-pilot topology is locked: two Vercel Hobby projects (`apps/web` and
+`apps/api`) plus a fresh Supabase Free project. Deployment configuration is
+checked in. The previous Cloudflare Pages + Render path remains an optional
+container fallback. The legacy Supabase staging schema and RLS isolation
+exercise are green, but that project is not approved for real Artha data.
 
 Before production can be called green:
 

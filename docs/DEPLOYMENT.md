@@ -1,73 +1,123 @@
 # Artha deployment runbook
 
-The repository is designed to run locally without cloud credentials. Production deployment has three separately controlled surfaces.
+The private-pilot topology is two Vercel Hobby projects plus one Supabase Free
+project. All three must be owned by the user's personal account; the legacy
+`aarshiimagingcenter` Supabase/hosting accounts are explicitly out of scope.
 
-## 1. Supabase
+## Environment inventory
 
-Five migrations and the live two-household RLS exercise passed against a legacy
-staging project. That project is under the wrong account and is not approved for
-real Artha data. Create a fresh project under the user's personal account and
-repeat the complete exercise before launch.
+| Surface | Target owner | Project | Expected URL |
+|---|---|---|---|
+| Source and CI | GitHub `snayan06` | `artha` | `github.com/snayan06/artha` |
+| PWA | Personal Vercel account | `artha-web` | `https://artha-web.vercel.app` or assigned equivalent |
+| API | Personal Vercel account | `artha-api` | `https://artha-api.vercel.app` or assigned equivalent |
+| Auth and data | Personal Supabase organization | `artha-production` | `https://<new-project-ref>.supabase.co` |
 
-1. Create a new Supabase project in the Mumbai region when available.
-2. Link the local project with the Supabase CLI.
-3. Review migrations under `supabase/migrations` before applying them.
-4. Apply migrations and verify RLS is enabled on every exposed table.
-5. Configure magic-link redirect URLs for the Pages preview and production domains.
-6. Copy only the project URL and publishable/anon key to the web deployment.
+Record the actual project IDs and URLs in `docs/artifacts/qa/` after creation.
+Do not record passwords, access tokens, JWTs or private keys.
 
-Never expose the service-role key in the browser. Normal FastAPI requests should preserve the signed-in user's authorization context so RLS remains effective.
+## 1. Fresh Supabase project
 
-## 2. FastAPI private pilot on Render Free
+The five versioned migrations and live two-household RLS exercise passed against
+a legacy staging project. That project is under the wrong account and must never
+hold real Artha data.
 
-Create a Python Web Service rooted at `apps/api`.
+1. Sign into Supabase with the user's personal account, not
+   `aarshiimagingcenter`.
+2. Create `artha-production` on the Free plan in Mumbai when available.
+3. Link the repository with the Supabase CLI without saving a database password
+   in source.
+4. Apply every migration under `supabase/migrations` to the empty project.
+5. Run the SQL catalog checks and the live anonymous/two-household RLS exercise.
+6. Confirm Auth uses an asymmetric signing key supported by the API JWKS verifier.
+7. Initially set the Auth site URL and redirect allow-list to the final PWA
+   `vercel.app` origin only.
 
-- Build command: `pip install uv && uv sync --frozen --no-dev`
-- Start command: `uv run uvicorn artha_api.app:app --host 0.0.0.0 --port $PORT`
-- Health check: `/health`
-- Python: `3.13`
+Only the project URL and publishable/anon key go to Vercel. Never expose the
+service-role key. FastAPI forwards each user's bearer token to Supabase so RLS
+remains the authorization boundary.
 
-Set server-side environment variables from `.env.example`. Never enable automatic paid upgrades. Render Free sleeps after idle time, so its first request may be slow.
+## 2. FastAPI on Vercel Hobby
 
-The checked-in `render.yaml` uses `ARTHA_ENV=production`. Production mode never
-creates or connects to the SQLite demo database: it verifies Supabase JWTs and
-forwards the same user bearer through the separate REST/RPC repository so RLS
-remains active. Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` only; never add
-the service-role key to the Render application.
+Import `https://github.com/snayan06/artha` into a personal Vercel account as a
+project named `artha-api`.
 
-For a production upgrade, use a paid Render instance or Google Cloud Run with a billing budget and hard alerts. Do not switch simply to hide cold starts without adding cost controls.
+- Root directory: `apps/api`
+- Framework: FastAPI/Python auto-detection
+- Entrypoint: `artha_api.app:app` from `pyproject.toml`
+- Build/output overrides: none
+- Health check after deployment: `GET /health`
 
-## 3. React PWA on Cloudflare Pages
+Production environment variables:
 
-Create a Pages project from the public GitHub repository.
+```dotenv
+ARTHA_ENV=production
+ARTHA_CORS_ORIGINS=https://artha-web.vercel.app
+SUPABASE_URL=https://<new-project-ref>.supabase.co
+SUPABASE_ANON_KEY=<publishable-or-anon-key>
+SUPABASE_JWT_AUDIENCE=authenticated
+ARTHA_LLM_PROVIDER=disabled
+```
+
+Use the actual PWA origin if Vercel assigns a different name. Do not add the
+service-role key. Keep the hosted model disabled until the ledger acceptance gate
+passes; later, add the Groq key only to `artha-api`.
+
+## 3. React PWA on Vercel Hobby
+
+Import the same repository as a second project named `artha-web`.
 
 - Root directory: `apps/web`
-- Build command: `npm ci && npm run build`
+- Framework preset: Vite
+- Install command: `npm ci`
+- Build command: `npm run build`
 - Output directory: `dist`
-- `VITE_API_URL`: deployed FastAPI origin
-- `VITE_DEMO_MODE`: `false`
-- `VITE_SUPABASE_URL`: Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Supabase publishable/anon key
 
-Static deployments contain no secrets. Supabase's publishable key is acceptable in the client only when RLS policies are correct.
-Add the final Pages origin to Supabase Auth's site URL and allowed redirect URLs.
-The browser persists the Supabase session, refreshes short-lived access tokens,
-and sends the current bearer token to FastAPI; never place a service-role key in
-any `VITE_` variable.
+Production environment variables:
+
+```dotenv
+VITE_API_URL=https://artha-api.vercel.app
+VITE_DEMO_MODE=false
+VITE_SUPABASE_URL=https://<new-project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<publishable-or-anon-key>
+```
+
+Every `VITE_` value is compiled into the public client bundle; only the Supabase
+publishable key is allowed. `vercel.json` provides SPA route fallback for direct
+loads of `/transactions`, `/shared`, `/add` and `/assistant`.
+
+After both deployments exist, update the API's exact CORS origin and Supabase's
+site/redirect URLs, then redeploy both projects. Do not use wildcard CORS.
+
+## 4. Free-tier constraints
+
+- Vercel Hobby is for personal non-commercial use and has included usage caps.
+- Vercel's Python runtime is beta and the FastAPI application must remain within
+  function duration and 500 MB bundle limits.
+- Supabase Free can pause after low activity and provides no managed backups.
+- A custom domain and WhatsApp Business messaging are outside the ₹0 promise.
+- `render.yaml` is retained only as a fallback; Render Free's idle wake-up can
+  take about a minute.
+
+The application now fails closed instead of showing fictional demo balances when
+the production API is unavailable.
 
 ## Acceptance before calling production green
 
-Current status: **legacy staging data path green, personal deployment pending**. Production
-JWT verification, repository access, anonymous denial and two-household live RLS
-isolation pass. Do not enter real finance data until the remaining final-domain
-and recovery gates below pass.
+Current status: **legacy staging data path green; personal deployment pending**.
+Do not enter real financial data until every unchecked item passes.
 
-- Magic-link login works on the final Pages domain.
-- [x] A user cannot read another household through the API or direct Supabase calls.
-- Quick Add creates a draft and does not write before confirmation.
-- A confirmed shared transaction updates account movement, personal spend and every selected member's receivable correctly.
-- Reload preserves the authenticated session and confirmed transaction.
-- CSV export reconstructs the ledger.
-- [x] Mobile widths 320 px and 390 px have no overflow.
-- API and browser logs contain no tokens or financial payloads.
-- A manual encrypted export is downloaded and restoration is tested.
+- [ ] Magic-link login works on the final PWA domain.
+- [ ] Reload, token refresh and sign-out work without losing a confirmed entry.
+- [ ] Two test identities can onboard separate households and cannot read each
+  other's API or direct Supabase data.
+- [ ] Quick Add creates only a draft before confirmation.
+- [ ] A confirmed shared transaction updates account movement, personal spend and
+  every selected member receivable correctly.
+- [ ] Four bank accounts, multiple cards and a backdated entry work end to end.
+- [ ] Direct loads of every PWA route return the application rather than 404.
+- [ ] Mobile widths 320 px and 390 px plus desktop pass in light and dark modes.
+- [ ] API and browser logs contain no tokens or financial payloads.
+- [ ] Encrypted export reconstructs the ledger and a restore drill succeeds.
+- [ ] Final URLs, owners, project IDs and sanitized evidence are stored under
+  `docs/artifacts/qa/`.
