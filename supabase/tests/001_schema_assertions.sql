@@ -91,7 +91,10 @@ begin
 
   if to_regprocedure('public.get_current_household()') is null
      or to_regprocedure('public.setup_household(text,text,jsonb,jsonb)') is null
-     or to_regprocedure('public.void_transaction(uuid,uuid,text)') is null then
+     or to_regprocedure('public.void_transaction(uuid,uuid,text)') is null
+     or to_regprocedure(
+       'public.list_ledger_activity(uuid,integer,integer)'
+     ) is null then
     raise exception 'production safety RPC is missing';
   end if;
 
@@ -120,12 +123,59 @@ begin
     raise exception 'get_current_household must be stable';
   end if;
 
+  if exists (
+    select 1
+    from pg_catalog.pg_proc p
+    where p.oid = to_regprocedure(
+      'public.list_ledger_activity(uuid,integer,integer)'
+    )
+      and (
+        not p.prosecdef
+        or p.provolatile <> 's'
+        or coalesce(array_to_string(p.proconfig, ','), '') not like '%search_path=%'
+        or coalesce(array_to_string(p.proconfig, ','), '') not like '%row_security=off%'
+      )
+  ) then
+    raise exception 'logical ledger activity RPC must be stable and hardened';
+  end if;
+
+  if position(
+    'union all' in lower(pg_get_functiondef(
+      to_regprocedure('public.list_ledger_activity(uuid,integer,integer)')
+    ))
+  ) = 0
+     or position(
+       'from public.transfer_links' in lower(pg_get_functiondef(
+         to_regprocedure('public.list_ledger_activity(uuid,integer,integer)')
+       ))
+     ) = 0
+     or position(
+       'limit p_limit' in lower(pg_get_functiondef(
+         to_regprocedure('public.list_ledger_activity(uuid,integer,integer)')
+       ))
+     ) < position(
+       'union all' in lower(pg_get_functiondef(
+         to_regprocedure('public.list_ledger_activity(uuid,integer,integer)')
+       ))
+     )
+     or position(
+       'offset p_offset' in lower(pg_get_functiondef(
+         to_regprocedure('public.list_ledger_activity(uuid,integer,integer)')
+       ))
+     ) = 0 then
+    raise exception 'logical ledger pagination must join transfers before limit and offset';
+  end if;
+
   if not has_function_privilege(
     'authenticated', 'public.get_current_household()', 'EXECUTE'
   ) or not has_function_privilege(
     'authenticated', 'public.setup_household(text,text,jsonb,jsonb)', 'EXECUTE'
   ) or not has_function_privilege(
     'authenticated', 'public.void_transaction(uuid,uuid,text)', 'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.list_ledger_activity(uuid,integer,integer)',
+    'EXECUTE'
   ) then
     raise exception 'authenticated role is missing production safety RPC execute grant';
   end if;
@@ -145,6 +195,14 @@ begin
      )
      or has_function_privilege(
        'service_role', 'public.void_transaction(uuid,uuid,text)', 'EXECUTE'
+     )
+     or has_function_privilege(
+       'anon', 'public.list_ledger_activity(uuid,integer,integer)', 'EXECUTE'
+     )
+     or has_function_privilege(
+       'service_role',
+       'public.list_ledger_activity(uuid,integer,integer)',
+       'EXECUTE'
      ) then
     raise exception 'production safety RPC leaked execute privilege';
   end if;

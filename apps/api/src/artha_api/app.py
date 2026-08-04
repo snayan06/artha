@@ -14,6 +14,7 @@ from .assistant_routes import router as assistant_router
 from .database import build_engine, create_schema, default_database_url
 from .production_routes import router as production_router
 from .routes import router
+from .security import SecurityHeadersMiddleware
 from .supabase_rest import SupabaseRestSettings
 
 
@@ -71,6 +72,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(SecurityHeadersMiddleware, production=is_production)
     if is_production:
         app.include_router(production_router)
     else:

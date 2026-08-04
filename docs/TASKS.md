@@ -1,6 +1,6 @@
 # Artha task list
 
-Updated: 4 August 2026
+Updated: 5 August 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
@@ -56,7 +56,7 @@ For the current ordered delivery view, blockers and user actions, see
 ### P1 — private-pilot improvements
 
 - [x] Add a versioned 50-case fictional capture/parser dataset and CI contract checker.
-- [ ] Add deterministic and hosted-Qwen scoring runners and publish accuracy/error slices.
+- [x] Add deterministic and hosted-Qwen scoring runners with sanitized accuracy/error slices.
 - [ ] Add edit, correction and soft-delete controls to the UI for the existing API operations.
 - [ ] Show assistant evidence date range, source count and matching transactions.
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
@@ -118,6 +118,7 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Add Home balance summary and six-month trend chart.
 - [x] Add conversational Quick Add and parsed review card.
 - [x] Add transaction list, search and filters.
+- [x] Add a per-account activity filter that includes both sides of transfers.
 - [x] Add the household member-balance screen and unsettled activity.
 - [x] Add installable manifest and icons.
 - [x] Add accessible error and confirmation states with touch-sized controls.
@@ -130,6 +131,8 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Add atomic confirmation, transfer and settlement functions.
 - [x] Add read-only account-balance function.
 - [x] Document magic-link authentication integration.
+- [x] Add explicit expired-link, wrong-browser callback and stale-session recovery states.
+- [x] Add no-store financial responses and baseline web/API security headers.
 - [x] Keep service-role and AI secrets out of browser configuration.
 
 ## Milestone 5 — integration and release gate
@@ -139,6 +142,7 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Verify editing a shared expense recalculates all derived totals.
 - [x] Verify settlement does not change spending or income.
 - [x] Run API tests, web tests, lint, type checks and production build.
+- [x] Page logical transfer activity in Postgres after transfer-pair collapse.
 - [x] Re-run responsive QA after onboarding/theme changes at narrow mobile, mobile and desktop widths.
 - [x] Document deployment steps for Pages, Render and Supabase.
 - [x] Record remaining V1 limitations explicitly.

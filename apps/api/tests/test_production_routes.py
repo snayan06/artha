@@ -17,7 +17,7 @@ from artha_api.production_routes import (
     ProductionDraft,
     ProductionSplit,
     confirm_transaction,
-    ledger_views,
+    list_transactions,
     member_balances,
     parse_draft,
     profile,
@@ -39,6 +39,7 @@ class FakeProductionClient:
     def __init__(self) -> None:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
+        self.activity_payload: dict[str, Any] | None = None
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
         if name == "get_current_household":
@@ -66,6 +67,29 @@ class FakeProductionClient:
             }]
         if name == "get_account_balances":
             return [{"account_id": ACCOUNT_ID, "balance_paise": 50_000}]
+        if name == "list_ledger_activity":
+            self.activity_payload = payload
+            return [{
+                "id": TRANSACTION_ID,
+                "kind": "transfer",
+                "amount_paise": 2_500_000,
+                "personal_share_paise": 2_500_000,
+                "description": "Self transfer",
+                "category": "Transfer",
+                "paid_by_member_id": None,
+                "source_account_id": ACCOUNT_ID,
+                "destination_account_id": DESTINATION_ACCOUNT_ID,
+                "settlement_member_id": None,
+                "settlement_direction": None,
+                "occurred_at": "2026-08-04T12:00:00+00:00",
+                "notes": "Self transfer",
+                "splits": [],
+                "is_deleted": False,
+                "created_at": "2026-08-04T12:00:00+00:00",
+                "updated_at": "2026-08-04T12:00:00+00:00",
+                "account_delta_paise": 0,
+                "member_balance_deltas": [],
+            }]
         raise AssertionError(f"unexpected RPC: {name}")
 
     async def request(self, _method: str, path: str, **_kwargs: Any) -> Any:
@@ -279,70 +303,22 @@ def test_member_balance_projection_handles_owner_and_member_paid_expenses() -> N
     ]
 
 
-def test_ledger_views_collapses_transfer_pair_without_cashflow() -> None:
-    out_id = "00000000-0000-0000-0000-000000000108"
-    in_id = "00000000-0000-0000-0000-000000000109"
-    rows = [
-        {
-            "id": out_id,
-            "account_id": ACCOUNT_ID,
-            "category_id": None,
-            "paid_by_member_id": None,
-            "direction": "transfer_out",
-            "amount_paise": 2_500_000,
-            "currency": "INR",
-            "occurred_at": "2026-08-04T12:00:00+00:00",
-            "merchant": None,
-            "note": "Self transfer",
-            "status": "posted",
-            "created_at": "2026-08-04T12:00:00+00:00",
-            "transaction_splits": [],
-        },
-        {
-            "id": in_id,
-            "account_id": DESTINATION_ACCOUNT_ID,
-            "category_id": None,
-            "paid_by_member_id": None,
-            "direction": "transfer_in",
-            "amount_paise": 2_500_000,
-            "currency": "INR",
-            "occurred_at": "2026-08-04T12:00:00+00:00",
-            "merchant": None,
-            "note": "Self transfer",
-            "status": "posted",
-            "created_at": "2026-08-04T12:00:00+00:00",
-            "transaction_splits": [],
-        },
-    ]
-    links = [
-        {
-            "id": TRANSACTION_ID,
-            "transfer_out_transaction_id": out_id,
-            "transfer_in_transaction_id": in_id,
-            "created_at": "2026-08-04T12:00:00+00:00",
-        }
-    ]
+async def test_transaction_history_pages_logical_activity_in_database() -> None:
+    fake = FakeProductionClient()
 
-    assert ledger_views(rows, links, OWNER_ID, {}) == [
-        {
-            "id": TRANSACTION_ID,
-            "kind": "transfer",
-            "amount_paise": 2_500_000,
-            "personal_share_paise": 2_500_000,
-            "description": "Self transfer",
-            "category": "Transfer",
-            "paid_by_member_id": None,
-            "source_account_id": ACCOUNT_ID,
-            "destination_account_id": DESTINATION_ACCOUNT_ID,
-            "settlement_member_id": None,
-            "settlement_direction": None,
-            "occurred_at": "2026-08-04T12:00:00+00:00",
-            "notes": "Self transfer",
-            "splits": [],
-            "is_deleted": False,
-            "created_at": "2026-08-04T12:00:00+00:00",
-            "updated_at": "2026-08-04T12:00:00+00:00",
-            "account_delta_paise": 0,
-            "member_balance_deltas": [],
-        }
-    ]
+    result = await list_transactions(
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        limit=25,
+        offset=50,
+    )
+
+    assert fake.activity_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_limit": 25,
+        "p_offset": 50,
+    }
+    assert result[0]["kind"] == "transfer"
+    assert result[0]["source_account_id"] == ACCOUNT_ID
+    assert result[0]["destination_account_id"] == DESTINATION_ACCOUNT_ID
+    assert result[0]["account_delta_paise"] == 0

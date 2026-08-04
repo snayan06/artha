@@ -1,5 +1,6 @@
-import { Bot, Home, List, LogOut, Plus, UsersRound } from 'lucide-react'
+import { Bot, Home, List, LogOut, Plus, UsersRound, WifiOff } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useOnlineStatus } from '../lib/network'
 import { type AppPath, useRouter } from '../lib/router'
 import { ThemeControl } from './ThemeControl'
 
@@ -12,6 +13,7 @@ const navigation = [
 
 export function Shell({ children, userEmail, onSignOut }: { children: ReactNode; userEmail?: string; onSignOut?: () => Promise<void> }) {
   const { path, navigate } = useRouter()
+  const isOnline = useOnlineStatus()
   const isQuickAdd = path === '/add'
 
   return (
@@ -25,6 +27,15 @@ export function Shell({ children, userEmail, onSignOut }: { children: ReactNode;
           <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">August overview</span><ThemeControl />{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Sign out"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span></button>}</div>
         </div>
       </header>
+
+      {!isOnline && (
+        <div className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-100" role="status">
+          <div className="mx-auto flex max-w-6xl items-start gap-2 text-sm font-medium sm:px-4">
+            <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>You’re offline. You can review what is already loaded, but new changes cannot be saved until you reconnect.</span>
+          </div>
+        </div>
+      )}
 
       <main className={`mx-auto max-w-6xl px-4 pb-32 pt-5 sm:px-8 sm:pt-8 ${isQuickAdd ? 'max-w-3xl' : ''}`}>{children}</main>
 

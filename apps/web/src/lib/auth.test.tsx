@@ -75,6 +75,7 @@ describe('Supabase auth provider', () => {
     supabase.signInWithOtp.mockResolvedValue({ data: {}, error: null })
     supabase.signOut.mockResolvedValue({ error: null })
     supabase.refreshSession.mockResolvedValue({ data: { session: null }, error: null })
+    window.history.replaceState({}, '', '/')
   })
 
   afterEach(() => {
@@ -82,6 +83,7 @@ describe('Supabase auth provider', () => {
     storage.clear()
     vi.unstubAllEnvs()
     vi.clearAllMocks()
+    window.history.replaceState({}, '', '/')
   })
 
   it('shows an accessible magic-link gate and sends the redirect to this origin', async () => {
@@ -117,5 +119,66 @@ describe('Supabase auth provider', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await waitFor(() => expect(supabase.signOut).toHaveBeenCalledTimes(1))
+  })
+
+  it('explains an expired or reused link and lets the user request a fresh one', async () => {
+    window.history.replaceState({}, '', '/?error=access_denied&error_code=otp_expired&error_description=Email%20link%20is%20invalid%20or%20has%20expired')
+    const user = userEvent.setup()
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This sign-in link has expired')
+    expect(screen.getByRole('alert')).toHaveTextContent('open the newest email in this browser')
+    expect(window.location.search).toBe('')
+
+    await user.type(screen.getByLabelText('Email address'), 'ari@example.com')
+    await user.click(screen.getByRole('button', { name: 'Email me a fresh sign-in link' }))
+
+    await waitFor(() => expect(supabase.signInWithOtp).toHaveBeenCalledWith({
+      email: 'ari@example.com',
+      options: { emailRedirectTo: window.location.origin }
+    }))
+    expect(screen.getByRole('status')).toHaveTextContent('sign-in is not complete yet')
+  })
+
+  it('explains a PKCE callback opened in the wrong browser', async () => {
+    window.history.replaceState({}, '', '/?code=one-time-authorization-code&sb_flow_id=flow-id')
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Open the link in the browser that requested it')
+    expect(screen.getByRole('alert')).toHaveTextContent('does not have the secure sign-in verifier')
+    expect(screen.getByLabelText('Email address')).toBeEnabled()
+    expect(window.location.search).toBe('')
+  })
+
+  it('accepts a successful callback session without showing recovery guidance', async () => {
+    const callbackSession = session('callback-token')
+    window.history.replaceState({}, '', '/?code=one-time-authorization-code&sb_flow_id=flow-id')
+    supabase.getSession.mockResolvedValue({ data: { session: callbackSession }, error: null })
+    render(<AuthProvider><AuthProbe /></AuthProvider>)
+
+    expect(await screen.findByText('authenticated')).toBeInTheDocument()
+    expect(screen.getByText('callback-token')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(window.location.search).toBe('')
+  })
+
+  it('turns a session PKCE error into recoverable same-browser guidance', async () => {
+    supabase.getSession.mockResolvedValue({ data: { session: null }, error: { message: 'PKCE code verifier not found in storage' } })
+    const user = userEvent.setup()
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Open the link in the browser that requested it')
+    expect(screen.getByLabelText('Email address')).toBeEnabled()
+    await user.type(screen.getByLabelText('Email address'), 'ari@example.com')
+    expect(screen.getByRole('button', { name: 'Email me a fresh sign-in link' })).toBeEnabled()
+  })
+
+  it('keeps an expired stored session recoverable without implying a new signup', async () => {
+    supabase.getSession.mockResolvedValue({ data: { session: null }, error: { message: 'Invalid Refresh Token: refresh token expired' } })
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your session has expired')
+    expect(screen.getByRole('alert')).toHaveTextContent('existing server-stored ledger and setup will still be there')
+    expect(screen.getByLabelText('Email address')).toBeEnabled()
   })
 })

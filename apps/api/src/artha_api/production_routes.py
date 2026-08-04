@@ -298,19 +298,24 @@ async def transaction_rows(
     return list(rows or [])
 
 
-async def transfer_link_rows(
+async def ledger_activity_rows(
     client: SupabaseRestClient,
     household_id: str,
+    *,
+    limit: int,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    rows = await client.request(
-        "GET",
-        "transfer_links",
-        params={
-            "household_id": f"eq.{household_id}",
-            "select": (
-                "id,transfer_out_transaction_id,transfer_in_transaction_id,created_at"
-            ),
-            "order": "created_at.desc,id.desc",
+    """Page already-collapsed logical activity inside Postgres.
+
+    Transfers use two transaction rows. The database RPC joins each pair before
+    applying limit/offset, so a page boundary can never hide half of a transfer.
+    """
+    rows = await client.rpc(
+        "list_ledger_activity",
+        {
+            "p_household_id": household_id,
+            "p_limit": limit,
+            "p_offset": offset,
         },
     )
     return list(rows or [])
@@ -359,56 +364,6 @@ def transaction_view(
     }
 
 
-def ledger_views(
-    rows: list[dict[str, Any]],
-    links: list[dict[str, Any]],
-    owner_id: str,
-    categories: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Collapse paired transfer rows into one user-facing ledger movement."""
-    rows_by_id = {str(row["id"]): row for row in rows}
-    links_by_out = {str(link["transfer_out_transaction_id"]): link for link in links}
-    views: list[dict[str, Any]] = []
-    for row in rows:
-        direction = str(row["direction"])
-        if direction in {"expense", "income"}:
-            views.append(transaction_view(row, owner_id, categories))
-            continue
-        if direction != "transfer_out":
-            continue
-        link = links_by_out.get(str(row["id"]))
-        if link is None:
-            continue
-        destination = rows_by_id.get(str(link["transfer_in_transaction_id"]))
-        if destination is None or destination.get("direction") != "transfer_in":
-            continue
-        amount_paise = int(row["amount_paise"])
-        views.append(
-            {
-                "id": link["id"],
-                "kind": "transfer",
-                "amount_paise": amount_paise,
-                "personal_share_paise": amount_paise,
-                "description": row.get("note") or "Account transfer",
-                "category": "Transfer",
-                "paid_by_member_id": None,
-                "source_account_id": row["account_id"],
-                "destination_account_id": destination["account_id"],
-                "settlement_member_id": None,
-                "settlement_direction": None,
-                "occurred_at": row["occurred_at"],
-                "notes": row.get("note"),
-                "splits": [],
-                "is_deleted": False,
-                "created_at": link.get("created_at") or row["created_at"],
-                "updated_at": link.get("created_at") or row["created_at"],
-                "account_delta_paise": 0,
-                "member_balance_deltas": [],
-            }
-        )
-    return views
-
-
 @router.get("/api/v1/transactions", tags=["transactions"])
 async def list_transactions(
     client: ClientDependency,
@@ -418,19 +373,13 @@ async def list_transactions(
 ) -> list[dict[str, Any]]:
     household_id = await current_household(client)
     assert household_id is not None
-    owner = await owner_member(client, household_id, auth.user_id)
-    categories = await categories_by_id(client, household_id)
-    # A transfer consumes two storage rows but one user-facing history row. Fetch
-    # enough raw activity to apply logical offset/limit after collapsing pairs.
-    rows = await transaction_rows(
+    await owner_member(client, household_id, auth.user_id)
+    return await ledger_activity_rows(
         client,
         household_id,
-        limit=2 * (limit + offset),
-        offset=0,
+        limit=limit,
+        offset=offset,
     )
-    links = await transfer_link_rows(client, household_id)
-    views = ledger_views(rows, links, str(owner["id"]), categories)
-    return views[offset : offset + limit]
 
 
 @router.post(
@@ -564,10 +513,8 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
     owner_id = str(owner["id"])
     members = await member_rows(client, household_id)
     accounts = await account_rows(client, household_id)
-    categories = await categories_by_id(client, household_id)
     rows = await transaction_rows(client, household_id, limit=1000)
-    links = await transfer_link_rows(client, household_id)
-    views = ledger_views(rows, links, owner_id, categories)
+    views = await ledger_activity_rows(client, household_id, limit=1000)
     now = datetime.now(UTC)
     month_key = now.strftime("%Y-%m")
     current = [view for view in views if str(view["occurred_at"]).startswith(month_key)]

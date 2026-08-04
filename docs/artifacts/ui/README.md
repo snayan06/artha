@@ -16,3 +16,5 @@ viewport and theme in the filename or adjacent Markdown note.
 Current interaction artifacts:
 
 - [Natural-language transfer review](v1-natural-language-transfer.md)
+- [Magic-link recovery states](v1-auth-recovery.md)
+- [Account activity filter](v1-account-activity-filter.md)

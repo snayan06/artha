@@ -9,7 +9,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          charts: ['recharts']
+          charts: ['recharts'],
+          auth: ['@supabase/supabase-js']
         }
       }
     }

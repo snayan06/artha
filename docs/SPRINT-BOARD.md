@@ -1,6 +1,6 @@
 # Artha sprint board
 
-Updated: 4 August 2026  
+Updated: 5 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -20,14 +20,15 @@ Sprint 1 dependency.
 | --- | --- | --- |
 | Public repository and CI | Done | GitHub, CI and CodeQL are active |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
-| Persistent production login | In progress | Magic-link callback and reopen behavior still need final-domain acceptance |
+| Persistent production login | Recovery done locally | Expired, reused, wrong-browser and stale-session states are implemented; final-domain acceptance remains |
 | Server-owned onboarding/profile | Done locally | Profile, household and members now hydrate from the server; final-domain acceptance remains |
 | ₹25k self-transfer flow | Deployed | Parser, review UI, atomic backend and history projection are live; authenticated smoke remains |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
-| Structured Qwen capture | Done locally | Strict schema and allow-list grounding pass tests; provider key and benchmark remain |
+| Structured Qwen capture | Runner done locally | Strict schema, allow-list grounding and the 50-case hosted evaluator pass locally; provider key and benchmark remain |
 | Parser evaluation dataset | Done | 50 fictional cases plus an automated contract checker are in the repository |
 | Family email invitations | Next | Permission model is defined; schema, RLS, email acceptance and limited UI remain |
-| Accounts/cards management after onboarding | Backlog | Detailed V2 task is recorded |
+| Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
+| Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
 | Production acceptance | Blocked | Requires two test identities plus login/link interaction from the user |
 
 ## Sprint 1 — trust and capture foundation
@@ -40,7 +41,7 @@ Sprint 1 dependency.
 - [x] Hydrate an existing user's display name, household and participants from the server after setup lookup.
 - [x] Clarify login copy: the same email action creates a first account or signs in a returning user.
 - [ ] Prove on the final domain that an existing user never repeats onboarding on another device.
-- [ ] Add explicit callback, expired-link and wrong-browser recovery states.
+- [x] Add explicit callback, expired-link and wrong-browser recovery states.
 - [ ] Verify sign-out clears the local session but never deletes ledger data.
 
 ### Natural-language capture and transfers
@@ -52,8 +53,8 @@ Sprint 1 dependency.
 - [x] Confirm transfers through the atomic, idempotent Supabase `create_transfer` RPC.
 - [x] Keep total balance, income and spending unchanged for internal transfers.
 - [x] Collapse paired transfer rows into one production history movement with zero cashflow.
-- [ ] Replace raw-row prefix pagination with a logical ledger activity projection so a transfer pair cannot be split at a page boundary.
-- [ ] Add dedicated per-account activity views (history already names both accounts).
+- [x] Replace raw-row prefix pagination with a logical ledger activity projection so a transfer pair cannot be split at a page boundary.
+- [x] Add an account activity filter that includes both the source and destination side of transfers.
 - [x] Run the full local web/API test and production-build gate.
 - [ ] Run the production smoke test after deployment.
 
@@ -66,7 +67,8 @@ Sprint 1 dependency.
 - [x] Never retry an unsafe onboarding write automatically.
 - [ ] Deploy and measure cold plus warm authenticated requests.
 - [x] Verify the deployed API executes in Mumbai (`bom1`) beside Supabase.
-- [ ] Add sanitized latency evidence and a user-friendly network-state UI.
+- [x] Add a truthful offline/network-state banner without claiming that V1 queues writes.
+- [ ] Add sanitized authenticated cold/warm latency evidence.
 
 ### Structured LLM parsing and evaluation
 
@@ -81,7 +83,8 @@ Sprint 1 dependency.
 - [x] Add 50 fictional evaluation cases across English, Hinglish, typos and ambiguity.
 - [x] Validate dataset IDs, allow-listed entities, outcomes and integer-paise values in CI.
 - [x] Gate 22 common/safety-critical deterministic drafts plus negative, ambiguous and unknown-member input.
-- [ ] Add the hosted-model evaluation runner and score all 50 cases.
+- [x] Add a hosted-model evaluation runner with field/outcome/tag slices and sanitized reports.
+- [ ] Score all 50 cases against hosted Qwen and review the error slices.
 - [ ] Configure the server-only Groq key after the user creates one.
 - [ ] Run the benchmark and publish accuracy/error slices before enabling Qwen.
 
@@ -126,13 +129,20 @@ non-login friends/family participants for splits.
 ### Production quality
 
 - [ ] Record cold/warm authenticated latency after the Mumbai deployment.
-- [ ] Add rate limits, security headers and log-redaction evidence.
+- [ ] Add a deliberate per-user rate-limit policy.
+- [x] Add no-store API caching policy and web/API security headers locally.
+- [ ] Verify deployed security headers and record sanitized log-redaction evidence.
 - [ ] Test PWA install/reopen, offline unsaved drafts, expired auth and accessibility.
 - [ ] Complete the 320 px, 390 px and desktop light/dark matrix.
 
+Current local evidence: Home and Transactions pass at 320 px, 390 px and
+desktop in light/dark with no horizontal overflow or browser-console errors.
+Onboarding, Quick add, Shared, Assistant and auth recovery still need the full
+final-domain matrix.
+
 ### Measured AI
 
-- [ ] Add deterministic and hosted-model scoring runners for the 50-case dataset.
+- [x] Add deterministic and hosted-model scoring runners for the 50-case dataset.
 - [ ] Publish separate amount/date/account/transfer/split/Hinglish error slices.
 - [ ] Enable hosted Qwen only if the agreed critical-field thresholds pass.
 - [ ] Show assistant evidence range, source count and matching transactions.
