@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a focused product or engineering improvement.
+title: "[Feature]: "
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user problem or workflow is currently difficult?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the desired behavior without prescribing implementation unnecessarily.
+    validations:
+      required: true
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Money or privacy considerations
+      description: Note any ledger, authentication, shared-expense, or personal-data implications.
