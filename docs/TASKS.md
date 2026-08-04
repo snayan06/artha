@@ -155,6 +155,14 @@ Updated: 4 August 2026
 
 ## Assistant preview and V2
 
+- [ ] Add post-onboarding **Accounts & family** management.
+  - [ ] Let users add, rename and archive bank, cash and wallet accounts after initial setup.
+  - [ ] Let users add and update credit-card names, limits, statement days and payment due days.
+  - [ ] Record balance corrections as explicit audited adjustments; never silently rewrite an opening balance or transaction history.
+  - [ ] Let users add, rename and deactivate non-login family participants used for splits.
+  - [ ] Keep authenticated household invitations and roles as a separate authorization flow.
+  - [ ] Cover empty, duplicate-name, outstanding-over-limit and archived-account edge cases.
+  - [ ] Verify the management screens at 320 px, 390 px and desktop in light and dark modes.
 - [ ] Invite selected participants as authenticated household members.
 - [x] Add hosted Qwen3.6-27B and local Qwen3 4B provider adapters.
 - [x] Add analytics assistant with user-scoped read-only summaries.
