@@ -207,6 +207,7 @@ screenshots. Report vulnerabilities according to [SECURITY.md](SECURITY.md).
 - [Architecture decisions](docs/DECISIONS.md)
 - [Deployment runbook](docs/DEPLOYMENT.md)
 - [Implementation checklist](docs/TASKS.md)
+- [Documentation artifacts and release evidence](docs/artifacts/)
 
 ## License
 

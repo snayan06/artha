@@ -9,6 +9,7 @@ Updated: 4 August 2026
 - [x] Add environment template, repository rules and standard commands.
 - [x] Publish a sanitized fresh-history public GitHub repository and verify `main`.
 - [x] Add CI workflow for web and API checks.
+- [x] Add a versioned documentation-artifact index and release evidence.
 
 ## Milestone 1 — trustworthy ledger API
 
