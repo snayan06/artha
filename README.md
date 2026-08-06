@@ -59,9 +59,9 @@ capture itself feel like accounting.
    split. Nothing reaches the ledger until confirmation.
 4. **Understand the result.** See balances, personal spending, income, account
    activity, shared receivables and a six-month trend.
-5. **Ask the ledger.** Gemini selects an approved answer pattern and safe
-   widgets around values calculated by Artha—never model-authored HTML, model-
-   calculated balances or direct writes.
+5. **Ask the ledger.** Gemini selects one supported intent, then must return that
+   intent's exact approved narrative and server-owned widget bundle—never model-
+   authored HTML, model-calculated balances or direct writes.
 6. **Keep control.** Export a client-side encrypted backup whose passphrase never
    reaches the API.
 
@@ -113,9 +113,11 @@ owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
 authentication, RLS, idempotency and ledger invariants. A draft is not a
 transaction; only the reviewed confirmation can write.
 
-The assistant follows the same separation. Database code calculates financial
-values, Gemini chooses an approved qualitative narrative and allow-listed
-widgets, and React renders them. Model failure produces no guessed draft or
+The assistant follows the same separation. FastAPI builds a bounded snapshot
+from database-backed dashboard data and the canonical widget bundle for every
+supported intent. Gemini chooses the intent and must copy its exact narrative
+and bundle; titles, labels, values, rows, order and widget count cannot change.
+React renders the validated result. Model failure produces no guessed draft or
 assistant answer.
 
 | Layer | Technology |
@@ -238,8 +240,8 @@ Previous release evidence (recorded before the current documentation pass):
 | `POST` | `/api/v1/onboarding/setup` | Atomically create accounts and household members |
 | `GET` | `/api/v1/profile` | Load the authenticated user's server-owned profile and household |
 | `GET/POST` | `/api/v1/members` | List or create household participants |
-| `GET/POST` | `/api/v1/merchant-rules` | Manage deterministic household auto-tag rules |
-| `POST` | `/api/v1/merchant-rules/learn` | Explicitly remember a prospective merchant rule |
+| `GET/POST` | `/api/v1/merchant-rules` | Manage stored household rules; production Quick Add integration is planned |
+| `POST` | `/api/v1/merchant-rules/learn` | Store a prospective rule; production Quick Add integration is planned |
 | `POST` | `/api/v1/drafts/parse` | Parse an unsaved transaction draft |
 | `POST` | `/api/v1/transactions/confirm` | Confirm a reviewed draft idempotently |
 | `GET` | `/api/v1/transactions` | List confirmed transactions |

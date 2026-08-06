@@ -42,7 +42,9 @@ Money trackers fail because recording every payment feels like work. They also c
 
 1. **Capture first:** one sentence or one tap should create a complete draft.
 2. **Confirm before saving:** AI never silently posts financial data.
-3. **Remember preferences:** repeated merchants, accounts, and splits become defaults.
+3. **Remember preferences safely:** the local/demo rule path learns
+   prospectively; production merchant learning must ship as an explicit,
+   reviewable integration rather than an implied default.
 4. **Cash and expense are different:** a payer’s account may lose the full amount while their personal expense is only their share.
 5. **Answers are calculated, not guessed:** the language model interprets the question; database functions calculate the result.
 6. **Private by default:** household data is visible only to authorized members.
@@ -58,7 +60,9 @@ Money trackers fail because recording every payment feels like work. They also c
 - Natural-language debit/credit capture.
 - Parsed review: amount, type, merchant, category, account, date, notes, and split.
 - Manual edit and confirm.
-- Auto-tagging using rules first and AI only when needed.
+- Production category suggestion through Gemini, constrained to existing
+  household categories, with manual selection on failure. Merchant-rule-first
+  behavior is currently local/demo only; production integration is planned.
 - Dashboard: available balance, month income, month spend, and pending shared balance.
 - Transaction list, search, filters, edit, and soft delete.
 - Equal, percentage, or exact shared split.
@@ -83,7 +87,8 @@ Money trackers fail because recording every payment feels like work. They also c
 ### Later
 
 - V2 member invites so selected family members can sign in, inspect shared items and record settlements.
-- V2 read-only agent chat with safe inline charts, cards and transaction tables.
+- Richer assistant filtering, user-selected date ranges, source-linked evidence
+  and affordability analysis beyond the current fixed-intent snapshot preview.
 - Investments, liabilities, goals, net worth, and asset allocation.
 - Bank/email/SMS automation only after legal, privacy, reliability, and cost review.
 - Native Android/iOS apps only if PWA capture proves insufficient.
@@ -130,7 +135,8 @@ Draft:
 
 ### Reducing repeated effort
 
-- “Reliance Fresh” learns category `groceries` after confirmation.
+- On the local/demo path, “Reliance Fresh” can learn category `groceries` after
+  confirmation; production learning remains planned.
 - “from HDFC UPI” becomes the default payment account for UPI entries.
 - “split with family” proposes the most recently used member set and ratio.
 - Recent merchants and common amounts appear as suggestions, not forced guesses.
@@ -139,8 +145,8 @@ Draft:
 - When no date is mentioned, the review visibly defaults to today. Relative dates
   such as `yesterday`, `3 days ago`, and explicit unambiguous dates are parsed;
   Today/Yesterday and a date picker remain one-tap corrections.
-- Confirmed merchant/category/account choices can become future suggestions;
-  corrections update the rule prospectively and never rewrite old transactions.
+- When production merchant learning ships, confirmed corrections may update a
+  prospective rule and must never rewrite old transactions.
 
 ## 7. Core screens
 
@@ -148,7 +154,8 @@ Draft:
 2. **Home:** available money, month spend, shared pending, recent activity, top categories.
 3. **Quick add:** conversational field, parsed draft, uncertainty indicators, confirm.
 4. **Transactions:** searchable ledger with account/category/member/date filters.
-5. **Ask:** conversational questions with source transaction count and date range.
+5. **Ask:** fixed-intent read-only assistant preview with canonical metrics,
+   charts, tables and clarification states.
 6. **Family:** per-member net owed/owing, expense details, and settlement actions.
 7. **Settings:** accounts, categories, rules, members, export, delete account.
 
@@ -177,31 +184,41 @@ A card purchase increases card liability. Paying the card is an account transfer
 
 Edits preserve an audit record. Deletes are soft deletes. Recalculations happen transactionally so balances, splits, and settlements cannot diverge.
 
-## 9. Ask Artha design
+## 9. Ask Artha current preview
 
-Supported intents:
+The current preview supports exactly eight intents:
 
-- spending total by time, category, merchant, account, or person;
-- income total;
-- account and overall balances;
-- shared balance and contributing transactions;
-- month-over-month category comparison;
-- “Can I afford X?” based on current cash, upcoming recurring bills, and a user-set savings buffer.
+| Intent | Canonical result |
+|---|---|
+| `summary` | Total balance, current-month spending and current-month income metrics, in that order |
+| `spending` | Current-month spending metric plus a top-category bar chart when category data exists |
+| `income` | Current-month income metric |
+| `cashflow` | Monthly income then monthly spending line charts, or clarification when monthly context is empty |
+| `shared` | Household-balance table, or clarification when member context is empty |
+| `transactions` | Recent-activity table, or clarification when transaction context is empty |
+| `clarification` | Approved question and choices for an unclear request |
+| `unsupported` | Read-only boundary message and approved alternatives |
 
 Pipeline:
 
-1. Gemini interprets the question into a strict, supported intent.
-2. Validate allowed dimensions and date range.
-3. Run a predefined database function.
-4. Gemini selects an approved intent-matched qualitative narrative and allow-
-   listed widgets around the server-derived values.
-5. Validate the complete response and render repository-owned React components
-   with the date range and source transactions.
+1. FastAPI builds a bounded snapshot from authenticated dashboard context:
+   total balance, current-month spend/income, up to 20 member balances, 5 top
+   categories, 6 monthly points and 8 recent transaction summaries.
+2. Server code builds the exact approved narrative and canonical widget array
+   for each intent.
+3. Gemini selects an intent and must copy that intent's narrative and bundle.
+4. FastAPI requires exact equality for titles, labels, values, rows, points,
+   order and cardinality.
+5. React renders repository-owned components.
 
-The model never generates SQL, calculates authoritative financial values,
-receives write tools, emits arbitrary numeric prose or supplies executable HTML.
-If it is unavailable or returns an invalid contract, the API returns a sanitized
-`503` and the interface shows an honest error rather than a generated fallback.
+The model never calculates authoritative financial values, changes the ledger,
+emits arbitrary numeric prose or supplies executable HTML. If it is unavailable
+or returns an invalid contract, the API returns a sanitized `503` and the
+interface shows an honest error rather than a generated fallback.
+
+This preview answers from the current bounded snapshot; it does not yet offer
+arbitrary filters, custom date ranges, affordability analysis or source-linked
+drill-down. Those remain explicit future capabilities.
 
 ## 10. Data model
 
@@ -231,9 +248,9 @@ All money values use integer paise, never floating-point numbers.
 | Hosting | Vercel Hobby | Two personal projects for the Vite PWA and FastAPI monorepo roots |
 | Auth + database | Supabase Free | Managed Postgres, magic links, row-level security, realtime, storage |
 | API | Python 3.13 + FastAPI + Pydantic v2 on Vercel | Typed APIs without a minute-long container wake-up |
-| Assistant | Gemini via the official Google SDK, strict Pydantic schemas and approved read-only tools | Model-selected intent/narrative/widgets around database-derived values, without write access |
+| Assistant | Gemini via the official Google SDK, strict Pydantic schemas and server-owned canonical bundles | Fixed-intent read-only preview; exact titles, values, rows, order and cardinality come from bounded database context |
 | Natural-language capture | Gemini via the official Google SDK, grounded in authenticated household context | Strict validated unsaved drafts; preserved text and manual form when interpretation is unavailable |
-| Auto-tagging | Learned merchant rules first; Gemini suggestion second | Only existing household categories may be selected; manual selection on failure |
+| Auto-tagging | Production Gemini suggestion; merchant-rule-first matching remains local/demo pending Supabase integration | Only existing household categories may be selected; manual selection on failure |
 | Voice | Cloudflare Workers AI Whisper, capped | Free allocation is sufficient for a private pilot |
 | OCR | Client-side OCR first | Keeps screenshots private and avoids API cost |
 | Source + CI | GitHub Free + GitHub Actions | Version control and automated checks |
@@ -304,7 +321,8 @@ Prototype these tasks:
 ### User-test success criteria
 
 - A first-time user completes each task without explanation.
-- Median transaction capture is under 10 seconds initially and under 5 seconds for a learned merchant.
+- Median transaction capture is under 10 seconds initially; after production
+  merchant-rule integration, the target is under 5 seconds for a learned merchant.
 - No participant confuses account cash movement with personal share.
 - Users can always tell whether a transaction has been saved or is still a draft.
 
@@ -348,7 +366,7 @@ The application itself needs database transactions, authentication, offline beha
 ### Week 3 — shared money and Ask
 
 - Splits, receivables, settlements.
-- Supported Ask intents and deterministic database functions.
+- Fixed-intent Ask preview with bounded context and canonical server-owned bundles.
 - CSV export/import and reconciliation.
 
 ### Week 4 — hardening and private launch
@@ -369,7 +387,8 @@ The MVP is ready only when:
 - Full account movement and personal share are both correct.
 - Editing/deleting a shared expense recalculates all balances atomically.
 - Settlement does not inflate income or expense.
-- Assistant financial values match direct database queries and show their date range/source count.
+- Assistant narratives and canonical bundles match the selected intent and
+  bounded server context exactly.
 - CSV export can reconstruct the ledger.
 - Installed PWA works on Android and iPhone; offline entries remain drafts until synced.
 - The service operates at ₹0 within documented quotas, excluding an optional custom domain and WhatsApp.
@@ -382,6 +401,7 @@ The MVP is ready only when:
 - Transactions recorded per active week.
 - Imported statement transactions missing from Artha.
 - Shared-balance disputes/corrections.
-- Ask answers opened into source transactions.
+- Assistant requests resolved to a supported, clarification or unsupported intent.
+- Assistant model-unavailable and invalid-contract rate.
 
 The key launch metric is not sign-ups; it is **at least 90% of real transactions captured for four consecutive weeks without the process feeling burdensome**.

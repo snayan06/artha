@@ -3,20 +3,33 @@
 Auto-tagging is a suggestion pipeline. It never posts or rewrites a transaction
 without confirmation.
 
-## Decision order
+## Current production behavior
 
-1. Normalize the merchant and description: lowercase, collapse whitespace, and
-   remove payment-network noise that does not identify the merchant.
-2. Match an active household `merchant_rules` entry by priority (`exact`, then
-   `contains`, then carefully validated `regex`).
-3. If no rule matches, ask Gemini for a structured suggestion constrained to
-   the household's existing categories.
-4. Validate that the returned category already exists in the household and show
-   its confidence and reason in the draft review.
-5. If Gemini is unavailable or its answer is invalid, leave category selection
-   to the user. Never generate a new fallback category.
-6. Save only after the user confirms. When the user corrects the category, offer
-   to remember that merchant-to-category rule for future drafts.
+Supabase production Quick Add sends the authenticated capture context directly
+to Gemini, including the household's existing category allow-list. It does not
+currently load or apply `merchant_rules` before interpretation.
+
+The production tag-suggestion endpoint is also Gemini-only today:
+
+1. Send the minimum merchant/description context and existing category IDs.
+2. Validate that Gemini selected an exact allow-listed category.
+3. Present the suggestion in the unsaved review flow.
+4. If Gemini is missing, unavailable or invalid, leave category selection to
+   the user. Never create a fallback category.
+
+Only explicit transaction confirmation can save the reviewed draft.
+
+## Local/demo rule behavior
+
+The SQLAlchemy local/demo path implements merchant-rule-first behavior. It
+normalizes merchant text, matches household rules by `exact`, `contains`, then
+validated `regex`, and asks the configured model only when no rule matches. A
+confirmed correction can prospectively create or update a rule for later local
+entries.
+
+Production Supabase integration for matching and learning these rules is
+planned. Until it ships, rule-first categorization must not be presented as a
+production capability.
 
 ## Model input
 
@@ -32,8 +45,8 @@ The model receives only the minimum needed fields:
 }
 ```
 
-It does not receive account numbers, card numbers, database credentials, raw
-household history, or arbitrary SQL access.
+It does not receive account numbers, card numbers, database credentials or raw
+household history.
 
 ## Model output
 
@@ -49,13 +62,13 @@ The API rejects unknown categories, malformed JSON, and out-of-range confidence.
 A high-confidence result is preselected but remains an unsaved draft. A lower
 confidence result is presented as a suggestion or clarification question.
 
-## Learning behavior
+## Learning contract
 
-Learning is household-specific and prospective. A correction may create or
-update a `merchant_rules` row, so later entries become deterministic and do not
-consume model quota. Existing confirmed transactions are never silently
-retagged. Bulk historical retagging, if added later, must be an explicit preview
-and confirmation workflow.
+Where learning is enabled on the local/demo path, it is household-specific and
+prospective. Existing confirmed transactions are never silently retagged. The
+planned production integration must preserve the same rule: corrections affect
+future suggestions only, and any bulk historical retagging requires an explicit
+preview and confirmation workflow.
 
 ## Provider behavior
 

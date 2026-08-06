@@ -139,10 +139,10 @@
   </g>
   <text x="62" y="431" class="label">Ask Artha is read-only</text>
   <rect x="65" y="451" width="238" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
-  <text x="184" y="478" text-anchor="middle" class="body">Database computes values</text>
+  <text x="184" y="478" text-anchor="middle" class="body">DB values → canonical bundles</text>
   <path d="M305 473 C326 468 340 477 360 473" class="arrow"/>
   <rect x="368" y="451" width="320" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
-  <text x="528" y="478" text-anchor="middle" class="body">Gemini selects approved narrative + widgets</text>
+  <text x="528" y="478" text-anchor="middle" class="body">Gemini selects intent + copies exact bundle</text>
   <path d="M690 473 C711 477 725 468 746 473" class="arrow"/>
   <rect x="754" y="451" width="220" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
   <text x="864" y="478" text-anchor="middle" class="body">React safely renders</text>

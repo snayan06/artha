@@ -73,30 +73,32 @@ If step 3 or 4 fails, the exact source text is retained and the manual form
 opens. No deterministic language-parser guess is promoted as production
 recovery, and nothing is saved.
 
-Merchant categorization has a narrower deterministic layer. A household's
-learned merchant rule may select its remembered category. When no rule matches,
-Gemini may suggest one existing category ID; an unavailable or invalid model
-response leaves category selection to the user. It never creates a category.
+Production Quick Add currently asks Gemini to select from existing household
+categories as part of capture; it does not load or apply `merchant_rules`.
+Likewise, the production tag-suggestion endpoint asks Gemini directly and leaves
+selection to the user when the response is unavailable or invalid. The local
+SQLAlchemy demo path can match and learn merchant rules before model suggestion.
+Connecting that learned rule behavior to Supabase production capture is planned,
+not a live production claim.
 
 ## Assistant and generative UI
 
-The assistant is read-only and LLM-powered. It has three deliberately separated
-responsibilities:
+The assistant is read-only and LLM-powered. FastAPI first creates a bounded
+financial snapshot from authenticated dashboard context: total balance,
+current-month spending and income, up to 20 member balances, 5 top categories,
+6 monthly cash-flow points and 8 recent transaction summaries.
 
-1. Database functions calculate balances, totals, comparisons and matching
-   transaction IDs from authenticated ledger data.
-2. Gemini selects the supported intent, one approved intent-matched qualitative
-   narrative and an allow-listed set of widgets.
-3. FastAPI validates the complete response, then React renders repository-owned
-   metric, chart and table components.
+From that snapshot, server code builds the exact canonical widget bundle for
+each supported intent: `summary`, `spending`, `income`, `cashflow`, `shared`,
+`transactions`, `clarification` and `unsupported`. Gemini selects one intent and
+must copy that intent's approved narrative and widget array exactly. FastAPI
+rejects any changed title, label, value, row, point, order or cardinality; React
+then renders repository-owned metric, chart, table or clarification components.
 
-Gemini does not execute SQL, receive a write tool, calculate authoritative
-financial values, return arbitrary numeric prose or render HTML/JavaScript. A
-numeric value shown to the user must come from the server/database result and
-pass the response contract. Narrative text must match the selected intent and
-an approved qualitative template. When Gemini is unavailable or its output is
-invalid, the API returns a sanitized `503` and the UI shows an honest error; it
-does not fall back to fabricated cards or an assistant answer.
+Gemini cannot calculate authoritative financial values, add arbitrary numeric
+prose, alter the ledger or render HTML/JavaScript. When Gemini is unavailable or
+its output is invalid, the API returns a sanitized `503` and the UI shows an
+honest error; it does not fall back to fabricated cards or an assistant answer.
 
 ## Ledger and security rules
 
@@ -107,8 +109,8 @@ does not fall back to fabricated cards or an assistant answer.
 - RLS is enabled on exposed household tables.
 - Account, member and category references are resolved against authenticated
   household allow-lists.
-- Model output is untrusted input; arbitrary model HTML, JavaScript and SQL are
-  never executed.
+- Model output is untrusted input; arbitrary model HTML or JavaScript is never
+  rendered.
 - Raw account/card numbers are neither required nor stored.
 - Free-tier Gemini must receive fictional data only; real financial text needs
   an appropriate paid privacy configuration.

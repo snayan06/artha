@@ -18,10 +18,11 @@ Account balances, spending and shared receivables are derived from immutable-sty
 
 ## ADR-005: constrained read-only assistant
 
-The assistant receives only predefined read-only analytics capabilities. It
-cannot execute SQL, receive write tools or render arbitrary code. Its strict
-structured output maps to reviewed React components, while database code owns
-all financial values.
+The assistant operates on a bounded, server-built financial snapshot. Gemini
+selects one supported intent and must copy its exact approved narrative and
+canonical widget bundle. FastAPI rejects changed titles, labels, values, rows,
+points, order or cardinality before React renders repository-owned components.
+The assistant cannot alter the ledger or render arbitrary model code.
 
 ## ADR-006: Gemini is the production private-pilot model
 
@@ -39,13 +40,17 @@ unsaved review draft; only explicit confirmation writes. If interpretation is
 unavailable or invalid, Artha preserves the exact text and opens the manual form
 without guessing.
 
-Merchant rules remain the learned deterministic auto-tag layer. With no matching
-rule, Gemini may suggest only an existing category; failure leaves the choice to
-the user. For the assistant, database code calculates every financial value and
-Gemini selects a supported intent, approved qualitative narrative and allow-
-listed widgets. Invalid or unavailable output produces a sanitized `503`, not a
-fabricated answer. An explicitly configured Ollama adapter may be used for local
-development only and is not part of the production decision.
+Merchant-rule-first matching and learning remain available in the local
+SQLAlchemy demo path. Production Supabase Quick Add and category suggestion call
+Gemini directly today; production merchant-rule integration is planned. Gemini
+may select only an existing category, and failure leaves the choice to the user.
+
+For the assistant, server code owns the bounded context and exact canonical
+bundle for every supported intent. Gemini selects an intent and must copy its
+approved narrative and bundle without changing titles, labels, values, rows,
+points, order or cardinality. Invalid or unavailable output produces a sanitized
+`503`, not a fabricated answer. An explicitly configured Ollama adapter may be
+used for local development only and is not part of the production decision.
 
 ## ADR-007: Vercel Hobby and Supabase Free for the private pilot
 
