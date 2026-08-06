@@ -21,6 +21,7 @@ from artha_api.feature_evals import (
     build_decision,
     load_assistant_suite,
     load_tag_suite,
+    main,
     run_tag_suite,
     score_assistant_case,
     score_tag_case,
@@ -76,7 +77,6 @@ async def test_hosted_tag_benchmark_dispatches_to_selected_gemini_model() -> Non
         AssistantSettings(
             provider=LlmProvider.GEMINI,
             gemini_api_key="gemini-test-key",
-            groq_api_key=None,
         ),
         gemini_client=gemini,
     )
@@ -99,6 +99,18 @@ async def test_hosted_tag_benchmark_dispatches_to_selected_gemini_model() -> Non
     assert calls[0]["model"] == "gemini-3.5-flash-lite"
     assert report["model"] == "gemini-3.5-flash-lite"
     assert report["summary"]["case_accuracy"] == 1.0
+
+
+def test_hosted_feature_eval_requires_gemini_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+
+    with pytest.raises(
+        ValueError, match="ARTHA_GEMINI_API_KEY is required for hosted evaluation"
+    ):
+        main(["--mode", "run", "--suite", "tag"])
 
 
 def test_tag_scoring_distinguishes_correct_null_and_invented_category() -> None:

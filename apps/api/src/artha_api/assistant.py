@@ -50,7 +50,6 @@ class GeminiClient(Protocol):
 
 class LlmProvider(StrEnum):
     GEMINI = "gemini"
-    GROQ = "groq"
     OLLAMA = "ollama"
     DISABLED = "disabled"
 
@@ -367,7 +366,6 @@ class CaptureInterpretationEnvelope(StrictModel):
     result: CaptureInterpretation
 
 
-DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
@@ -376,9 +374,6 @@ class AssistantSettings:
     provider: LlmProvider
     gemini_api_key: str | None = field(default=None, repr=False)
     gemini_model: str = DEFAULT_GEMINI_MODEL
-    groq_api_key: str | None = field(default=None, repr=False)
-    groq_base_url: str = "https://api.groq.com/openai/v1"
-    groq_model: str = DEFAULT_GROQ_MODEL
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:4b-instruct"
     ollama_fallback_enabled: bool = False
@@ -387,27 +382,24 @@ class AssistantSettings:
     @classmethod
     def from_env(cls) -> AssistantSettings:
         gemini_api_key = getenv("ARTHA_GEMINI_API_KEY") or None
-        groq_api_key = getenv("ARTHA_GROQ_API_KEY") or None
         raw_provider = getenv("ARTHA_LLM_PROVIDER")
         if raw_provider is None:
-            if gemini_api_key:
-                provider = LlmProvider.GEMINI
-            elif groq_api_key:
-                provider = LlmProvider.GROQ
-            else:
-                provider = LlmProvider.DISABLED
+            provider = (
+                LlmProvider.GEMINI if gemini_api_key else LlmProvider.DISABLED
+            )
         else:
+            normalized_provider = raw_provider.strip().casefold()
             try:
-                provider = LlmProvider(raw_provider.strip().casefold())
-            except ValueError:
-                provider = LlmProvider.DISABLED
+                provider = LlmProvider(normalized_provider)
+            except ValueError as error:
+                raise ValueError(
+                    f"unsupported LLM provider: {normalized_provider}"
+                ) from error
         fallback = getenv("ARTHA_OLLAMA_FALLBACK", "false").strip().casefold()
         return cls(
             provider=provider,
             gemini_api_key=gemini_api_key,
             gemini_model=getenv("ARTHA_GEMINI_MODEL", DEFAULT_GEMINI_MODEL).strip(),
-            groq_api_key=groq_api_key,
-            groq_model=getenv("ARTHA_GROQ_MODEL", DEFAULT_GROQ_MODEL).strip(),
             ollama_base_url=getenv(
                 "ARTHA_OLLAMA_BASE_URL", "http://127.0.0.1:11434"
             ).rstrip("/"),
@@ -475,7 +467,7 @@ def _completion_schema() -> dict[str, object]:
 
 
 def _strict_json_schema(schema: dict[str, object]) -> dict[str, object]:
-    """Return Groq strict-mode schema without changing runtime Pydantic models."""
+    """Return a strict schema without changing runtime Pydantic models."""
 
     def normalize(value: object) -> object:
         if isinstance(value, list):
@@ -496,19 +488,6 @@ def _strict_json_schema(schema: dict[str, object]) -> dict[str, object]:
     result = normalize(schema)
     assert isinstance(result, dict)
     return result
-
-
-def _groq_response_format(
-    name: str, schema: dict[str, object]
-) -> dict[str, object]:
-    return {
-        "type": "json_schema",
-        "json_schema": {
-            "name": name,
-            "strict": True,
-            "schema": _strict_json_schema(schema),
-        },
-    }
 
 
 def _gemini_response_format(schema: dict[str, object]) -> dict[str, object]:
@@ -541,152 +520,6 @@ def _prompt(message: str, context: AssistantFinancialContext) -> str:
         + context.model_dump_json()
         + "\nRequired response JSON schema:\n"
         + json.dumps(_completion_schema(), separators=(",", ":"))
-    )
-
-
-def _intent(message: str) -> AssistantIntent:
-    lowered = message.casefold()
-    if any(word in lowered for word in ("owe", "owed", "shared", "split", "household")):
-        return AssistantIntent.SHARED
-    if any(word in lowered for word in ("spend", "spent", "expense", "category")):
-        return AssistantIntent.SPENDING
-    if any(word in lowered for word in ("income", "salary", "earned")):
-        return AssistantIntent.INCOME
-    if any(word in lowered for word in ("transaction", "recent", "latest")):
-        return AssistantIntent.TRANSACTIONS
-    if any(word in lowered for word in ("balance", "cash", "summary", "overview")):
-        return AssistantIntent.SUMMARY
-    return AssistantIntent.CLARIFICATION
-
-
-def deterministic_completion(
-    message: str, context: AssistantFinancialContext
-) -> AssistantCompletion:
-    intent = _intent(message)
-    if intent is AssistantIntent.SHARED:
-        if not context.member_balances:
-            return AssistantCompletion(
-                intent=intent,
-                widgets=[
-                    InsightWidget(
-                        type="insight",
-                        title="Household balances",
-                        body="No household member balances are available yet.",
-                    )
-                ],
-            )
-        return AssistantCompletion(
-            intent=intent,
-            widgets=[
-                TableWidget(
-                    type="table",
-                    title="Household balances",
-                    rows=[
-                        TableRow(
-                            label=item.member_name,
-                            amount_paise=item.balance_paise,
-                        )
-                        for item in context.member_balances
-                    ],
-                )
-            ],
-        )
-    if intent is AssistantIntent.SPENDING:
-        widgets: list[AssistantWidget] = [
-            MetricWidget(
-                type="metric",
-                title="Spending this month",
-                value_paise=context.current_month_spend_paise,
-            )
-        ]
-        if context.top_categories:
-            widgets.append(
-                ChartWidget(
-                    type="chart",
-                    title="Top spending categories",
-                    chart_type="bar",
-                    points=[
-                        ChartPoint(label=item.category, value_paise=item.amount_paise)
-                        for item in context.top_categories
-                    ],
-                )
-            )
-        return AssistantCompletion(intent=intent, widgets=widgets)
-    if intent is AssistantIntent.INCOME:
-        return AssistantCompletion(
-            intent=intent,
-            widgets=[
-                MetricWidget(
-                    type="metric",
-                    title="Income this month",
-                    value_paise=context.current_month_income_paise,
-                    tone="positive",
-                )
-            ],
-        )
-    if intent is AssistantIntent.TRANSACTIONS and context.recent_transactions:
-        return AssistantCompletion(
-            intent=intent,
-            widgets=[
-                TableWidget(
-                    type="table",
-                    title="Recent activity",
-                    rows=[
-                        TableRow(
-                            label=item.category,
-                            amount_paise=item.personal_share_paise,
-                            date=item.occurred_on,
-                            kind=item.kind,
-                        )
-                        for item in context.recent_transactions
-                    ],
-                )
-            ],
-        )
-    if intent is AssistantIntent.SUMMARY:
-        return AssistantCompletion(
-            intent=intent,
-            widgets=[
-                MetricWidget(
-                    type="metric",
-                    title="Total account balance",
-                    value_paise=context.total_balance_paise,
-                ),
-                MetricWidget(
-                    type="metric",
-                    title="Spending this month",
-                    value_paise=context.current_month_spend_paise,
-                ),
-            ],
-        )
-    return AssistantCompletion(
-        intent=AssistantIntent.CLARIFICATION,
-        widgets=[
-            ClarificationWidget(
-                type="clarification",
-                question="What would you like to review?",
-                choices=["Account balance", "Monthly spending", "Income", "Household balances"],
-            )
-        ],
-    )
-
-
-def deterministic_tag_suggestion(payload: TagSuggestionRequest) -> TagSuggestion:
-    description = payload.description.casefold()
-    for category in payload.allowed_categories:
-        normalized_name = category.name.casefold()
-        if normalized_name in description:
-            return TagSuggestion(
-                category_id=category.id,
-                category_name=category.name,
-                confidence=0.75,
-                reason="The existing category name appears in the description.",
-            )
-    return TagSuggestion(
-        category_id=None,
-        category_name=None,
-        confidence=0.0,
-        reason="No deterministic category match was found.",
     )
 
 
@@ -777,8 +610,6 @@ class LocalFinancialAssistant:
     def selected_model(self) -> str | None:
         if self.settings.provider is LlmProvider.GEMINI:
             return self.settings.gemini_model
-        if self.settings.provider is LlmProvider.GROQ:
-            return self.settings.groq_model
         if self.settings.provider is LlmProvider.OLLAMA:
             return self.settings.ollama_model
         return None
@@ -788,8 +619,6 @@ class LocalFinancialAssistant:
     ) -> AssistantCompletion:
         if self.settings.provider is LlmProvider.GEMINI:
             return await self._gemini_completion(message, context)
-        if self.settings.provider is LlmProvider.GROQ:
-            return await self._groq_completion(message, context)
         if self.settings.provider is LlmProvider.OLLAMA:
             return await self._ollama_completion(message, context)
         raise ValueError("model provider is disabled")
@@ -799,8 +628,6 @@ class LocalFinancialAssistant:
     ) -> TagSuggestion:
         if self.settings.provider is LlmProvider.GEMINI:
             result = await self._gemini_tag_suggestion(payload)
-        elif self.settings.provider is LlmProvider.GROQ:
-            result = await self._groq_tag_suggestion(payload)
         elif self.settings.provider is LlmProvider.OLLAMA:
             result = await self._ollama_tag_suggestion(payload)
         else:
@@ -818,20 +645,11 @@ class LocalFinancialAssistant:
                 ollama_fallback_enabled=settings.ollama_fallback_enabled,
                 detail="disabled",
             )
-        if (
-            settings.provider is LlmProvider.GEMINI
-            and not settings.gemini_api_key
-        ) or (
-            settings.provider is LlmProvider.GROQ and not settings.groq_api_key
-        ):
+        if settings.provider is LlmProvider.GEMINI and not settings.gemini_api_key:
             return AssistantStatus(
                 configured=False,
                 provider=settings.provider,
-                model=(
-                    settings.gemini_model
-                    if settings.provider is LlmProvider.GEMINI
-                    else settings.groq_model
-                ),
+                model=settings.gemini_model,
                 available=False,
                 ollama_fallback_enabled=settings.ollama_fallback_enabled,
                 detail="missing_api_key",
@@ -840,9 +658,6 @@ class LocalFinancialAssistant:
             if settings.provider is LlmProvider.GEMINI:
                 await self._gemini_model()
                 model = settings.gemini_model
-            elif settings.provider is LlmProvider.GROQ:
-                await self._groq_models()
-                model = settings.groq_model
             else:
                 await self._ollama_tags()
                 model = settings.ollama_model
@@ -853,11 +668,7 @@ class LocalFinancialAssistant:
                 model=(
                     settings.gemini_model
                     if settings.provider is LlmProvider.GEMINI
-                    else (
-                        settings.groq_model
-                        if settings.provider is LlmProvider.GROQ
-                        else settings.ollama_model
-                    )
+                    else settings.ollama_model
                 ),
                 available=False,
                 ollama_fallback_enabled=settings.ollama_fallback_enabled,
@@ -880,12 +691,10 @@ class LocalFinancialAssistant:
         attempts: list[tuple[LlmProvider, str]] = []
         if settings.provider is LlmProvider.GEMINI and settings.gemini_api_key:
             attempts.append((LlmProvider.GEMINI, settings.gemini_model))
-        elif settings.provider is LlmProvider.GROQ and settings.groq_api_key:
-            attempts.append((LlmProvider.GROQ, settings.groq_model))
         elif settings.provider is LlmProvider.OLLAMA:
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
         if (
-            settings.provider in {LlmProvider.GEMINI, LlmProvider.GROQ}
+            settings.provider is LlmProvider.GEMINI
             and settings.ollama_fallback_enabled
         ):
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
@@ -894,8 +703,6 @@ class LocalFinancialAssistant:
             try:
                 if provider is LlmProvider.GEMINI:
                     result = await self._gemini_completion(message, context)
-                elif provider is LlmProvider.GROQ:
-                    result = await self._groq_completion(message, context)
                 else:
                     result = await self._ollama_completion(message, context)
             except (
@@ -921,12 +728,10 @@ class LocalFinancialAssistant:
         attempts: list[tuple[LlmProvider, str]] = []
         if settings.provider is LlmProvider.GEMINI and settings.gemini_api_key:
             attempts.append((LlmProvider.GEMINI, settings.gemini_model))
-        elif settings.provider is LlmProvider.GROQ and settings.groq_api_key:
-            attempts.append((LlmProvider.GROQ, settings.groq_model))
         elif settings.provider is LlmProvider.OLLAMA:
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
         if (
-            settings.provider in {LlmProvider.GEMINI, LlmProvider.GROQ}
+            settings.provider is LlmProvider.GEMINI
             and settings.ollama_fallback_enabled
         ):
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
@@ -935,8 +740,6 @@ class LocalFinancialAssistant:
             try:
                 if provider is LlmProvider.GEMINI:
                     result = await self._gemini_tag_suggestion(payload)
-                elif provider is LlmProvider.GROQ:
-                    result = await self._groq_tag_suggestion(payload)
                 else:
                     result = await self._ollama_tag_suggestion(payload)
                 result = self._ground_tag_suggestion(result, payload.allowed_categories)
@@ -975,12 +778,10 @@ class LocalFinancialAssistant:
         attempts: list[tuple[LlmProvider, str]] = []
         if settings.provider is LlmProvider.GEMINI and settings.gemini_api_key:
             attempts.append((LlmProvider.GEMINI, settings.gemini_model))
-        elif settings.provider is LlmProvider.GROQ and settings.groq_api_key:
-            attempts.append((LlmProvider.GROQ, settings.groq_model))
         elif settings.provider is LlmProvider.OLLAMA:
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
         if (
-            settings.provider in {LlmProvider.GEMINI, LlmProvider.GROQ}
+            settings.provider is LlmProvider.GEMINI
             and settings.ollama_fallback_enabled
         ):
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
@@ -992,8 +793,6 @@ class LocalFinancialAssistant:
             try:
                 if provider is LlmProvider.GEMINI:
                     result = await self._gemini_capture_interpretation(message, context)
-                elif provider is LlmProvider.GROQ:
-                    result = await self._groq_capture_interpretation(message, context)
                 else:
                     result = await self._ollama_capture_interpretation(message, context)
                 self._ground_capture_interpretation(result, context)
@@ -1059,45 +858,10 @@ class LocalFinancialAssistant:
             raise ValueError("Gemini interaction has no model text")
         return content
 
-    async def _groq_models(self) -> None:
-        assert self.settings.groq_api_key is not None
-        async with self._client(
-            base_url=self.settings.groq_base_url,
-            headers={"Authorization": f"Bearer {self.settings.groq_api_key}"},
-        ) as client:
-            response = await client.get("models")
-            response.raise_for_status()
-
     async def _ollama_tags(self) -> None:
         async with self._client(base_url=self.settings.ollama_base_url) as client:
             response = await client.get("/api/tags")
             response.raise_for_status()
-
-    async def _groq_completion(
-        self, message: str, context: AssistantFinancialContext
-    ) -> AssistantCompletion:
-        assert self.settings.groq_api_key is not None
-        payload = {
-            "model": self.settings.groq_model,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": _prompt(message, context)},
-            ],
-            "temperature": 0,
-            "response_format": _groq_response_format(
-                "artha_assistant_completion", _completion_schema()
-            ),
-            "reasoning_effort": "low",
-        }
-        async with self._client(
-            base_url=self.settings.groq_base_url,
-            headers={"Authorization": f"Bearer {self.settings.groq_api_key}"},
-        ) as client:
-            response = await client.post("chat/completions", json=payload)
-            response.raise_for_status()
-            body = response.json()
-        content = body["choices"][0]["message"]["content"]
-        return AssistantCompletion.model_validate_json(content)
 
     async def _gemini_completion(
         self, message: str, context: AssistantFinancialContext
@@ -1140,36 +904,6 @@ class LocalFinancialAssistant:
         if allowed.get(suggestion.category_id) != suggestion.category_name:
             raise ValueError("model suggestion is not in the category allow-list")
         return suggestion
-
-    async def _groq_tag_suggestion(
-        self, payload: TagSuggestionRequest
-    ) -> TagSuggestion:
-        assert self.settings.groq_api_key is not None
-        request_body = {
-            "model": self.settings.groq_model,
-            "messages": [
-                {"role": "system", "content": TAG_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": payload.model_dump_json()
-                    + "\nRequired response JSON schema:\n"
-                    + json.dumps(TagSuggestion.model_json_schema(), separators=(",", ":")),
-                },
-            ],
-            "temperature": 0,
-            "response_format": _groq_response_format(
-                "artha_tag_suggestion", TagSuggestion.model_json_schema()
-            ),
-            "reasoning_effort": "low",
-        }
-        async with self._client(
-            base_url=self.settings.groq_base_url,
-            headers={"Authorization": f"Bearer {self.settings.groq_api_key}"},
-        ) as client:
-            response = await client.post("chat/completions", json=request_body)
-            response.raise_for_status()
-            body = response.json()
-        return TagSuggestion.model_validate_json(body["choices"][0]["message"]["content"])
 
     async def _gemini_tag_suggestion(
         self, payload: TagSuggestionRequest
@@ -1237,47 +971,6 @@ class LocalFinancialAssistant:
                 raise ValueError("model selected an income-only category for an expense")
             if result.kind == "income" and category_kind not in {"income", "both"}:
                 raise ValueError("model selected an expense-only category for income")
-
-    async def _groq_capture_interpretation(
-        self, message: str, context: CaptureContext
-    ) -> CaptureInterpretation:
-        assert self.settings.groq_api_key is not None
-        prompt = (
-            "User utterance:\n"
-            + json.dumps(message, ensure_ascii=False)
-            + "\nAllowed context:\n"
-            + context.model_dump_json()
-            + "\nRequired response JSON schema:\n"
-            + json.dumps(
-                CaptureInterpretationEnvelope.model_json_schema(),
-                separators=(",", ":"),
-            )
-        )
-        request_body = {
-            "model": self.settings.groq_model,
-            "messages": [
-                {"role": "system", "content": CAPTURE_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0,
-            "response_format": _groq_response_format(
-                "artha_capture_interpretation",
-                CaptureInterpretationEnvelope.model_json_schema(),
-            ),
-            "reasoning_effort": "low",
-        }
-        async with self._client(
-            base_url=self.settings.groq_base_url,
-            headers={"Authorization": f"Bearer {self.settings.groq_api_key}"},
-        ) as client:
-            response = await client.post("chat/completions", json=request_body)
-            response.raise_for_status()
-            body = response.json()
-        content = body["choices"][0]["message"]["content"]
-        decoded = json.loads(content)
-        if isinstance(decoded, dict) and "result" in decoded:
-            return CaptureInterpretationEnvelope.model_validate(decoded).result
-        return CAPTURE_INTERPRETATION_ADAPTER.validate_python(decoded)
 
     async def _gemini_capture_interpretation(
         self, message: str, context: CaptureContext

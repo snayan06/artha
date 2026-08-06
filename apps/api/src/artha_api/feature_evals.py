@@ -547,8 +547,6 @@ async def _run(root: Path, suite_name: str) -> int:
     settings = assistant.settings
     if settings.provider is LlmProvider.GEMINI and not settings.gemini_api_key:
         raise ValueError("ARTHA_GEMINI_API_KEY is required for hosted evaluation")
-    if settings.provider is LlmProvider.GROQ and not settings.groq_api_key:
-        raise ValueError("ARTHA_GROQ_API_KEY is required for hosted evaluation")
     if settings.provider is LlmProvider.DISABLED:
         raise ValueError("a hosted provider is required for hosted evaluation")
     output_dir = root / "evals" / "reports"

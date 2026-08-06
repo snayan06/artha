@@ -245,7 +245,7 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
         _context: object,
     ) -> CaptureInterpretationResponse:
         return CaptureInterpretationResponse(
-            provider=LlmProvider.GROQ,
+            provider=LlmProvider.GEMINI,
             model="test-model",
             result=CaptureClarification(
                 outcome="clarify",

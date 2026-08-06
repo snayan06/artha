@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from types import SimpleNamespace
 
 import httpx
@@ -54,18 +53,23 @@ class FakeGeminiClient:
         )
 
 
-def test_groq_defaults_to_gpt_oss_20b(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_groq_provider_is_rejected_as_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ARTHA_LLM_PROVIDER", "groq")
-    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "test-key")
-    monkeypatch.delenv("ARTHA_GROQ_MODEL", raising=False)
 
-    direct = AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key")
-    from_env = AssistantSettings.from_env()
+    with pytest.raises(ValueError, match="unsupported LLM provider: groq"):
+        AssistantSettings.from_env()
 
-    assert direct.groq_model == "openai/gpt-oss-20b"
-    assert from_env.groq_model == "openai/gpt-oss-20b"
-    assert "test-key" not in repr(direct)
-    assert "test-key" not in str(asdict(direct) | {"groq_api_key": "redacted"})
+
+def test_legacy_groq_key_does_not_auto_select_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARTHA_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "legacy-key")
+
+    assert AssistantSettings.from_env().provider is LlmProvider.DISABLED
 
 
 def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
@@ -73,7 +77,6 @@ def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
 ) -> None:
     monkeypatch.delenv("ARTHA_LLM_PROVIDER", raising=False)
     monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "gemini-test-key")
-    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "groq-test-key")
     monkeypatch.delenv("ARTHA_GEMINI_MODEL", raising=False)
 
     direct = AssistantSettings(
@@ -85,6 +88,15 @@ def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
     assert from_env.provider is LlmProvider.GEMINI
     assert from_env.gemini_model == "gemini-3.5-flash-lite"
     assert "gemini-test-key" not in repr(direct)
+
+
+def test_explicit_ollama_selection_remains_supported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "ollama")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+
+    assert AssistantSettings.from_env().provider is LlmProvider.OLLAMA
 
 
 @pytest.fixture
@@ -132,64 +144,6 @@ async def test_disabled_assistant_is_unavailable(
 
 
 @pytest.mark.asyncio
-async def test_groq_uses_strict_structured_output_without_tools_or_raw_rows(
-    financial_context: AssistantFinancialContext,
-) -> None:
-    seen_request: dict[str, object] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen_request["authorization"] = request.headers.get("Authorization")
-        body = json.loads(request.content)
-        seen_request["body"] = body
-        completion = {
-            "intent": "spending",
-            "widgets": [
-                {
-                    "type": "metric",
-                    "title": "Spending this month",
-                    "value_paise": 250000,
-                    "caption": None,
-                    "tone": "neutral",
-                }
-            ],
-        }
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(completion)}}]},
-        )
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
-        transport=httpx.MockTransport(handler),
-    )
-    response = await assistant.chat("Show spending", financial_context)
-
-    assert response.mode == "model"
-    assert response.provider == "groq"
-    assert seen_request["authorization"] == "Bearer test-key"
-    body = seen_request["body"]
-    assert isinstance(body, dict)
-    assert "tools" not in body
-    assert body["temperature"] == 0
-    response_format = body["response_format"]
-    assert response_format["type"] == "json_schema"
-    assert response_format["json_schema"]["name"] == "artha_assistant_completion"
-    assert response_format["json_schema"]["strict"] is True
-    schema = response_format["json_schema"]["schema"]
-    assert schema["additionalProperties"] is False
-    assert set(schema["required"]) == set(schema["properties"])
-    assert body["reasoning_effort"] == "low"
-    system_prompt = body["messages"][0]["content"]
-    assert "intent=unsupported" in system_prompt
-    assert "cashflow" in system_prompt
-    assert "recent activity" in system_prompt.casefold()
-    prompt = body["messages"][1]["content"]
-    assert "account_id" not in prompt
-    assert "description" not in prompt
-    assert "notes" not in prompt
-
-
-@pytest.mark.asyncio
 async def test_gemini_uses_private_stateless_structured_output(
     financial_context: AssistantFinancialContext,
 ) -> None:
@@ -228,67 +182,6 @@ async def test_gemini_uses_private_stateless_structured_output(
     assert "top spending categories must use a chart" in normalized_prompt
     assert "cashflow comparison must use a chart" in normalized_prompt
     assert "tools" not in body
-
-
-@pytest.mark.asyncio
-async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_accounts() -> None:
-    context = CaptureContext(
-        today="2026-08-04",
-        timezone="Asia/Kolkata",
-        accounts=[
-            CaptureAccount(id="icici-id", name="ICICI Bank", kind="bank"),
-            CaptureAccount(id="hdfc-id", name="HDFC Bank", kind="bank"),
-        ],
-        categories=[CaptureCategory(id="other-id", name="Other", kind="both")],
-    )
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        assert "25k means 25,000 rupees" in body["messages"][0]["content"]
-        assert "include every field required" in body["messages"][0]["content"]
-        assert "selected outcome schema" in body["messages"][0]["content"]
-        response_format = body["response_format"]
-        assert response_format["type"] == "json_schema"
-        assert response_format["json_schema"]["name"] == "artha_capture_interpretation"
-        assert response_format["json_schema"]["strict"] is True
-        assert body["reasoning_effort"] == "low"
-        interpretation = {
-            "outcome": "draft",
-            "kind": "transfer",
-            "amount_paise": 2_500_000,
-            "description": "Self transfer",
-            "category_id": None,
-            "category_name": None,
-            "source_account_id": "icici-id",
-            "destination_account_id": "hdfc-id",
-            "member_ids": [],
-            "split_equally": False,
-            "occurred_on": "2026-08-04",
-            "confidence": 0.99,
-            "warnings": [],
-        }
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {"message": {"content": json.dumps({"result": interpretation})}}
-                ]
-            },
-        )
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
-        transport=httpx.MockTransport(handler),
-    )
-    response = await assistant.interpret_capture(
-        "self transfer 25k ICICI -> HDFC", context
-    )
-
-    assert response is not None
-    assert response.mode == "model"
-    assert response.result.amount_paise == 2_500_000
-    assert response.result.source_account_id == "icici-id"
-    assert response.result.destination_account_id == "hdfc-id"
 
 
 @pytest.mark.asyncio
@@ -362,7 +255,7 @@ async def test_capture_diagnostics_classify_rate_limit_without_provider_text() -
         )
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
 
@@ -400,12 +293,11 @@ async def test_capture_interpretation_rejects_invented_account_id() -> None:
             "warnings": [],
         }
         return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(interpretation)}}]},
+            200, json={"message": {"content": json.dumps(interpretation)}}
         )
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
 
@@ -427,13 +319,10 @@ async def test_capture_interpretation_can_request_clarification_without_a_draft(
             "missing": ["source_account_id"],
             "warnings": [],
         }
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(result)}}]},
-        )
+        return httpx.Response(200, json={"message": {"content": json.dumps(result)}})
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
     response = await assistant.interpret_capture("25k", context)
@@ -444,15 +333,13 @@ async def test_capture_interpretation_can_request_clarification_without_a_draft(
 
 
 @pytest.mark.asyncio
-async def test_groq_failure_can_use_opt_in_ollama_fallback(
+async def test_gemini_failure_can_use_opt_in_ollama_fallback(
     financial_context: AssistantFinancialContext,
 ) -> None:
     requested_hosts: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requested_hosts.append(request.url.host or "")
-        if request.url.host == "api.groq.com":
-            return httpx.Response(503, json={"error": "unavailable"})
         completion = {
             "intent": "shared",
             "widgets": [
@@ -472,15 +359,16 @@ async def test_groq_failure_can_use_opt_in_ollama_fallback(
 
     assistant = LocalFinancialAssistant(
         AssistantSettings(
-            provider=LlmProvider.GROQ,
-            groq_api_key="test-key",
+            provider=LlmProvider.GEMINI,
+            gemini_api_key="test-key",
             ollama_fallback_enabled=True,
         ),
         transport=httpx.MockTransport(handler),
+        gemini_client=FakeGeminiClient("invalid model response"),
     )
     response = await assistant.chat("What is the shared balance?", financial_context)
 
-    assert requested_hosts == ["api.groq.com", "127.0.0.1"]
+    assert requested_hosts == ["127.0.0.1"]
     assert response.mode == "model"
     assert response.provider == "ollama"
     assert response.model == "qwen3:4b-instruct"
@@ -523,77 +411,6 @@ async def test_invalid_model_payload_makes_assistant_unavailable(
         AssistantUnavailableError, match="AI assistant is unavailable"
     ):
         await assistant.chat("Show spending", financial_context)
-
-
-@pytest.mark.asyncio
-async def test_status_never_serializes_groq_key() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/openai/v1/models"
-        return httpx.Response(200, json={"data": []})
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="never-return-me"),
-        transport=httpx.MockTransport(handler),
-    )
-    status = await assistant.status()
-
-    serialized = status.model_dump_json()
-    assert status.available is True
-    assert status.active_provider == "groq"
-    assert "never-return-me" not in serialized
-
-
-@pytest.mark.asyncio
-async def test_tag_suggestion_is_grounded_in_allowed_categories() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        response_format = body["response_format"]
-        assert response_format["type"] == "json_schema"
-        assert response_format["json_schema"]["name"] == "artha_tag_suggestion"
-        assert response_format["json_schema"]["strict"] is True
-        assert body["reasoning_effort"] == "low"
-        system_prompt = body["messages"][0]["content"]
-        assert "generic payment" in system_prompt
-        assert "transfers and card payments" in system_prompt
-        prompt = json.loads(
-            body["messages"][1]["content"].split("\nRequired response JSON schema:\n")[0]
-        )
-        assert set(prompt) == {
-            "description",
-            "amount_paise",
-            "direction",
-            "allowed_categories",
-        }
-        suggestion = {
-            "category_id": "food",
-            "category_name": "Food",
-            "confidence": 0.91,
-            "reason": "The merchant is a restaurant.",
-        }
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(suggestion)}}]},
-        )
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
-        transport=httpx.MockTransport(handler),
-    )
-    response = await assistant.suggest_tag(
-        TagSuggestionRequest(
-            description="Corner restaurant",
-            amount_paise=85000,
-            direction="expense",
-            allowed_categories=[
-                TagCategory(id="food", name="Food"),
-                TagCategory(id="travel", name="Travel"),
-            ],
-        )
-    )
-
-    assert response.mode == "model"
-    assert response.result.category_id == "food"
-    assert response.result.confidence == 0.91
 
 
 @pytest.mark.asyncio
