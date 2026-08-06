@@ -21,7 +21,8 @@ export function AssistantPage() {
 
   async function send(event?: FormEvent) {
     event?.preventDefault()
-    const question = message.trim()
+    const rawQuestion = message
+    const question = rawQuestion.trim()
     if (!question || loading) return
     setLoading(true)
     setMessage('')
@@ -31,7 +32,7 @@ export function AssistantPage() {
       setHistory((current) => [...current, { id: crypto.randomUUID(), question, reply }])
     } catch {
       setError('Artha could not reach the assistant. Your ledger was not changed; please try again.')
-      setMessage(question)
+      setMessage(rawQuestion)
     } finally {
       setLoading(false)
     }

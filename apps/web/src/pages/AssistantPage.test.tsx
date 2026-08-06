@@ -76,14 +76,16 @@ describe('AssistantPage generated UI', () => {
       })
     const user = userEvent.setup()
     render(<AssistantPage />)
-    const question = 'Could I cover a ₹12,000 repair today?'
+    const rawQuestion = '  Could I cover a ₹12,000 repair today?  '
+    const question = rawQuestion.trim()
     const input = screen.getByLabelText('Ask Artha')
 
-    await user.type(input, question)
+    await user.type(input, rawQuestion)
     await user.click(screen.getByRole('button', { name: 'Send question' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Artha could not reach the assistant. Your ledger was not changed; please try again.')
-    expect(input).toHaveValue(question)
+    expect(input).toHaveValue(rawQuestion)
+    expect(chatAssistant).toHaveBeenNthCalledWith(1, question)
     expect(screen.queryByText(question, { selector: 'section p' })).not.toBeInTheDocument()
     expect(screen.queryByText('Available balance')).not.toBeInTheDocument()
     expect(screen.queryByText('AI response')).not.toBeInTheDocument()
@@ -93,5 +95,15 @@ describe('AssistantPage generated UI', () => {
     expect(await screen.findByText('Your available balance is shown below.')).toBeInTheDocument()
     expect(chatAssistant).toHaveBeenNthCalledWith(2, question)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('does not submit a blank-only question', async () => {
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+
+    await user.type(screen.getByLabelText('Ask Artha'), '   ')
+
+    expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled()
+    expect(chatAssistant).not.toHaveBeenCalled()
   })
 })

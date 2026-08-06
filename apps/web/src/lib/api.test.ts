@@ -253,7 +253,7 @@ describe('FastAPI adapter', () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       provider: 'gemini', model: 'gemini-3.5-flash-lite',
-      result: { intent: 'spending', widgets: [
+      result: { message: 'Your spending view is ready.', intent: 'spending', widgets: [
         { type: 'metric', title: 'Spend', value_paise: 12345, caption: 'This month', tone: 'neutral' },
         { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Aug', value_paise: 5000 }] },
         { type: 'clarification', question: 'Which period?', choices: ['This month'] },
@@ -265,10 +265,25 @@ describe('FastAPI adapter', () => {
 
     const reply = await chatAssistant('Show spending')
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ message: 'Show spending' })
+    expect(reply.message).toBe('Your spending view is ready.')
     expect(reply.provider).toBe('gemini · gemini-3.5-flash-lite')
     expect(Object.keys(reply).sort()).toEqual(['message', 'provider', 'widgets'])
     expect(reply.widgets.map((widget) => widget.type)).toEqual(['metric', 'line_chart', 'clarification'])
     expect(JSON.stringify(reply)).not.toContain('onerror')
+  })
+
+  it('rejects a successful response without a model-written assistant message', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      provider: 'gemini', model: 'gemini-3.5-flash-lite',
+      result: {
+        intent: 'summary',
+        widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }]
+      }
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response did not include a valid model message')
   })
 
   it('propagates assistant provider failures in demo mode without fabricating local widgets', async () => {

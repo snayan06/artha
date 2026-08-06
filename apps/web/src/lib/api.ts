@@ -419,9 +419,10 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
   const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
   const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
   const model = safeText(response.model, '', 80)
-  const intent = safeText(result.intent, 'ledger', 40).replaceAll('_', ' ')
+  const assistantMessage = safeText(result.message, '', 400)
+  if (!assistantMessage.trim()) throw new Error('Assistant response did not include a valid model message.')
   return {
-    message: safeText(response.message ?? response.answer ?? response.content, `Here is your ${intent} view.`, 2000),
+    message: assistantMessage,
     widgets: mapAssistantWidgets(result.widgets ?? response.widgets),
     provider: model ? `${provider} · ${model}` : provider
   }

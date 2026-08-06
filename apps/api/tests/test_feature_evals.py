@@ -175,6 +175,7 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
         tags=("summary",),
     )
     correct = AssistantCompletion(
+        message="Your available balance is summarized below.",
         intent=AssistantIntent.SUMMARY,
         widgets=[
             MetricWidget(
@@ -185,6 +186,7 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
         ],
     )
     wrong_number = AssistantCompletion(
+        message="Your available balance is shown below.",
         intent=AssistantIntent.SUMMARY,
         widgets=[MetricWidget(type="metric", title="Balance", value_paise=1_400_000)],
     )

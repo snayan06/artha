@@ -5,9 +5,12 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from artha_api.assistant import (
+    AssistantCompletion,
     AssistantFinancialContext,
+    AssistantIntent,
     AssistantSettings,
     AssistantUnavailableError,
     CaptureAccount,
@@ -21,6 +24,7 @@ from artha_api.assistant import (
     ContextTransaction,
     LlmProvider,
     LocalFinancialAssistant,
+    MetricWidget,
     TagCategory,
     TagSuggestionRequest,
 )
@@ -121,6 +125,50 @@ def financial_context() -> AssistantFinancialContext:
     )
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        pytest.param(None, id="missing"),
+        pytest.param("   \n\t", id="blank"),
+        pytest.param("x" * 401, id="too-long"),
+    ],
+)
+def test_assistant_completion_requires_a_nonblank_bounded_model_message(
+    message: str | None,
+) -> None:
+    payload: dict[str, object] = {
+        "intent": AssistantIntent.SUMMARY,
+        "widgets": [
+            MetricWidget(
+                type="metric",
+                title="Available balance",
+                value_paise=1_500_000,
+            )
+        ],
+    }
+    if message is not None:
+        payload["message"] = message
+
+    with pytest.raises(ValidationError):
+        AssistantCompletion.model_validate(payload)
+
+
+def test_assistant_completion_accepts_a_400_character_model_message() -> None:
+    completion = AssistantCompletion(
+        message="x" * 400,
+        intent=AssistantIntent.SUMMARY,
+        widgets=[
+            MetricWidget(
+                type="metric",
+                title="Available balance",
+                value_paise=1_500_000,
+            )
+        ],
+    )
+
+    assert len(completion.message) == 400
+
+
 @pytest.mark.asyncio
 async def test_disabled_assistant_is_unavailable(
     financial_context: AssistantFinancialContext,
@@ -148,6 +196,7 @@ async def test_gemini_uses_private_stateless_structured_output(
     financial_context: AssistantFinancialContext,
 ) -> None:
     completion = {
+        "message": "Your monthly spending is summarized below.",
         "intent": "spending",
         "widgets": [
             {
@@ -171,6 +220,7 @@ async def test_gemini_uses_private_stateless_structured_output(
 
     assert response.mode == "model"
     assert response.provider == "gemini"
+    assert response.result.message == "Your monthly spending is summarized below."
     body = gemini.aio.interactions.calls[0]
     assert body["model"] == "gemini-3.5-flash-lite"
     assert body["store"] is False
@@ -181,6 +231,8 @@ async def test_gemini_uses_private_stateless_structured_output(
     normalized_prompt = " ".join(body["system_instruction"].casefold().split())
     assert "top spending categories must use a chart" in normalized_prompt
     assert "cashflow comparison must use a chart" in normalized_prompt
+    assert "one concise plain-language message" in normalized_prompt
+    assert "financial numbers only in allow-listed widgets" in normalized_prompt
     assert "tools" not in body
 
 
@@ -341,6 +393,7 @@ async def test_gemini_failure_can_use_opt_in_ollama_fallback(
     def handler(request: httpx.Request) -> httpx.Response:
         requested_hosts.append(request.url.host or "")
         completion = {
+            "message": "Your shared balance is summarized below.",
             "intent": "shared",
             "widgets": [
                 {
@@ -372,6 +425,7 @@ async def test_gemini_failure_can_use_opt_in_ollama_fallback(
     assert response.mode == "model"
     assert response.provider == "ollama"
     assert response.model == "qwen3:4b-instruct"
+    assert response.result.message == "Your shared balance is summarized below."
 
 
 @pytest.mark.asyncio
@@ -386,6 +440,7 @@ async def test_invalid_model_payload_makes_assistant_unavailable(
                 "message": {
                     "content": json.dumps(
                         {
+                            "message": "This payload contains an unsafe widget field.",
                             "intent": "spending",
                             "widgets": [
                                 {
