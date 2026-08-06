@@ -1,4 +1,4 @@
-.PHONY: setup dev-web dev-api test lint build check check-sql check-supabase-link check-live-rpc-catalog eval-capture-validate eval-capture-hosted
+.PHONY: setup dev-web dev-api test lint build check check-sql check-supabase-link check-live-rpc-catalog eval-capture-validate eval-capture-hosted eval-feature-validate eval-feature-hosted
 
 setup:
 	npm --prefix apps/web ci
@@ -26,6 +26,7 @@ build:
 check: lint test build check-sql
 	python scripts/check_capture_evals.py
 	$(MAKE) eval-capture-validate
+	$(MAKE) eval-feature-validate
 
 check-sql:
 	uv run --with 'pglast>=7,<8' python scripts/check_sql.py
@@ -42,4 +43,10 @@ eval-capture-validate:
 	cd apps/api && uv run python -m artha_api.capture_evals --mode validate
 
 eval-capture-hosted:
-	cd apps/api && uv run python -m artha_api.capture_evals --mode run
+	cd apps/api && set -a && . ../../.env && set +a && uv run python -m artha_api.capture_evals --mode run
+
+eval-feature-validate:
+	cd apps/api && uv run python -m artha_api.feature_evals --mode validate
+
+eval-feature-hosted:
+	cd apps/api && set -a && . ../../.env && set +a && uv run python -m artha_api.feature_evals --mode run --suite all

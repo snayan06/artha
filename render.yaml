@@ -21,6 +21,10 @@ services:
       - key: SUPABASE_JWT_AUDIENCE
         value: authenticated
       - key: ARTHA_LLM_PROVIDER
-        value: disabled
+        sync: false
+      - key: ARTHA_GEMINI_API_KEY
+        sync: false
+      - key: ARTHA_GEMINI_MODEL
+        value: gemini-3.5-flash-lite
       - key: ARTHA_GROQ_API_KEY
         sync: false
