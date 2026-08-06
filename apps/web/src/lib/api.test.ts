@@ -240,4 +240,29 @@ describe('FastAPI adapter', () => {
     expect(reply.widgets.map((widget) => widget.type)).toEqual(['metric', 'line_chart', 'clarification'])
     expect(JSON.stringify(reply)).not.toContain('onerror')
   })
+
+  it('previews and restores a recovery bundle with an idempotency key', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        sha256: 'a'.repeat(64), household_name: 'Family ledger', eligible: true, blocker: null,
+        members: 2, accounts: 4, categories: 8, transactions: 42, splits: 10,
+        transfers: 3, settlements: 1, merchant_rules: 2, audit_events: 20
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        household_id: 'household-1', restored: true, idempotent_replay: false, sha256: 'a'.repeat(64)
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { previewRecoveryBundle, restoreRecoveryBundle } = await import('./api')
+    const bundle = { format: 'artha-recovery', schema_version: 1 }
+
+    await expect(previewRecoveryBundle(bundle)).resolves.toMatchObject({ householdName: 'Family ledger', eligible: true, counts: { accounts: 4, transactions: 42 } })
+    await expect(restoreRecoveryBundle(bundle, 'restore-key-123')).resolves.toMatchObject({ householdId: 'household-1', restored: true })
+
+    const restoreRequest = fetchMock.mock.calls[1]?.[1] as RequestInit
+    expect(restoreRequest.method).toBe('POST')
+    expect(restoreRequest.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': 'restore-key-123' }))
+    expect(JSON.parse(String(restoreRequest.body))).toEqual(bundle)
+  })
 })

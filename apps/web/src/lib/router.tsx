@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, type AnchorHTMLAttributes, type MouseEvent, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 
-export type AppPath = '/' | '/transactions' | '/shared' | '/assistant' | '/add'
+export type AppPath = '/' | '/transactions' | '/shared' | '/assistant' | '/add' | '/settings'
 
 interface RouterValue {
   path: AppPath
@@ -13,7 +13,7 @@ interface RouterValue {
 const RouterContext = createContext<RouterValue | null>(null)
 
 function cleanPath(pathname: string): AppPath {
-  return pathname === '/transactions' || pathname === '/shared' || pathname === '/assistant' || pathname === '/add' ? pathname : '/'
+  return pathname === '/transactions' || pathname === '/shared' || pathname === '/assistant' || pathname === '/add' || pathname === '/settings' ? pathname : '/'
 }
 
 export function RouterProvider({ children }: { children: ReactNode }) {

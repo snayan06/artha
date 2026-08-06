@@ -121,6 +121,19 @@ describe('Supabase auth provider', () => {
     await waitFor(() => expect(supabase.signOut).toHaveBeenCalledTimes(1))
   })
 
+  it('restores the same signed-in session after the app remounts', async () => {
+    const persisted = session('persisted-token')
+    supabase.getSession.mockResolvedValue({ data: { session: persisted }, error: null })
+    const first = render(<AuthProvider><AuthProbe /></AuthProvider>)
+
+    expect(await screen.findByText('persisted-token')).toBeInTheDocument()
+    first.unmount()
+    render(<AuthProvider><AuthProbe /></AuthProvider>)
+
+    expect(await screen.findByText('persisted-token')).toBeInTheDocument()
+    expect(supabase.getSession).toHaveBeenCalledTimes(2)
+  })
+
   it('explains an expired or reused link and lets the user request a fresh one', async () => {
     window.history.replaceState({}, '', '/?error=access_denied&error_code=otp_expired&error_description=Email%20link%20is%20invalid%20or%20has%20expired')
     const user = userEvent.setup()

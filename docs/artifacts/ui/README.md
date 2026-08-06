@@ -18,3 +18,4 @@ Current interaction artifacts:
 - [Natural-language transfer review](v1-natural-language-transfer.md)
 - [Magic-link recovery states](v1-auth-recovery.md)
 - [Account activity filter](v1-account-activity-filter.md)
+- [Encrypted export and restore](v1-encrypted-recovery.md)

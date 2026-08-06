@@ -21,6 +21,33 @@ export function configureApiAccessTokenProvider(provider: AccessTokenProvider): 
 
 type JsonObject = Record<string, unknown>
 
+export type RecoveryBundle = JsonObject
+
+export interface RecoverySummary {
+  sha256: string
+  householdName: string
+  eligible: boolean
+  blocker: string | null
+  counts: {
+    members: number
+    accounts: number
+    categories: number
+    transactions: number
+    splits: number
+    transfers: number
+    settlements: number
+    merchantRules: number
+    auditEvents: number
+  }
+}
+
+export interface RecoveryRestoreResult {
+  householdId: string
+  restored: boolean
+  idempotentReplay: boolean
+  sha256: string
+}
+
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message)
@@ -300,6 +327,54 @@ export async function getUserProfile(): Promise<UserProfile> {
     displayName: stringValue(raw.display_name, 'You'),
     householdName: stringValue(raw.household_name, 'My household'),
     members: mapMembers(raw.members)
+  }
+}
+
+function mapRecoverySummary(raw: JsonObject): RecoverySummary {
+  return {
+    sha256: stringValue(raw.sha256, ''),
+    householdName: stringValue(raw.household_name, 'Restored household'),
+    eligible: raw.eligible === true,
+    blocker: typeof raw.blocker === 'string' ? safeText(raw.blocker, '', 240) : null,
+    counts: {
+      members: numberValue(raw.members),
+      accounts: numberValue(raw.accounts),
+      categories: numberValue(raw.categories),
+      transactions: numberValue(raw.transactions),
+      splits: numberValue(raw.splits),
+      transfers: numberValue(raw.transfers),
+      settlements: numberValue(raw.settlements),
+      merchantRules: numberValue(raw.merchant_rules),
+      auditEvents: numberValue(raw.audit_events)
+    }
+  }
+}
+
+export async function getRecoveryExport(): Promise<RecoveryBundle> {
+  const bundle = await request<unknown>('/api/v1/recovery/export')
+  if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) throw new Error('Artha returned an invalid recovery bundle.')
+  return bundle as RecoveryBundle
+}
+
+export async function previewRecoveryBundle(bundle: RecoveryBundle): Promise<RecoverySummary> {
+  const response = await request<JsonObject>('/api/v1/recovery/preview', {
+    method: 'POST',
+    body: JSON.stringify(bundle)
+  })
+  return mapRecoverySummary(response)
+}
+
+export async function restoreRecoveryBundle(bundle: RecoveryBundle, idempotencyKey: string = crypto.randomUUID()): Promise<RecoveryRestoreResult> {
+  const response = await request<JsonObject>('/api/v1/recovery/restore', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(bundle)
+  })
+  return {
+    householdId: stringValue(response.household_id, ''),
+    restored: response.restored === true,
+    idempotentReplay: response.idempotent_replay === true,
+    sha256: stringValue(response.sha256, '')
   }
 }
 

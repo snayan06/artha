@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 6 August 2026, 22:57 IST
+Updated: 7 August 2026, 00:17 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,7 +20,7 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: Production ledger RPC recovered; authenticated acceptance remains.**
+**Status: Encrypted recovery is locally complete; consolidated AI/release PR is in progress.**
 
 Do not enter real financial data yet. The ledger RPC outage and application
 deployment are fixed, but final-domain login persistence, two-owner isolation
@@ -33,7 +33,8 @@ and recovery acceptance still require interactive testing.
 | Vercel | Web and API production aliases serve the current release successfully from Mumbai |
 | Supabase RPC catalog | The deployed project resolves `get_account_balances` and `list_ledger_activity`; exact-project migration-history access remains an owner-only operational requirement |
 | Public checks | API health and web return `200`; anonymous catalog probes resolve both required ledger RPCs without exposing ledger data |
-| Remaining gate | Authenticated login/reopen/sign-out, two-owner isolation and financial-flow smoke |
+| Local recovery candidate | Client-side encrypted export/restore, recovery RPCs, Settings UI and two-household SQL contracts pass the full local gate |
+| Remaining gate | Integrate Gemini and dependency PRs, apply the recovery migration to the exact Artha project, then complete authenticated login/reopen/sign-out, two-owner isolation, recovery and financial-flow smoke |
 
 ## Resume checklist
 
@@ -45,8 +46,12 @@ and recovery acceptance still require interactive testing.
 - [ ] Complete authenticated login, reopen, sign-out, transfer and account-filter
   smoke tests using fictional data.
 - [ ] Complete two-owner hosted isolation and the remaining responsive matrix.
-- [ ] Begin S2-01 owner-only **Accounts & family** settings after the acceptance
-  gate; use the Sprint 2 artifacts and board IDs as the implementation contract.
+- [x] Implement client-side encrypted export/restore with an empty-household
+  restore guard and local SQL round-trip contract.
+- [ ] Consolidate Gemini PR #15 and dependency PRs #8-#10 into one tested release.
+- [ ] Apply `20260806030000_encrypted_recovery.sql` to the exact Artha production
+  project before deploying the application code that exposes recovery.
+- [ ] Begin S2-01 owner-only **Accounts & family** settings after the acceptance gate.
 
 ## Completed in the current release candidate
 
@@ -65,11 +70,12 @@ and recovery acceptance still require interactive testing.
 ## Verification checkpoint
 
 ```text
-Local web: 13 files, 86 tests passed
-Local API: 99 tests passed
+Local web after recovery: 15 files, 98 tests passed
+Local API after recovery: 112 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 7 migrations, seed and 2 SQL contract tests parsed
+Recovery SQL: 8 migrations and 4 SQL contract tests parsed; blank-local-database migration and direct SQL contracts passed
 Capture evaluation: 50 fictional cases valid; hosted baseline was 16/16 evaluated passes at 16/50 coverage
 Manual UI: 320 px, 390 px and desktop checks passed in light/dark
 Production: PR #13 merged; CodeQL and both Vercel checks green; GitHub Web/API/SQL jobs queued during an Actions outage
@@ -111,13 +117,13 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 ## Next engineering priorities
 
-1. Finish final-domain login/session and two-owner isolation acceptance.
-2. Complete the full mobile/desktop light/dark matrix for every screen.
-3. Diagnose Qwen unavailability, resume the 50-case benchmark and review slices.
-4. Build S2-01 through S2-05 **Accounts & family** owner management.
-5. Add invitation/RLS support only after owner-only hardening passes.
-6. Add the private capture-feedback learning loop.
-7. Add encrypted export/restore before storing real financial data.
+1. Consolidate and verify Gemini plus safe dependency updates.
+2. Apply the recovery migration before the application deployment.
+3. Finish final-domain login/session, recovery and two-owner isolation acceptance.
+4. Complete the full mobile/desktop light/dark matrix for every screen.
+5. Build S2-01 through S2-05 **Accounts & family** owner management.
+6. Add invitation/RLS support only after owner-only hardening passes.
+7. Add the private capture-feedback learning loop.
 
 ## Source-of-truth map
 
@@ -137,6 +143,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 7 Aug 2026 | Implemented encrypted export/restore, Settings recovery UI, recovery RPCs and two-household/round-trip SQL contracts; full local gate passed with 98 web and 112 API tests; production migration and consolidated Gemini release remain |
 | 6 Aug 2026 | Deployed and merged PR #13; full local gate, CodeQL, Vercel, public routing, API health and both live RPC probes passed; GitHub Web/API/SQL runners remained queued during the GitHub Actions outage |
 | 6 Aug 2026 | Recovered the production ledger RPC catalog, verified both required functions through the deployed REST endpoint and added exact-project release guards |
 | 6 Aug 2026 | Logical-ledger migration applied; PR #11 merged; main CI, CodeQL, Vercel and public health/routing checks green; Sprint 2 contract and Qwen baseline recorded |

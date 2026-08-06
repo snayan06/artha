@@ -12,6 +12,7 @@ Current feature artifacts:
 
 - [Atomic account-transfer contract](v1-atomic-transfer.md)
 - [LLM usage map and safety boundary](v1-llm-usage-map.md)
+- [Encrypted ledger recovery](v1-encrypted-ledger-recovery.md)
 - [Sprint 2 Accounts & family product contract](sprint-2-accounts-family-contract.md)
 - [Accounts & family implementation architecture](v2-accounts-family-management.md)
 

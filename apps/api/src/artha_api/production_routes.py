@@ -30,6 +30,7 @@ from .assistant import (
     TagSuggestionResponse,
 )
 from .auth import AuthDependency
+from .recovery import RecoveryBundle
 from .schemas import AccountCreate, MemberCreate, ParseRequest
 from .supabase_rest import SupabaseRestClient, rest_client_for_request
 
@@ -569,6 +570,60 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
         "monthly": monthly,
         "recent_transactions": views[:10],
     }
+
+
+@router.get("/api/v1/recovery/export", tags=["recovery"])
+async def export_recovery_bundle(
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    raw = await client.rpc("export_household_bundle")
+    bundle = RecoveryBundle.model_validate(raw)
+    return bundle.model_dump(mode="json")
+
+
+@router.post("/api/v1/recovery/preview", tags=["recovery"])
+async def preview_recovery_bundle(
+    bundle: RecoveryBundle,
+    client: ClientDependency,
+) -> dict[str, Any]:
+    existing_household_id = await current_household(client, required=False)
+    return {
+        **bundle.summary(),
+        "household_name": bundle.household.name,
+        "eligible": existing_household_id is None,
+        "blocker": (
+            None
+            if existing_household_id is None
+            else "Restore requires a new account with no existing household."
+        ),
+    }
+
+
+@router.post(
+    "/api/v1/recovery/restore",
+    status_code=status.HTTP_201_CREATED,
+    tags=["recovery"],
+)
+async def restore_recovery_bundle(
+    bundle: RecoveryBundle,
+    client: ClientDependency,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
+) -> dict[str, Any]:
+    result = await client.rpc(
+        "restore_household_bundle",
+        {
+            "p_bundle": bundle.model_dump(mode="json"),
+            "p_idempotency_key": idempotency_key,
+        },
+    )
+    return {**dict(result), "sha256": bundle.summary()["sha256"]}
 
 
 @router.post("/api/v1/drafts/parse", tags=["transactions"])

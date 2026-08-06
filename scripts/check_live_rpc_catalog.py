@@ -22,6 +22,11 @@ REQUIRED_RPCS = {
         "p_limit": 1,
         "p_offset": 0,
     },
+    "export_household_bundle": {},
+    "restore_household_bundle": {
+        "p_bundle": {},
+        "p_idempotency_key": "catalog-probe",
+    },
 }
 
 

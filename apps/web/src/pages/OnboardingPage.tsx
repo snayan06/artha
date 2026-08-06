@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark, Plus, ShieldCheck, Sparkles, Trash2, UsersRound, WalletCards } from 'lucide-react'
 import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
+import { RecoveryRestorePanel } from '../components/RecoveryPanel'
 import { ThemeControl } from '../components/ThemeControl'
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import type { AccountSetupInput, SetupAccountKind, UserProfile } from '../types'
@@ -28,7 +29,7 @@ const newMoneyRow = (): MoneyRow => ({ id: nextRowId++, name: '', kind: 'bank', 
 const newCardRow = (): CardRow => ({ id: nextRowId++, name: '', outstanding: '', limit: '', statementDay: '', paymentDueDay: '' })
 const newMemberRow = (): MemberRow => ({ id: nextRowId++, name: '' })
 
-export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { onSave: (accounts: AccountSetupInput[], profile: UserProfile) => Promise<void>; onExploreDemo: (profile: UserProfile) => Promise<void>; allowDemo?: boolean }) {
+export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = true }: { onSave: (accounts: AccountSetupInput[], profile: UserProfile) => Promise<void>; onExploreDemo: (profile: UserProfile) => Promise<void>; onRestored?: () => Promise<void>; allowDemo?: boolean }) {
   const [step, setStep] = useState<'accounts' | 'review'>('accounts')
   const [moneyRows, setMoneyRows] = useState<MoneyRow[]>(() => [newMoneyRow()])
   const [cardRows, setCardRows] = useState<CardRow[]>([])
@@ -148,7 +149,11 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
               <p className="mt-3 max-w-xl text-sm leading-6 text-[#6e7b74] tone-muted">Add today’s balances. Artha stores them as opening entries, then keeps the total updated from confirmed transactions.</p>
             </div>
 
-            <Card className="mt-7 p-4 sm:p-5">
+            {onRestored && <div className="mt-7"><RecoveryRestorePanel onRestored={onRestored} /></div>}
+
+            {onRestored && <div className="my-7 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#819088] tone-subtle"><span className="h-px flex-1 bg-line" />or create a new ledger<span className="h-px flex-1 bg-line" /></div>}
+
+            <Card className={`${onRestored ? '' : 'mt-7'} p-4 sm:p-5`}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <SetupField label="Your display name" ariaLabel="Your display name" placeholder="You" value={displayName} onChange={setDisplayName} />
                 <SetupField label="Household name" ariaLabel="Household name" placeholder="My household" value={householdName} onChange={setHouseholdName} />
