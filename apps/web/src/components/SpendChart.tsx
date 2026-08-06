@@ -29,11 +29,13 @@ export function SpendChart({ data }: { data: MonthlyPoint[] }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <table className="sr-only tabular-nums">
-        <caption>Six-month income and spending values</caption>
-        <thead><tr><th scope="col">Month</th><th scope="col">Income</th><th scope="col">Spending</th></tr></thead>
-        <tbody>{data.map((point) => <tr key={point.month}><th scope="row">{point.month}</th><td>{formatMoney(point.incomePaise)}</td><td>{formatMoney(point.spendPaise)}</td></tr>)}</tbody>
-      </table>
+      <div className="sr-only">
+        <table className="tabular-nums">
+          <caption>Six-month income and spending values</caption>
+          <thead><tr><th scope="col">Month</th><th scope="col">Income</th><th scope="col">Spending</th></tr></thead>
+          <tbody>{data.map((point) => <tr key={point.month}><th scope="row">{point.month}</th><td>{formatMoney(point.incomePaise)}</td><td>{formatMoney(point.spendPaise)}</td></tr>)}</tbody>
+        </table>
+      </div>
     </figure>
   )
 }
