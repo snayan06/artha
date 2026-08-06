@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 5 August 2026, 00:56 IST
+Updated: 6 August 2026, 19:52 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,39 +20,31 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: release candidate green; production merge intentionally held.**
+**Status: Sprint 1 reliability release deployed; authenticated acceptance remains.**
 
-Do not enter real financial data yet. The new logical-ledger migration must be
-applied to Supabase before the API changes reach production.
+Do not enter real financial data yet. Database, CI and public deployment checks
+are green, but final-domain login persistence, two-owner isolation and recovery
+acceptance still require interactive testing.
 
 | Surface | Current state |
 | --- | --- |
-| Production `main` | Still at `0fa2013`; current live application is unchanged |
-| Local release commits | `0393be8` and `61c59db` on local `main` |
-| Public release candidate | PR [#11](https://github.com/snayan06/artha/pull/11); use the PR head as the current public release commit |
-| GitHub checks | Web, API, SQL, CodeQL and both Vercel previews green |
-| Supabase migration | `20260805010000_logical_ledger_activity.sql` not yet applied remotely |
-| Deployment blocker | Supabase CLI waits on macOS Keychain authorization without terminal output |
+| Production `main` | Merge `82045a8`; PR [#11](https://github.com/snayan06/artha/pull/11) is merged |
+| GitHub checks | Fresh main Web, API, SQL and CodeQL checks passed |
+| Vercel | Web and API production deployments completed successfully |
+| Supabase migration | All six migrations match locally and remotely, including `20260805010000` |
+| Public checks | API health and web `/transactions` plus `/assistant` routing return `200` with security headers |
+| Remaining gate | Authenticated login/reopen/sign-out, two-owner isolation and financial-flow smoke |
 
-## Morning resume checklist
+## Resume checklist
 
-Work in this order. Do not merge first.
-
-- [ ] User is at the Mac and ready to approve one Keychain dialog locally.
-- [ ] Run `supabase migration list --linked`.
-- [ ] If macOS asks, the user enters the Mac login password directly and chooses
-  the appropriate allow option. The password is never sent to Codex or chat.
-- [ ] Run `supabase db push --linked --dry-run` and confirm that only
-  `20260805010000_logical_ledger_activity.sql` is pending.
-- [ ] Run `supabase db push --linked` and wait for success.
-- [ ] Re-run `supabase migration list --linked` and store sanitized evidence.
-- [ ] Confirm PR #11 checks are still green, then merge it into `main`.
-- [ ] Verify production API health, web routing, security headers and Mumbai
-  execution.
+- [x] Apply and verify `20260805010000_logical_ledger_activity.sql` remotely.
+- [x] Merge PR #11 and pass fresh main CI, CodeQL and Vercel deployments.
+- [x] Verify public API health, web routing and baseline security headers.
 - [ ] Complete authenticated login, reopen, sign-out, transfer and account-filter
   smoke tests using fictional data.
-- [ ] Update this checkpoint, the sprint board and the QA artifact with the final
-  result.
+- [ ] Complete two-owner hosted isolation and the remaining responsive matrix.
+- [ ] Begin S2-01 owner-only **Accounts & family** settings after the acceptance
+  gate; use the Sprint 2 artifacts and board IDs as the implementation contract.
 
 ## Completed in the current release candidate
 
@@ -72,14 +64,14 @@ Work in this order. Do not merge first.
 
 ```text
 Local web: 12 files, 80 tests passed
-Local API: 96 tests passed
+Local API: 99 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 6 migrations, seed and 2 SQL contract tests parsed
-Capture evaluation: 50 fictional cases valid; hosted model not called
+Capture evaluation: 50 fictional cases valid; hosted baseline was 16/16 evaluated passes at 16/50 coverage
 Manual UI: 320 px, 390 px and desktop checks passed in light/dark
 Browser console: no warnings or errors during the checked flows
-PR #11: all GitHub and Vercel preview checks green
+Production: PR #11 merged; fresh main CI, CodeQL and both Vercel deployments green
 ```
 
 Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliability-batch.md).
@@ -91,8 +83,12 @@ Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliabil
 - Money is integer paise. Transfers and card payments are not spending or income.
 - Natural-language and LLM parsing only create unsaved review drafts. A user must
   explicitly confirm every ledger write.
-- Deterministic parsing remains available without a model. Hosted Qwen is not
-  enabled until the 50-case benchmark is run and reviewed.
+- Deterministic parsing remains available without a model. Hosted Qwen stays
+  experimental until all 50 cases receive valid outcomes and the error slices
+  pass; availability failures are reported separately from model correctness.
+- Private capture learning history is planned as default-on with clear notice,
+  Settings disable/delete/export controls and no external training/public use
+  without separate consent.
 - Multiple banks/cards are first-class accounts. Post-onboarding account editing
   belongs in **Accounts & family** settings.
 - Production order is always database migration → application deployment →
@@ -104,19 +100,19 @@ Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliabil
 
 Only ask for these when the engineering work reaches the corresponding gate:
 
-1. Approve the local macOS Keychain dialog for the Supabase CLI.
-2. Later, use a second fictional test identity for household-isolation acceptance.
-3. Later, create a Groq key and enter it directly in the deployment secret store;
-   never paste it into chat or source control.
+1. Complete final-domain sign-in/reopen/sign-out testing when prompted.
+2. Use a second fictional test identity for household-isolation acceptance.
+3. The local Groq key is configured safely; add it to Vercel only after the
+   complete benchmark passes, never in chat or source control.
 
 ## Next engineering priorities
 
-1. Apply the logical-ledger migration and deploy PR #11 safely.
-2. Finish final-domain login/session and two-owner isolation acceptance.
-3. Complete the full mobile/desktop light/dark matrix for every screen.
-4. Run the hosted Qwen benchmark and review critical-field error slices.
-5. Build **Accounts & family** management.
-6. Add invitation/RLS support only after the personal pilot is trustworthy.
+1. Finish final-domain login/session and two-owner isolation acceptance.
+2. Complete the full mobile/desktop light/dark matrix for every screen.
+3. Diagnose Qwen unavailability, resume the 50-case benchmark and review slices.
+4. Build S2-01 through S2-05 **Accounts & family** owner management.
+5. Add invitation/RLS support only after owner-only hardening passes.
+6. Add the private capture-feedback learning loop.
 7. Add encrypted export/restore before storing real financial data.
 
 ## Source-of-truth map
@@ -137,4 +133,5 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 6 Aug 2026 | Logical-ledger migration applied; PR #11 merged; main CI, CodeQL, Vercel and public health/routing checks green; Sprint 2 contract and Qwen baseline recorded |
 | 5 Aug 2026 | Release candidate implemented, manually checked, published as PR #11 and fully green; production held for Supabase migration authorization |

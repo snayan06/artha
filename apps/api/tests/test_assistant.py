@@ -11,6 +11,8 @@ from artha_api.assistant import (
     CaptureAccount,
     CaptureCategory,
     CaptureContext,
+    CaptureFailureKind,
+    CaptureInterpretationError,
     ContextCategory,
     ContextMemberBalance,
     ContextMonth,
@@ -163,6 +165,35 @@ async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_acco
     assert response.result.amount_paise == 2_500_000
     assert response.result.source_account_id == "icici-id"
     assert response.result.destination_account_id == "hdfc-id"
+
+
+@pytest.mark.asyncio
+async def test_capture_diagnostics_classify_rate_limit_without_provider_text() -> None:
+    context = CaptureContext(
+        today="2026-08-04",
+        timezone="Asia/Kolkata",
+        accounts=[CaptureAccount(id="known-id", name="Known Bank", kind="bank")],
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429,
+            headers={"Retry-After": "7"},
+            json={"error": "sensitive provider response must not escape"},
+        )
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(CaptureInterpretationError) as captured:
+        await assistant.interpret_capture_or_raise("fictional capture", context)
+
+    assert captured.value.kind is CaptureFailureKind.RATE_LIMITED
+    assert captured.value.retryable is True
+    assert captured.value.retry_after_seconds == 7.0
+    assert str(captured.value) == "rate_limited"
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from enum import StrEnum
 from os import getenv
 from typing import Annotated, Literal
@@ -26,6 +28,35 @@ class LlmProvider(StrEnum):
     GROQ = "groq"
     OLLAMA = "ollama"
     DISABLED = "disabled"
+
+
+class CaptureFailureKind(StrEnum):
+    """Sanitized provider failure classes safe to persist in eval artifacts."""
+
+    RATE_LIMITED = "rate_limited"
+    TIMEOUT = "timeout"
+    NETWORK = "network"
+    PROVIDER_5XX = "provider_5xx"
+    PROVIDER_4XX = "provider_4xx"
+    INVALID_RESPONSE = "invalid_response"
+    NOT_CONFIGURED = "not_configured"
+    UNKNOWN = "unknown"
+
+
+class CaptureInterpretationError(Exception):
+    """Capture failure metadata without response bodies, URLs, or model text."""
+
+    def __init__(
+        self,
+        kind: CaptureFailureKind,
+        *,
+        retryable: bool,
+        retry_after_seconds: float | None = None,
+    ) -> None:
+        self.kind = kind
+        self.retryable = retryable
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(kind.value)
 
 
 class AssistantIntent(StrEnum):
@@ -526,6 +557,51 @@ def deterministic_tag_suggestion(payload: TagSuggestionRequest) -> TagSuggestion
     )
 
 
+def _retry_after_seconds(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=UTC)
+        seconds = (retry_at - datetime.now(UTC)).total_seconds()
+    return max(0.0, seconds)
+
+
+def _capture_failure(error: Exception) -> CaptureInterpretationError:
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        if status == 429:
+            return CaptureInterpretationError(
+                CaptureFailureKind.RATE_LIMITED,
+                retryable=True,
+                retry_after_seconds=_retry_after_seconds(
+                    error.response.headers.get("Retry-After")
+                ),
+            )
+        if status >= 500:
+            return CaptureInterpretationError(
+                CaptureFailureKind.PROVIDER_5XX, retryable=True
+            )
+        return CaptureInterpretationError(
+            CaptureFailureKind.PROVIDER_4XX, retryable=False
+        )
+    if isinstance(error, httpx.TimeoutException):
+        return CaptureInterpretationError(CaptureFailureKind.TIMEOUT, retryable=True)
+    if isinstance(error, httpx.TransportError):
+        return CaptureInterpretationError(CaptureFailureKind.NETWORK, retryable=True)
+    if isinstance(error, (KeyError, TypeError, ValueError, ValidationError)):
+        return CaptureInterpretationError(
+            CaptureFailureKind.INVALID_RESPONSE, retryable=True
+        )
+    return CaptureInterpretationError(CaptureFailureKind.UNKNOWN, retryable=False)
+
+
 class LocalFinancialAssistant:
     def __init__(
         self,
@@ -661,6 +737,16 @@ class LocalFinancialAssistant:
     async def interpret_capture(
         self, message: str, context: CaptureContext
     ) -> CaptureInterpretationResponse | None:
+        try:
+            return await self.interpret_capture_or_raise(message, context)
+        except CaptureInterpretationError:
+            return None
+
+    async def interpret_capture_or_raise(
+        self, message: str, context: CaptureContext
+    ) -> CaptureInterpretationResponse:
+        """Interpret capture while preserving only sanitized failure diagnostics."""
+
         settings = self.settings
         attempts: list[tuple[LlmProvider, str]] = []
         if settings.provider is LlmProvider.GROQ and settings.groq_api_key:
@@ -670,6 +756,9 @@ class LocalFinancialAssistant:
         if settings.provider is LlmProvider.GROQ and settings.ollama_fallback_enabled:
             attempts.append((LlmProvider.OLLAMA, settings.ollama_model))
 
+        failure = CaptureInterpretationError(
+            CaptureFailureKind.NOT_CONFIGURED, retryable=False
+        )
         for provider, model in attempts:
             try:
                 result = (
@@ -678,14 +767,15 @@ class LocalFinancialAssistant:
                     else await self._ollama_capture_interpretation(message, context)
                 )
                 self._ground_capture_interpretation(result, context)
-            except (httpx.HTTPError, KeyError, TypeError, ValueError, ValidationError):
+            except (httpx.HTTPError, KeyError, TypeError, ValueError, ValidationError) as error:
+                failure = _capture_failure(error)
                 continue
             return CaptureInterpretationResponse(
                 provider=provider,
                 model=model,
                 result=result,
             )
-        return None
+        raise failure
 
     def _client(self, *, base_url: str, headers: dict[str, str] | None = None) -> httpx.AsyncClient:
         return httpx.AsyncClient(

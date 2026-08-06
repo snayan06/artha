@@ -8,6 +8,8 @@ import pytest
 
 from artha_api.assistant import (
     CaptureDraftInterpretation,
+    CaptureFailureKind,
+    CaptureInterpretationError,
     CaptureInterpretationResponse,
     LlmProvider,
 )
@@ -18,6 +20,7 @@ from artha_api.capture_evals import (
     build_validation_report,
     evaluate_capture_suite,
     load_capture_eval_suite,
+    load_checkpoint,
     main,
     render_evaluation_markdown,
     score_capture_case,
@@ -109,11 +112,9 @@ def test_scoring_reports_field_and_outcome_mismatches() -> None:
     assert field_score.passed is False
     assert [item.field for item in field_score.mismatches] == ["amount_paise"]
     assert unavailable_score.actual_outcome is None
-    assert [item.field for item in unavailable_score.mismatches] == [
-        "outcome",
-        "kind",
-        "amount_paise",
-    ]
+    assert unavailable_score.passed is None
+    assert unavailable_score.failure_kind is CaptureFailureKind.UNKNOWN
+    assert unavailable_score.mismatches == ()
 
 
 class _RetryingInterpreter(CaptureInterpreter):
@@ -124,6 +125,26 @@ class _RetryingInterpreter(CaptureInterpreter):
         del message, context
         self.calls += 1
         return None if self.calls == 1 else _response()
+
+
+class _RateLimitedInterpreter(CaptureInterpreter):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def interpret_capture(self, message, context):  # type: ignore[no-untyped-def]
+        del message, context
+        return None
+
+    async def interpret_capture_or_raise(self, message, context):  # type: ignore[no-untyped-def]
+        del message, context
+        self.calls += 1
+        if self.calls == 1:
+            raise CaptureInterpretationError(
+                CaptureFailureKind.RATE_LIMITED,
+                retryable=True,
+                retry_after_seconds=7.0,
+            )
+        return _response()
 
 
 @pytest.mark.asyncio
@@ -147,13 +168,100 @@ async def test_evaluator_retries_adapter_unavailability_without_logging_payload(
     assert scores[0].attempts == 2
 
 
+@pytest.mark.asyncio
+async def test_evaluator_honors_retry_after_and_writes_sanitized_checkpoint(
+    tmp_path: Path,
+) -> None:
+    suite = _suite()
+    one_case_suite = type(suite)(
+        dataset_path=suite.dataset_path,
+        context_path=suite.context_path,
+        context_id=suite.context_id,
+        context=suite.context,
+        cases=(suite.cases[0],),
+    )
+    interpreter = _RateLimitedInterpreter()
+    sleeps: list[float] = []
+
+    async def record_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    checkpoint_path = tmp_path / "capture.checkpoint.json"
+    scores = await evaluate_capture_suite(
+        one_case_suite,
+        interpreter,
+        max_attempts=2,
+        delay_seconds=0,
+        checkpoint_path=checkpoint_path,
+        sleep=record_sleep,
+    )
+
+    assert scores[0].passed is True
+    assert sleeps == [7.0]
+    checkpoint_text = checkpoint_path.read_text(encoding="utf-8")
+    assert one_case_suite.cases[0].utterance not in checkpoint_text
+    assert "Model free text must not be persisted" not in checkpoint_text
+    assert load_checkpoint(one_case_suite, checkpoint_path) == scores
+
+
+@pytest.mark.asyncio
+async def test_resume_retries_only_unavailable_checkpoint_cases(tmp_path: Path) -> None:
+    suite = _suite()
+    one_case_suite = type(suite)(
+        dataset_path=suite.dataset_path,
+        context_path=suite.context_path,
+        context_id=suite.context_id,
+        context=suite.context,
+        cases=(suite.cases[0],),
+    )
+    checkpoint_path = tmp_path / "capture.checkpoint.json"
+    interpreter = _RateLimitedInterpreter()
+
+    unavailable_scores = await evaluate_capture_suite(
+        one_case_suite,
+        interpreter,
+        max_attempts=1,
+        delay_seconds=0,
+        checkpoint_path=checkpoint_path,
+    )
+    assert unavailable_scores[0].failure_kind is CaptureFailureKind.RATE_LIMITED
+
+    completed_scores = await evaluate_capture_suite(
+        one_case_suite,
+        interpreter,
+        max_attempts=1,
+        delay_seconds=0,
+        initial_scores=load_checkpoint(one_case_suite, checkpoint_path),
+        checkpoint_path=checkpoint_path,
+    )
+    assert completed_scores[0].passed is True
+    assert interpreter.calls == 2
+
+    should_not_be_called = _RateLimitedInterpreter()
+    resumed_scores = await evaluate_capture_suite(
+        one_case_suite,
+        should_not_be_called,
+        max_attempts=1,
+        delay_seconds=0,
+        initial_scores=load_checkpoint(one_case_suite, checkpoint_path),
+    )
+    assert resumed_scores == completed_scores
+    assert should_not_be_called.calls == 0
+
+
 def test_reports_include_error_slices_and_exclude_utterances(tmp_path: Path) -> None:
     suite = _suite()
     case = suite.cases[0]
     score = score_capture_case(case, _response(amount_paise=25_000), attempts=1)
+    unavailable = score_capture_case(
+        suite.cases[1],
+        None,
+        attempts=2,
+        failure_kind=CaptureFailureKind.RATE_LIMITED,
+    )
     report = build_evaluation_report(
         suite,
-        [score],
+        [score, unavailable],
         started_at=datetime(2026, 8, 5, tzinfo=UTC),
         finished_at=datetime(2026, 8, 5, 0, 0, 1, tzinfo=UTC),
     )
@@ -164,10 +272,17 @@ def test_reports_include_error_slices_and_exclude_utterances(tmp_path: Path) -> 
     assert machine["field_slices"]["amount_paise"]["failed"] == 1
     assert machine["tag_slices"]["transfer"]["failed"] == 1
     assert machine["failures"][0]["case_id"] == "CAP-001"
-    assert case.utterance not in json_path.read_text(encoding="utf-8")
-    assert case.utterance not in human
+    assert machine["summary"]["evaluated"] == 1
+    assert machine["summary"]["failed"] == 1
+    assert machine["summary"]["provider_unavailable_cases"] == 1
+    assert machine["unavailable_failure_kinds"] == {"rate_limited": 1}
+    assert "mismatches" not in machine["unavailable_cases"][0]
+    for evaluated_case in suite.cases[:2]:
+        assert evaluated_case.utterance not in json_path.read_text(encoding="utf-8")
+        assert evaluated_case.utterance not in human
     assert "Mismatched fields" in human
     assert "amount_paise" in human
+    assert "rate_limited" in human
 
 
 def test_validation_markdown_states_that_no_model_was_called() -> None:
