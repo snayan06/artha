@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from artha_api.assistant import (
+    ASSISTANT_INTENT_MESSAGES,
     AssistantCompletion,
     AssistantFinancialContext,
     AssistantIntent,
@@ -153,20 +154,8 @@ def test_assistant_completion_requires_a_nonblank_bounded_model_message(
         AssistantCompletion.model_validate(payload)
 
 
-def test_assistant_completion_accepts_a_400_character_model_message() -> None:
-    completion = AssistantCompletion(
-        message="x" * 400,
-        intent=AssistantIntent.SUMMARY,
-        widgets=[
-            MetricWidget(
-                type="metric",
-                title="Available balance",
-                value_paise=1_500_000,
-            )
-        ],
-    )
-
-    assert len(completion.message) == 400
+def test_assistant_completion_keeps_the_400_character_schema_bound() -> None:
+    assert AssistantCompletion.model_json_schema()["properties"]["message"]["maxLength"] == 400
 
 
 @pytest.mark.parametrize(
@@ -176,6 +165,10 @@ def test_assistant_completion_accepts_a_400_character_model_message() -> None:
         "Your balance is ninety nine crore.",
         "Your balance is ninety-nine crore.",
         "Your balance is ९९ crore.",
+        "Your balance is a dollar.",
+        "Your balance is a euro.",
+        "Your balance is a grand.",
+        "The weather outside is pleasant.",
         "Your balance is one lakh rupees.",
         "Your savings rate is fifty percent.",
         "INR one hundred is shown below.",
@@ -186,7 +179,7 @@ def test_assistant_completion_accepts_a_400_character_model_message() -> None:
         "Your savings rate is %high.",
     ],
 )
-def test_assistant_completion_rejects_numeric_or_financial_symbols(
+def test_assistant_completion_rejects_unapproved_narrative(
     message: str,
 ) -> None:
     with pytest.raises(ValidationError):
@@ -203,10 +196,14 @@ def test_assistant_completion_rejects_numeric_or_financial_symbols(
         )
 
 
-def test_assistant_completion_accepts_normalized_qualitative_message() -> None:
+@pytest.mark.parametrize(("intent", "message"), ASSISTANT_INTENT_MESSAGES.items())
+def test_assistant_completion_accepts_only_the_message_for_its_intent(
+    intent: AssistantIntent,
+    message: str,
+) -> None:
     completion = AssistantCompletion(
-        message="  Your   current balance is shown below.  ",
-        intent=AssistantIntent.SUMMARY,
+        message=message,
+        intent=intent,
         widgets=[
             MetricWidget(
                 type="metric",
@@ -216,7 +213,11 @@ def test_assistant_completion_accepts_normalized_qualitative_message() -> None:
         ],
     )
 
-    assert completion.message == "Your current balance is shown below."
+    assert completion.message == message
+
+
+def test_every_assistant_intent_has_one_approved_message() -> None:
+    assert set(ASSISTANT_INTENT_MESSAGES) == set(AssistantIntent)
 
 
 @pytest.mark.asyncio
@@ -246,7 +247,7 @@ async def test_gemini_uses_private_stateless_structured_output(
     financial_context: AssistantFinancialContext,
 ) -> None:
     completion = {
-        "message": "Your monthly spending is summarized below.",
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
         "intent": "spending",
         "widgets": [
             {
@@ -270,7 +271,7 @@ async def test_gemini_uses_private_stateless_structured_output(
 
     assert response.mode == "model"
     assert response.provider == "gemini"
-    assert response.result.message == "Your monthly spending is summarized below."
+    assert response.result.message == ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING]
     body = gemini.aio.interactions.calls[0]
     assert body["model"] == "gemini-3.5-flash-lite"
     assert body["store"] is False
@@ -281,13 +282,10 @@ async def test_gemini_uses_private_stateless_structured_output(
     normalized_prompt = " ".join(body["system_instruction"].casefold().split())
     assert "top spending categories must use a chart" in normalized_prompt
     assert "cashflow comparison must use a chart" in normalized_prompt
-    assert "one concise plain-language message" in normalized_prompt
+    assert "return exactly its approved message" in normalized_prompt
     assert "financial numbers only in allow-listed widgets" in normalized_prompt
-    assert (
-        "must contain no amounts, dates, percentages, numeric digits, or currency symbols"
-        in normalized_prompt
-    )
-    assert "written number words, unicode digits, or financial units" in normalized_prompt
+    for intent, message in ASSISTANT_INTENT_MESSAGES.items():
+        assert f'intent={intent.value}: message="{message.casefold()}"' in normalized_prompt
     assert "tools" not in body
 
 
@@ -448,7 +446,7 @@ async def test_gemini_failure_can_use_opt_in_ollama_fallback(
     def handler(request: httpx.Request) -> httpx.Response:
         requested_hosts.append(request.url.host or "")
         completion = {
-            "message": "Your shared balance is summarized below.",
+            "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SHARED],
             "intent": "shared",
             "widgets": [
                 {
@@ -480,7 +478,7 @@ async def test_gemini_failure_can_use_opt_in_ollama_fallback(
     assert response.mode == "model"
     assert response.provider == "ollama"
     assert response.model == "qwen3:4b-instruct"
-    assert response.result.message == "Your shared balance is summarized below."
+    assert response.result.message == ASSISTANT_INTENT_MESSAGES[AssistantIntent.SHARED]
 
 
 @pytest.mark.asyncio
@@ -495,7 +493,7 @@ async def test_invalid_model_payload_makes_assistant_unavailable(
                 "message": {
                     "content": json.dumps(
                         {
-                            "message": "This payload contains an unsafe widget field.",
+                            "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
                             "intent": "spending",
                             "widgets": [
                                 {

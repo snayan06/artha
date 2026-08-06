@@ -14,7 +14,7 @@ describe('AssistantPage generated UI', () => {
 
   it('renders generated chart data as an accessible table', async () => {
     vi.mocked(chatAssistant).mockResolvedValue({
-      message: 'Your spending increased in August.',
+      message: 'Here is your spending overview.',
       provider: 'Test provider',
       widgets: [{
         type: 'bar_chart',
@@ -28,7 +28,7 @@ describe('AssistantPage generated UI', () => {
     await user.type(screen.getByLabelText('Ask Artha'), 'Show my monthly spending trend')
     await user.click(screen.getByRole('button', { name: 'Send question' }))
 
-    expect(await screen.findByText('Your spending increased in August.')).toBeInTheDocument()
+    expect(await screen.findByText('Here is your spending overview.')).toBeInTheDocument()
     const dataTable = screen.getByRole('table', { name: 'Monthly spend values' })
     expect(within(dataTable).getByRole('rowheader', { name: 'August' })).toBeInTheDocument()
     expect(within(dataTable).getByRole('cell', { name: '15000' })).toBeInTheDocument()
@@ -36,7 +36,7 @@ describe('AssistantPage generated UI', () => {
 
   it('renders a chart-specific empty state instead of a broken graph', async () => {
     vi.mocked(chatAssistant).mockResolvedValue({
-      message: 'There is no matching activity yet.',
+      message: 'Here is your recent ledger activity.',
       provider: 'Test provider',
       widgets: [{ type: 'line_chart', title: 'Monthly trend', data: [] }]
     })
@@ -51,7 +51,7 @@ describe('AssistantPage generated UI', () => {
 
   it('labels successful model output as an AI response and shows its provider and model', async () => {
     vi.mocked(chatAssistant).mockResolvedValue({
-      message: 'Your available balance is shown below.',
+      message: 'Here is your current account overview.',
       provider: 'Gemini · gemini-3.5-flash-lite',
       widgets: [{ type: 'metric', title: 'Available balance', value: '₹12,345' }]
     })
@@ -70,7 +70,7 @@ describe('AssistantPage generated UI', () => {
     vi.mocked(chatAssistant)
       .mockRejectedValueOnce(new Error('API request failed (503)'))
       .mockResolvedValueOnce({
-        message: 'Your available balance is shown below.',
+        message: 'Here is your current account overview.',
         provider: 'Ollama · qwen3:4b',
         widgets: [{ type: 'metric', title: 'Available balance', value: '₹12,345' }]
       })
@@ -92,7 +92,7 @@ describe('AssistantPage generated UI', () => {
 
     await user.click(screen.getByRole('button', { name: 'Send question' }))
 
-    expect(await screen.findByText('Your available balance is shown below.')).toBeInTheDocument()
+    expect(await screen.findByText('Here is your current account overview.')).toBeInTheDocument()
     expect(chatAssistant).toHaveBeenNthCalledWith(2, question)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

@@ -7,7 +7,7 @@ function assistantEnvelope(widget: Record<string, unknown>, overrides: Record<st
     model: 'gemini-3.5-flash-lite',
     mode: 'model',
     result: {
-      message: 'Your ledger view is shown below.',
+      message: 'Here is your current account overview.',
       intent: 'summary',
       widgets: [widget]
     },
@@ -267,7 +267,7 @@ describe('FastAPI adapter', () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your spending view is ready.', intent: 'spending', widgets: [
+      result: { message: 'Here is your spending overview.', intent: 'spending', widgets: [
         { type: 'metric', title: 'Spend', value_paise: 12345, caption: 'This month', tone: 'neutral' },
         { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Aug', value_paise: 5000 }] },
         { type: 'clarification', question: 'Which period?', choices: ['This month'] }
@@ -278,7 +278,7 @@ describe('FastAPI adapter', () => {
 
     const reply = await chatAssistant('Show spending')
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ message: 'Show spending' })
-    expect(reply.message).toBe('Your spending view is ready.')
+    expect(reply.message).toBe('Here is your spending overview.')
     expect(reply.provider).toBe('gemini · gemini-3.5-flash-lite')
     expect(Object.keys(reply).sort()).toEqual(['message', 'provider', 'widgets'])
     expect(reply.widgets.map((widget) => widget.type)).toEqual(['metric', 'line_chart', 'clarification'])
@@ -332,27 +332,27 @@ describe('FastAPI adapter', () => {
   it.each([
     ['missing mode', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite',
-      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
     }],
     ['deterministic mode', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'deterministic_fallback',
-      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
     }],
     ['missing intent', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+      result: { message: 'Here is your current account overview.', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
     }],
     ['unknown intent', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', intent: 'forecast', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+      result: { message: 'Here is your current account overview.', intent: 'forecast', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
     }],
     ['missing widgets', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', intent: 'summary' }
+      result: { message: 'Here is your current account overview.', intent: 'summary' }
     }],
     ['empty widgets', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [] }
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [] }
     }],
     ['overlong message', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
@@ -360,15 +360,15 @@ describe('FastAPI adapter', () => {
     }],
     ['unknown widget', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'html', content: '<b>unsafe</b>' }] }
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'html', content: '<b>unsafe</b>' }] }
     }],
     ['legacy widget alias', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'bar_chart', title: 'Trend', data: [{ label: 'Now', value: 1 }] }] }
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'bar_chart', title: 'Trend', data: [{ label: 'Now', value: 1 }] }] }
     }],
     ['invalid chart widget', {
       provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
-      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'chart', title: 'Trend', chart_type: 'line', points: [] }] }
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'chart', title: 'Trend', chart_type: 'line', points: [] }] }
     }]
   ])('rejects an invalid assistant envelope with %s', async (_case, payload) => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')

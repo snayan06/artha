@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from artha_api.assistant import (
+    ASSISTANT_INTENT_MESSAGES,
     AssistantCompletion,
     AssistantIntent,
     AssistantSettings,
@@ -176,7 +177,7 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
         tags=("summary",),
     )
     correct = AssistantCompletion(
-        message="Your available balance is summarized below.",
+        message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
         intent=AssistantIntent.SUMMARY,
         widgets=[
             MetricWidget(
@@ -187,7 +188,7 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
         ],
     )
     wrong_number = AssistantCompletion(
-        message="Your available balance is shown below.",
+        message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
         intent=AssistantIntent.SUMMARY,
         widgets=[MetricWidget(type="metric", title="Balance", value_paise=1_400_000)],
     )
@@ -208,6 +209,33 @@ def test_assistant_eval_rejects_unsafe_prose_before_scoring(message: str) -> Non
         AssistantCompletion(
             message=message,
             intent=AssistantIntent.SUMMARY,
+            widgets=[
+                MetricWidget(
+                    type="metric",
+                    title="Balance",
+                    value_paise=1_500_000,
+                )
+            ],
+        )
+
+
+@pytest.mark.parametrize(
+    ("intent", "message"),
+    [
+        (AssistantIntent.SUMMARY, "Here is your spending overview."),
+        (AssistantIntent.SUMMARY, "  Here is your current account overview.  "),
+        (AssistantIntent.SUMMARY, "Your balance is a grand."),
+        (AssistantIntent.INCOME, "This benign arbitrary sentence is not approved."),
+    ],
+)
+def test_assistant_eval_rejects_unapproved_intent_narrative_before_scoring(
+    intent: AssistantIntent,
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        AssistantCompletion(
+            message=message,
+            intent=intent,
             widgets=[
                 MetricWidget(
                     type="metric",
