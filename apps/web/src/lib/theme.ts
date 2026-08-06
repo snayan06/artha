@@ -14,6 +14,7 @@ export function applyTheme(preference: ThemePreference): 'light' | 'dark' {
   document.documentElement.classList.toggle('dark', resolved === 'dark')
   document.documentElement.dataset.theme = resolved
   document.documentElement.dataset.themePreference = preference
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', resolved === 'dark' ? '#111412' : '#f5f7f2')
   return resolved
 }
 

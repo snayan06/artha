@@ -28,9 +28,11 @@ hold real Artha data.
 3. Link the repository with the Supabase CLI without saving a database password
    in source.
 4. Apply every migration under `supabase/migrations` to the empty project.
-5. Run the SQL catalog checks and the live anonymous/two-household RLS exercise.
-6. Confirm Auth uses an asymmetric signing key supported by the API JWKS verifier.
-7. Initially set the Auth site URL and redirect allow-list to the final PWA
+5. Refresh and verify the PostgREST function catalog; migration history alone
+   does not prove that a new RPC is callable through Supabase REST.
+6. Run the SQL catalog checks and the live anonymous/two-household RLS exercise.
+7. Confirm Auth uses an asymmetric signing key supported by the API JWKS verifier.
+8. Initially set the Auth site URL and redirect allow-list to the final PWA
    `vercel.app` origin only.
 
 Only the project URL and publishable/anon key go to Vercel. Never expose the
@@ -102,12 +104,38 @@ site/redirect URLs, then redeploy both projects. Do not use wildcard CORS.
 The application now fails closed instead of showing fictional demo balances when
 the production API is unavailable.
 
+After every migration that creates or replaces an RPC, run:
+
+```bash
+export ARTHA_SUPABASE_PROJECT_REF=<exact-ref-from-the-deployed-web-project-url>
+supabase link --project-ref "$ARTHA_SUPABASE_PROJECT_REF"
+make check-supabase-link
+supabase db push --linked
+make check-supabase-link
+supabase db query --linked "notify pgrst, 'reload schema';"
+ARTHA_SUPABASE_URL=<project-url> \
+ARTHA_SUPABASE_ANON_KEY=<publishable-key> \
+ARTHA_SUPABASE_PROJECT_REF="$ARTHA_SUPABASE_PROJECT_REF" \
+make check-live-rpc-catalog
+```
+
+Resolve the expected project ref from the Supabase URL configured in the
+deployed web project, not from a remembered CLI link or project display name.
+`make check-supabase-link` is a mandatory fail-closed guard immediately before
+every `--linked` write. If the CLI account cannot link to that exact project,
+stop and use an authorized project owner instead of switching to another
+project.
+
+The live catalog probe sends no user token or ledger payload. A `PGRST202`/404
+is a failed release even when `supabase migration list --linked` is synchronized.
+
 ## Acceptance before calling production green
 
 Current status: **personal infrastructure live; authenticated final-domain and recovery acceptance pending**.
 Do not enter real financial data until every unchecked item passes.
 
 - [ ] Magic-link login works on the final PWA domain.
+- [x] Required RPCs resolve through live PostgREST after the production migration.
 - [ ] Reload, token refresh and sign-out work without losing a confirmed entry.
 - [ ] Two test identities can onboard separate households and cannot read each
   other's API or direct Supabase data.

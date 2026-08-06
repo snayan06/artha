@@ -7,3 +7,5 @@ __pycache__/
 artha.db
 *.db-shm
 *.db-wal
+.vercel
+.env*

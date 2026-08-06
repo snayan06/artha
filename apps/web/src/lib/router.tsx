@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, type MouseEvent, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, type AnchorHTMLAttributes, type MouseEvent, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 
 export type AppPath = '/' | '/transactions' | '/shared' | '/assistant' | '/add'
 
@@ -30,7 +30,8 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     navigate: (path, state) => {
       window.history.pushState(state ?? null, '', path)
       setLocation({ path, state })
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
     },
     back: () => window.history.back()
   }), [location])
@@ -44,7 +45,7 @@ export function useRouter(): RouterValue {
   return value
 }
 
-export function AppLink({ to, children, className }: { to: AppPath; children: ReactNode; className?: string }) {
+export function AppLink({ to, children, ...props }: { to: AppPath; children: ReactNode } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
   const { navigate } = useRouter()
   function follow(event: MouseEvent<HTMLAnchorElement>) {
     if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) {
@@ -52,5 +53,5 @@ export function AppLink({ to, children, className }: { to: AppPath; children: Re
       navigate(to)
     }
   }
-  return <a href={to} onClick={follow} className={className}>{children}</a>
+  return <a href={to} {...props} onClick={(event) => { props.onClick?.(event); if (!event.defaultPrevented) follow(event) }}>{children}</a>
 }

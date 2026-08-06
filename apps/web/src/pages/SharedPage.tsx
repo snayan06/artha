@@ -18,10 +18,10 @@ export function SharedPage({ transactions, sharedBalancePaise, memberBalances, d
       <Card className="relative mt-6 overflow-hidden border-0 bg-moss-900 p-6 text-white dark:bg-night-raised sm:p-8">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border-[28px] border-white/[0.04]" />
         <div className="relative">
-          <div className="flex items-center gap-2 text-sm text-moss-200"><UsersRound className="h-4 w-4" /> Current shared balance</div>
+          <div className="flex items-center gap-2 text-sm text-moss-200"><UsersRound className="h-4 w-4" aria-hidden="true" /> Current shared balance</div>
           <p className="font-display mt-4 text-4xl font-bold tracking-[-0.05em] sm:text-5xl">{formatMoney(displayedOwed)}</p>
           <p className="mt-2 text-sm text-moss-200">{balanceLabel}</p>
-          <div className="mt-7 flex items-center gap-2 text-xs text-moss-200"><CheckCircle2 className="h-4 w-4" /> Based on {shared.length} confirmed shared expenses</div>
+          <div className="mt-7 flex items-center gap-2 text-xs text-moss-200"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Based on {shared.length} confirmed shared expenses</div>
         </div>
       </Card>
 
@@ -36,10 +36,10 @@ export function SharedPage({ transactions, sharedBalancePaise, memberBalances, d
       <Card className="mt-3 overflow-hidden">
         {shared.length ? <div className="divide-y divide-line">{shared.map((transaction) => (
           <article key={transaction.id} className="flex items-center gap-3 p-5 sm:px-6">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-moss-100 text-moss-800"><ArrowDownRight className="h-5 w-5" /></div>
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-moss-100 text-moss-800"><ArrowDownRight className="h-5 w-5" aria-hidden="true" /></div>
             <div className="min-w-0 flex-1"><div className="flex justify-between gap-3"><p className="truncate text-sm font-semibold">{transaction.merchant}</p><p className="shrink-0 text-sm font-bold text-moss-800">{formatMoney(transaction.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0))}</p></div><div className="mt-1 flex justify-between gap-2 text-xs text-[#7b8781] tone-muted"><span className="truncate">With {transaction.memberSplits.map((split) => split.memberName).join(', ')}</span><span className="shrink-0">{new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(`${transaction.occurredAt}T12:00:00`))}</span></div></div>
           </article>
-        ))}</div> : <div className="py-14 text-center"><UsersRound className="mx-auto h-7 w-7 text-[#9aa49f] tone-subtle" /><p className="mt-3 font-semibold">Nothing shared yet</p><p className="mt-1 text-sm text-[#7b8781] tone-muted">Shared expenses will appear here.</p></div>}
+        ))}</div> : <div className="py-14 text-center"><UsersRound className="mx-auto h-7 w-7 text-[#9aa49f] tone-subtle" aria-hidden="true" /><p className="mt-3 font-semibold">Nothing shared yet</p><p className="mt-1 text-sm text-[#7b8781] tone-muted">Shared expenses will appear here.</p></div>}
       </Card>
 
       <div className="mt-4 rounded-2xl border border-line bg-white/50 p-4 text-xs leading-5 text-[#6e7a74] tone-muted dark:bg-night-surface/80">

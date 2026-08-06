@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Check, CreditCard, Landmark, Plus, ShieldCheck, Sparkles, Trash2, UsersRound, WalletCards } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
 import { ThemeControl } from '../components/ThemeControl'
 import { formatMoney, rupeesToPaise } from '../lib/money'
@@ -38,6 +38,11 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [demoLoading, setDemoLoading] = useState(false)
+  const errorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus()
+  }, [error])
 
   const preparedAccounts = useMemo<AccountSetupInput[]>(() => [
     ...moneyRows.map((row) => ({
@@ -138,8 +143,8 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
         {step === 'accounts' ? (
           <>
             <div className="mt-10 sm:mt-14">
-              <div className="flex items-center gap-2 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" /> Let’s set up your starting point</div>
-              <h1 className="font-display mt-3 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Where does your money live?</h1>
+              <div className="flex items-center gap-2 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" aria-hidden="true" /> Let’s set up your starting point</div>
+              <h1 className="font-display mt-3 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Where does your money live?</h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-[#6e7b74] tone-muted">Add today’s balances. Artha stores them as opening entries, then keeps the total updated from confirmed transactions.</p>
             </div>
 
@@ -152,26 +157,26 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
             </Card>
 
             <section className="mt-7" aria-labelledby="members-heading">
-              <div className="mb-3 flex items-end justify-between gap-3"><div><div className="flex items-center gap-2"><h2 id="members-heading" className="font-display text-lg font-bold">Family members</h2><Badge>Optional</Badge></div><p className="mt-1 text-xs text-[#77837d] tone-muted">Add anyone you regularly split expenses with.</p></div><Button variant="secondary" className="shrink-0 px-3" onClick={() => setMemberRows((rows) => [...rows, newMemberRow()])} icon={<Plus className="h-4 w-4" />}>Add</Button></div>
-              {memberRows.length === 0 ? <button onClick={() => setMemberRows([newMemberRow()])} className="flex min-h-20 w-full items-center gap-3 rounded-[22px] border border-dashed border-moss-300 bg-moss-50/50 px-4 text-left transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-raised"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-moss-800"><UsersRound className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Add a family member</span><span className="mt-1 block text-xs text-[#748079] tone-muted">You can also keep Artha completely personal.</span></span></button> : <div className="space-y-3">{memberRows.map((member, index) => <Card key={member.id} className="flex items-end gap-3 p-4"><div className="min-w-0 flex-1"><SetupField label={`Member ${index + 1}`} ariaLabel={`Family member ${index + 1} name`} placeholder="Name" value={member.name} onChange={(name) => setMemberRows((rows) => rows.map((item) => item.id === member.id ? { ...item, name } : item))} /></div><button onClick={() => setMemberRows((rows) => rows.filter((item) => item.id !== member.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove family member ${index + 1}`}><Trash2 className="h-4 w-4" /></button></Card>)}</div>}
+              <div className="mb-3 flex items-end justify-between gap-3"><div><div className="flex items-center gap-2"><h2 id="members-heading" className="font-display text-lg font-bold">Family members</h2><Badge>Optional</Badge></div><p className="mt-1 text-xs text-[#77837d] tone-muted">Add anyone you regularly split expenses with.</p></div><Button variant="secondary" className="shrink-0 px-3" onClick={() => setMemberRows((rows) => [...rows, newMemberRow()])} icon={<Plus className="h-4 w-4" aria-hidden="true" />}>Add</Button></div>
+              {memberRows.length === 0 ? <button onClick={() => setMemberRows([newMemberRow()])} className="flex min-h-20 w-full items-center gap-3 rounded-[22px] border border-dashed border-moss-300 bg-moss-50/50 px-4 text-left transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-raised"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-moss-800"><UsersRound className="h-5 w-5" aria-hidden="true" /></span><span><span className="block text-sm font-semibold">Add a family member</span><span className="mt-1 block text-xs text-[#748079] tone-muted">You can also keep Artha completely personal.</span></span></button> : <div className="space-y-3">{memberRows.map((member, index) => <Card key={member.id} className="flex items-end gap-3 p-4"><div className="min-w-0 flex-1"><SetupField label={`Member ${index + 1}`} ariaLabel={`Family member ${index + 1} name`} placeholder="Name" value={member.name} onChange={(name) => setMemberRows((rows) => rows.map((item) => item.id === member.id ? { ...item, name } : item))} /></div><button onClick={() => setMemberRows((rows) => rows.filter((item) => item.id !== member.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove family member ${index + 1}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button></Card>)}</div>}
             </section>
 
             <section className="mt-7" aria-labelledby="money-accounts-heading">
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div><h2 id="money-accounts-heading" className="font-display text-lg font-bold">Money accounts</h2><p className="mt-1 text-xs text-[#77837d] tone-muted">Add at least one bank, cash, or wallet.</p></div>
-                <Button variant="secondary" className="shrink-0 px-3" onClick={() => setMoneyRows((rows) => [...rows, newMoneyRow()])} icon={<Plus className="h-4 w-4" />}>Add</Button>
+                <Button variant="secondary" className="shrink-0 px-3" onClick={() => setMoneyRows((rows) => [...rows, newMoneyRow()])} icon={<Plus className="h-4 w-4" aria-hidden="true" />}>Add</Button>
               </div>
               <div className="space-y-3">
                 {moneyRows.map((row, index) => (
                   <Card key={row.id} className="p-4 sm:p-5">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 hidden h-10 w-10 shrink-0 place-items-center rounded-xl bg-moss-100 text-moss-800 sm:grid"><Landmark className="h-5 w-5" /></div>
+                      <div className="mt-0.5 hidden h-10 w-10 shrink-0 place-items-center rounded-xl bg-moss-100 text-moss-800 sm:grid"><Landmark className="h-5 w-5" aria-hidden="true" /></div>
                       <div className="min-w-0 flex-1 space-y-3 sm:grid sm:grid-cols-[1.2fr_.8fr_1fr] sm:gap-3 sm:space-y-0">
                         <SetupField label="Account name" ariaLabel={`Money account ${index + 1} name`} placeholder="e.g. HDFC UPI" value={row.name} onChange={(name) => setMoneyRows((rows) => rows.map((item) => item.id === row.id ? { ...item, name } : item))} />
-                        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7c8882] tone-muted">Type</span><select aria-label={`Money account ${index + 1} type`} value={row.kind} onChange={(event) => setMoneyRows((rows) => rows.map((item) => item.id === row.id ? { ...item, kind: event.target.value as MoneyRow['kind'] } : item))} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus:border-moss-400 focus:ring-4 focus:ring-moss-100"><option value="bank">Bank</option><option value="cash">Cash</option><option value="wallet">Wallet</option></select></label>
+                        <label className="block"><span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7c8882] tone-muted">Type</span><select name={`money-account-${index + 1}-type`} autoComplete="off" aria-label={`Money account ${index + 1} type`} value={row.kind} onChange={(event) => setMoneyRows((rows) => rows.map((item) => item.id === row.id ? { ...item, kind: event.target.value as MoneyRow['kind'] } : item))} className="min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100"><option value="bank">Bank</option><option value="cash">Cash</option><option value="wallet">Wallet</option></select></label>
                         <SetupField label="Current balance" ariaLabel={`Money account ${index + 1} current balance`} prefix="₹" inputMode="decimal" placeholder="0" value={row.balance} onChange={(balance) => setMoneyRows((rows) => rows.map((item) => item.id === row.id ? { ...item, balance } : item))} />
                       </div>
-                      {moneyRows.length > 1 && <button onClick={() => setMoneyRows((rows) => rows.filter((item) => item.id !== row.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove money account ${index + 1}`}><Trash2 className="h-4 w-4" /></button>}
+                      {moneyRows.length > 1 && <button onClick={() => setMoneyRows((rows) => rows.filter((item) => item.id !== row.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove money account ${index + 1}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}
                     </div>
                   </Card>
                 ))}
@@ -181,11 +186,11 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
             <section className="mt-8" aria-labelledby="cards-heading">
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div><div className="flex items-center gap-2"><h2 id="cards-heading" className="font-display text-lg font-bold">Credit cards</h2><Badge>Optional</Badge></div><p className="mt-1 text-xs text-[#77837d] tone-muted">Track what you owe without counting card payments twice.</p></div>
-                <Button variant="secondary" className="shrink-0 px-3" onClick={() => setCardRows((rows) => [...rows, newCardRow()])} icon={<Plus className="h-4 w-4" />}>Add</Button>
+                <Button variant="secondary" className="shrink-0 px-3" onClick={() => setCardRows((rows) => [...rows, newCardRow()])} icon={<Plus className="h-4 w-4" aria-hidden="true" />}>Add</Button>
               </div>
               {cardRows.length === 0 ? (
                 <button onClick={() => setCardRows([newCardRow()])} className="flex min-h-20 w-full items-center gap-3 rounded-[22px] border border-dashed border-moss-300 bg-moss-50/50 px-4 text-left transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-raised">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-moss-800"><CreditCard className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Add a credit card</span><span className="mt-1 block text-xs text-[#748079] tone-muted">Outstanding is stored as a liability.</span></span>
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-moss-800"><CreditCard className="h-5 w-5" aria-hidden="true" /></span><span><span className="block text-sm font-semibold">Add a credit card</span><span className="mt-1 block text-xs text-[#748079] tone-muted">Outstanding is stored as a liability.</span></span>
                 </button>
               ) : (
                 <div className="space-y-3">
@@ -201,7 +206,7 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
                             <SetupField label="Due day" ariaLabel={`Credit card ${index + 1} payment due day`} inputMode="numeric" placeholder="Optional" value={row.paymentDueDay} onChange={(paymentDueDay) => setCardRows((rows) => rows.map((item) => item.id === row.id ? { ...item, paymentDueDay } : item))} />
                           </div>
                         </div>
-                        <button onClick={() => setCardRows((rows) => rows.filter((item) => item.id !== row.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove credit card ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
+                        <button onClick={() => setCardRows((rows) => rows.filter((item) => item.id !== row.id))} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[#84908a] tone-subtle hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Remove credit card ${index + 1}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
                       </div>
                     </Card>
                   ))}
@@ -209,17 +214,17 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
               )}
             </section>
 
-            {error && <ErrorMessage message={error} />}
+            {error && <ErrorMessage message={error} focusRef={errorRef} />}
             <div className={`mt-8 grid gap-3 sm:items-center ${allowDemo ? 'sm:grid-cols-[1fr_auto]' : 'sm:justify-end'}`}>
               {allowDemo && <Button variant="ghost" loading={demoLoading} onClick={() => void exploreDemo()} className="order-2 sm:order-1 sm:justify-self-start">Explore fictional demo</Button>}
-              <Button onClick={continueToReview} className="order-1 sm:order-2 sm:px-7">Review setup <ArrowRight className="h-4 w-4" /></Button>
+              <Button onClick={continueToReview} className="order-1 sm:order-2 sm:px-7">Review setup <ArrowRight className="h-4 w-4" aria-hidden="true" /></Button>
             </div>
             {allowDemo && <p className="mt-3 text-center text-[11px] text-[#87928c] tone-subtle sm:text-right">Demo data is fictional and can be cleared later.</p>}
           </>
         ) : (
           <div className="mt-10 sm:mt-14">
-            <button onClick={() => { setStep('accounts'); setError('') }} className="inline-flex min-h-11 items-center gap-2 rounded-xl pr-3 text-sm font-semibold text-[#66736d] tone-muted hover:text-moss-800"><ArrowLeft className="h-4 w-4" /> Edit accounts</button>
-            <div className="mt-4"><p className="text-sm font-semibold text-moss-700">Almost ready</p><h1 className="font-display mt-2 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Review your starting balances.</h1><p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">These become your ledger’s opening entries. Credit-card outstanding is shown as money owed.</p></div>
+            <button onClick={() => { setStep('accounts'); setError('') }} className="inline-flex min-h-11 items-center gap-2 rounded-xl pr-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Edit accounts</button>
+            <div className="mt-4"><p className="text-sm font-semibold text-moss-700">Almost ready</p><h1 className="font-display mt-2 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Review your starting balances.</h1><p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">These become your ledger’s opening entries. Credit-card outstanding is shown as money owed.</p></div>
 
             <Card className="mt-7 p-4"><p className="text-xs text-[#748079] tone-muted">Household</p><p className="mt-1 font-semibold">{householdName.trim() || 'My household'}</p><p className="mt-1 text-xs text-[#748079] tone-muted">{memberRows.length ? memberRows.map((member) => member.name).join(', ') : 'Personal ledger · no shared members'}</p></Card>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -232,7 +237,7 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
               <div className="divide-y divide-line px-5">
                 {preparedAccounts.map((account, index) => (
                   <div key={`${account.kind}-${account.name}-${index}`} className="flex items-center gap-3 py-4">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-moss-100 text-moss-800">{account.kind === 'credit_card' ? <CreditCard className="h-5 w-5" /> : <WalletCards className="h-5 w-5" />}</span>
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-moss-100 text-moss-800">{account.kind === 'credit_card' ? <CreditCard className="h-5 w-5" aria-hidden="true" /> : <WalletCards className="h-5 w-5" aria-hidden="true" />}</span>
                     <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{account.name}</p><p className="mt-1 text-xs capitalize text-[#7b8781] tone-muted">{account.kind.replace('_', ' ')}</p></div>
                     <div className="text-right"><p className={`text-sm font-bold ${account.opening_balance_paise < 0 ? 'text-[#8a4d43] tone-subtle tone-danger' : 'text-moss-800'}`}>{formatMoney(account.opening_balance_paise)}</p>{account.credit_limit_paise !== null && <p className="mt-1 text-[11px] text-[#7b8781] tone-muted">Limit {formatMoney(account.credit_limit_paise)}</p>}{account.statement_day && <p className="mt-1 text-[11px] text-[#7b8781] tone-muted">Statement {account.statement_day} · due {account.payment_due_day ?? '—'}</p>}</div>
                   </div>
@@ -240,9 +245,9 @@ export function OnboardingPage({ onSave, onExploreDemo, allowDemo = true }: { on
               </div>
             </Card>
 
-            <div className="mt-5 flex items-start gap-2 rounded-2xl border border-moss-200 bg-moss-50 p-4 text-xs leading-5 text-[#637069] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" /><p>Artha stores money in integer paise and never posts a transaction from natural language until you explicitly confirm it.</p></div>
-            {error && <ErrorMessage message={error} />}
-            <Button onClick={() => void save()} loading={saving} className="mt-6 w-full" icon={<Check className="h-4 w-4" />}>Save setup and open Artha</Button>
+            <div className="mt-5 flex items-start gap-2 rounded-2xl border border-moss-200 bg-moss-50 p-4 text-xs leading-5 text-[#637069] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" aria-hidden="true" /><p>Artha stores money in integer paise and never posts a transaction from natural language until you explicitly confirm it.</p></div>
+            {error && <ErrorMessage message={error} focusRef={errorRef} />}
+            <Button onClick={() => void save()} loading={saving} className="mt-6 w-full" icon={<Check className="h-4 w-4" aria-hidden="true" />}>Save setup and open Artha</Button>
           </div>
         )}
       </div>
@@ -260,11 +265,11 @@ function SetupField({ label, ariaLabel, prefix, ...inputProps }: { label: string
   return (
     <label className="block min-w-0">
       <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7c8882] tone-muted">{label}</span>
-      <span className="relative block">{prefix && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#68756e] tone-muted">{prefix}</span>}<input aria-label={ariaLabel} inputMode={inputProps.inputMode} value={inputProps.value} placeholder={inputProps.placeholder} min="0" max={inputProps.inputMode === 'numeric' ? '31' : undefined} step="1" type={inputProps.inputMode ? 'number' : 'text'} onChange={(event) => inputProps.onChange(event.target.value)} className={`min-h-11 w-full min-w-0 rounded-xl border border-line bg-white pr-3 text-sm font-semibold outline-none transition focus:border-moss-400 focus:ring-4 focus:ring-moss-100 ${prefix ? 'pl-7' : 'pl-3'}`} /></span>
+      <span className="relative block">{prefix && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#68756e] tone-muted">{prefix}</span>}<input name={ariaLabel.toLowerCase().replaceAll(' ', '-')} aria-label={ariaLabel} autoComplete="off" inputMode={inputProps.inputMode} value={inputProps.value} placeholder={`${inputProps.placeholder}…`} min="0" max={inputProps.inputMode === 'numeric' ? '31' : undefined} step={inputProps.inputMode === 'decimal' ? '0.01' : '1'} type={inputProps.inputMode ? 'number' : 'text'} onChange={(event) => inputProps.onChange(event.target.value)} className={`min-h-11 w-full min-w-0 rounded-xl border border-line bg-white pr-3 text-sm font-semibold outline-none transition focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 ${prefix ? 'pl-7' : 'pl-3'}`} /></span>
     </label>
   )
 }
 
-function ErrorMessage({ message }: { message: string }) {
-  return <div role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{message}</div>
+function ErrorMessage({ message, focusRef }: { message: string; focusRef: RefObject<HTMLDivElement | null> }) {
+  return <div ref={focusRef} tabIndex={-1} role="alert" aria-live="polite" className="mt-5 break-words rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 outline-none focus-visible:ring-2 focus-visible:ring-red-400">{message}</div>
 }

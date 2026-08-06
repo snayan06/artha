@@ -1,7 +1,9 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, LogOut, RefreshCw } from 'lucide-react'
 import { Shell } from './components/Shell'
 import { demoDashboard, demoTransactions } from './data/demo'
-import { bootstrapDemo, confirmDraft, getDashboard, getMembers, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding } from './lib/api'
+import { ApiError, bootstrapDemo, confirmDraft, getDashboard, getMembers, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding } from './lib/api'
 import { isDemoMode, useAuth } from './lib/auth'
 import { useRouter } from './lib/router'
 import { HomePage } from './pages/HomePage'
@@ -24,6 +26,59 @@ const emptyDashboard: Dashboard = {
   memberBalances: [],
   monthly: [],
   recentTransactions: []
+}
+
+export type LedgerLoadIssue = {
+  title: string
+  message: string
+  retryLabel: string
+  signOutLabel: string
+}
+
+export function ledgerLoadIssue(error: unknown, phase: 'setup' | 'ledger'): LedgerLoadIssue {
+  if (error instanceof ApiError) {
+    if (error.status === 401) {
+      return {
+        title: 'Your session needs refreshing',
+        message: 'Your ledger is safe, but this sign-in is no longer valid. Sign in again to continue.',
+        retryLabel: 'Try session again',
+        signOutLabel: 'Sign in again'
+      }
+    }
+    if (error.status === 403) {
+      return {
+        title: 'This ledger is not available to this account',
+        message: 'Artha could not verify access to this household. Sign in with the account that owns it.',
+        retryLabel: 'Check again',
+        signOutLabel: 'Use another account'
+      }
+    }
+    if (error.status === 404 || error.status === 501) {
+      return {
+        title: 'Artha is finishing an update',
+        message: 'A ledger service is not ready yet. Your data is safe and no demo balances are being shown.',
+        retryLabel: 'Try again',
+        signOutLabel: 'Sign out'
+      }
+    }
+    if ([408, 429, 502, 503, 504].includes(error.status)) {
+      return {
+        title: 'Artha is taking longer than expected',
+        message: 'The connection or ledger service is temporarily unavailable. Your data is safe; wait a moment and retry.',
+        retryLabel: 'Retry connection',
+        signOutLabel: 'Sign out'
+      }
+    }
+  }
+
+  return {
+    title: phase === 'setup' ? 'We could not verify your setup' : 'Your ledger is temporarily unavailable',
+    message: phase === 'setup'
+      ? 'Artha could not verify your household setup. No setup changes were made. Check the connection and try again.'
+      : 'Artha could not load your ledger. No demo balances are being shown. Check the connection and try again.',
+    retryLabel: 'Try again',
+    signOutLabel: 'Sign out'
+  }
 }
 
 function loadProfile(profileKey: string): UserProfile {
@@ -61,17 +116,17 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   const profileKey = userKey ? `${PROFILE_KEY}.${userKey}` : PROFILE_KEY
   const [setupComplete, setSetupComplete] = useState(() => localDemo && localStorage.getItem(setupKey) === 'true')
   const [checkingSetup, setCheckingSetup] = useState(!localDemo)
-  const [setupError, setSetupError] = useState('')
+  const [setupIssue, setSetupIssue] = useState<LedgerLoadIssue | null>(null)
   const [profile, setProfile] = useState<UserProfile>(() => loadProfile(profileKey))
   const [dashboard, setDashboard] = useState<Dashboard>(() => localDemo ? demoDashboard : emptyDashboard)
   const [transactions, setTransactions] = useState<Transaction[]>(() => localDemo ? demoTransactions : [])
   const [demoMode, setDemoMode] = useState(localDemo)
   const [loadingLedger, setLoadingLedger] = useState(setupComplete)
-  const [ledgerError, setLedgerError] = useState('')
+  const [ledgerIssue, setLedgerIssue] = useState<LedgerLoadIssue | null>(null)
 
   const checkSetup = useCallback(async () => {
     setCheckingSetup(true)
-    setSetupError('')
+    setSetupIssue(null)
     try {
       const complete = await isOnboardingComplete()
       if (complete) {
@@ -81,8 +136,8 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
         localStorage.setItem(profileKey, JSON.stringify(serverProfile))
       }
       setSetupComplete(complete)
-    } catch {
-      setSetupError('Artha could not verify your household setup. Check the connection and try again.')
+    } catch (error) {
+      setSetupIssue(ledgerLoadIssue(error, 'setup'))
     } finally {
       setCheckingSetup(false)
     }
@@ -90,14 +145,14 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
 
   const refreshLedger = useCallback(async () => {
     setLoadingLedger(true)
-    setLedgerError('')
+    setLedgerIssue(null)
     try {
       const [dashboardResponse, transactionsResponse] = await Promise.all([getDashboard(), getTransactions()])
       setDashboard(dashboardResponse.data)
       setTransactions(transactionsResponse.data)
       setDemoMode(dashboardResponse.demo || transactionsResponse.demo)
-    } catch {
-      setLedgerError('Artha could not load your ledger. No demo balances are being shown. Check the connection and try again.')
+    } catch (error) {
+      setLedgerIssue(ledgerLoadIssue(error, 'ledger'))
     } finally {
       setLoadingLedger(false)
     }
@@ -149,10 +204,10 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   }
 
   if (checkingSetup) return <SessionLoadingPage />
-  if (setupError) return <LedgerLoadError message={setupError} onRetry={checkSetup} onSignOut={onSignOut} />
+  if (setupIssue) return <LedgerLoadError issue={setupIssue} onRetry={checkSetup} onSignOut={onSignOut} />
   if (!setupComplete) return <OnboardingPage onSave={finishSetup} onExploreDemo={exploreDemo} allowDemo={localDemo} />
   if (loadingLedger) return <SessionLoadingPage />
-  if (ledgerError) return <LedgerLoadError message={ledgerError} onRetry={refreshLedger} onSignOut={onSignOut} />
+  if (ledgerIssue) return <LedgerLoadError issue={ledgerIssue} onRetry={refreshLedger} onSignOut={onSignOut} />
 
   let page = <HomePage dashboard={dashboard} demoMode={demoMode} profile={profile} />
   if (path === '/transactions') page = <TransactionsPage transactions={transactions} demoMode={demoMode} />
@@ -163,16 +218,36 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   return <Shell userEmail={userEmail} onSignOut={onSignOut}>{page}</Shell>
 }
 
-function LedgerLoadError({ message, onRetry, onSignOut }: { message: string; onRetry: () => Promise<void>; onSignOut?: () => Promise<void> }) {
+export function LedgerLoadError({ issue, onRetry, onSignOut }: { issue: LedgerLoadIssue; onRetry: () => Promise<void>; onSignOut?: () => Promise<void> }) {
+  const [retrying, setRetrying] = useState(false)
+
+  async function retry() {
+    if (retrying) return
+    setRetrying(true)
+    try {
+      await onRetry()
+    } finally {
+      setRetrying(false)
+    }
+  }
+
   return (
-    <main className="grid min-h-screen place-items-center bg-canvas px-4 text-ink">
-      <div className="w-full max-w-md rounded-[24px] border border-line bg-white p-6 text-center shadow-sm dark:bg-night-surface">
-        <h1 className="font-display text-2xl font-bold">Your ledger is temporarily unavailable</h1>
-        <p role="alert" className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">{message}</p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <button onClick={() => void onRetry()} className="min-h-11 rounded-xl bg-moss-900 px-5 text-sm font-semibold text-white">Try again</button>
-          {onSignOut && <button onClick={() => void onSignOut()} className="min-h-11 rounded-xl border border-line px-5 text-sm font-semibold">Sign out</button>}
+    <main className="safe-page grid min-h-[100svh] place-items-center bg-canvas py-6 text-ink">
+      <div className="w-full max-w-md rounded-[28px] border border-line bg-white p-5 text-left shadow-sm sm:p-8 dark:bg-night-surface">
+        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" aria-hidden="true">
+          <AlertTriangle className="h-6 w-6" />
         </div>
+        <p className="mt-5 text-xs font-bold uppercase tracking-[0.14em] text-[#718078] tone-muted">Nothing was changed</p>
+        <h1 className="mt-2 text-balance font-display text-2xl font-bold leading-tight sm:text-3xl">{issue.title}</h1>
+        <p role="alert" aria-live="polite" className="mt-3 break-words text-sm leading-6 text-[#617068] tone-muted sm:text-base">{issue.message}</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button disabled={retrying} onClick={() => void retry()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-moss-900 px-5 text-sm font-semibold text-white transition hover:bg-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 dark:bg-[#27604e] dark:hover:bg-[#31745f]">
+            <RefreshCw className={`h-4 w-4 ${retrying ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden="true" />
+            {retrying ? 'Trying again…' : issue.retryLabel}
+          </button>
+          {onSignOut && <button onClick={() => void onSignOut()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold transition hover:border-moss-300 hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 focus-visible:ring-offset-2 dark:bg-night-surface dark:hover:bg-night-raised"><LogOut className="h-4 w-4" aria-hidden="true" />{issue.signOutLabel}</button>}
+        </div>
+        <p className="mt-5 text-xs leading-5 text-[#7b8881] tone-muted">If retry keeps failing, sign in again. Artha never substitutes fictional balances for a failed private ledger.</p>
       </div>
     </main>
   )
