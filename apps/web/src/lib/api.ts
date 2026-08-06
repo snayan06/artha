@@ -7,7 +7,17 @@ const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'
 const TIMEOUT_MS = 10_000
 const RETRY_DELAY_MS = 250
 const TRANSIENT_STATUSES = new Set([502, 503, 504])
-const ASSISTANT_INTENTS = new Set(['summary', 'spending', 'income', 'cashflow', 'shared', 'transactions', 'clarification', 'unsupported'])
+export const APPROVED_ASSISTANT_MESSAGES = {
+  summary: 'Here is your current account overview.',
+  spending: 'Here is your spending overview.',
+  income: 'Here is your income overview.',
+  cashflow: 'Here is your cash-flow overview.',
+  shared: 'Here are your shared balances.',
+  transactions: 'Here is your recent ledger activity.',
+  clarification: 'I need a little more detail to answer that.',
+  unsupported: 'I can only help with read-only ledger questions.'
+} as const
+type AssistantIntent = keyof typeof APPROVED_ASSISTANT_MESSAGES
 const ASSISTANT_PROVIDERS = new Set(['gemini', 'ollama'])
 const RETRYABLE_POST_PATHS = new Set([
   '/api/v1/drafts/parse',
@@ -135,6 +145,10 @@ function formatAssistantPaise(value: number): string {
 
 function isJsonObject(value: unknown): value is JsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isAssistantIntent(value: string): value is AssistantIntent {
+  return Object.hasOwn(APPROVED_ASSISTANT_MESSAGES, value)
 }
 
 function hasExactKeys(value: JsonObject, allowed: readonly string[], required: readonly string[]): boolean {
@@ -488,16 +502,16 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
   const rawMessage = result.message
   const intent = safeText(result.intent)
   if (
-    !ASSISTANT_INTENTS.has(intent)
+    !isAssistantIntent(intent)
     || !Array.isArray(rawWidgets)
     || rawWidgets.length < 1
     || rawWidgets.length > 5
     || typeof rawMessage !== 'string'
+    || rawMessage !== APPROVED_ASSISTANT_MESSAGES[intent]
   ) {
     throw new Error('Assistant response was invalid.')
   }
-  const assistantMessage = rawMessage.trim().replace(/\s+/g, ' ')
-  if (!assistantMessage || assistantMessage.length > 400) throw new Error('Assistant response was invalid.')
+  const assistantMessage = rawMessage
   const widgets = rawWidgets.map(parseAssistantWidget)
   if (widgets.some((widget) => widget === null)) throw new Error('Assistant response was invalid.')
   const provider = response.provider as 'gemini' | 'ollama'

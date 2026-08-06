@@ -158,6 +158,21 @@ def test_assistant_completion_keeps_the_400_character_schema_bound() -> None:
     assert AssistantCompletion.model_json_schema()["properties"]["message"]["maxLength"] == 400
 
 
+def test_assistant_completion_schema_advertises_only_approved_messages() -> None:
+    message_schema = AssistantCompletion.model_json_schema()["properties"]["message"]
+
+    assert set(message_schema["enum"]) == {
+        "Here is your current account overview.",
+        "Here is your spending overview.",
+        "Here is your income overview.",
+        "Here is your cash-flow overview.",
+        "Here are your shared balances.",
+        "Here is your recent ledger activity.",
+        "I need a little more detail to answer that.",
+        "I can only help with read-only ledger questions.",
+    }
+
+
 @pytest.mark.parametrize(
     "message",
     [

@@ -301,6 +301,39 @@ describe('FastAPI adapter', () => {
     })])
   })
 
+  it.each([
+    ['arbitrary financial prose', 'summary', 'Your balance is a grand.'],
+    ['approved message for the wrong intent', 'summary', 'Here is your spending overview.'],
+    ['whitespace-modified approved message', 'summary', '  Here is your current account overview.  ']
+  ])('rejects assistant narrative contract violation: %s', async (_case, intent, message) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope({ type: 'metric', title: 'Balance', value_paise: 12345 })
+    payload.result.intent = intent
+    payload.result.message = message
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it('publishes the exact browser-side assistant narrative contract', async () => {
+    const api = await import('./api')
+
+    expect(api).toHaveProperty('APPROVED_ASSISTANT_MESSAGES', {
+      summary: 'Here is your current account overview.',
+      spending: 'Here is your spending overview.',
+      income: 'Here is your income overview.',
+      cashflow: 'Here is your cash-flow overview.',
+      shared: 'Here are your shared balances.',
+      transactions: 'Here is your recent ledger activity.',
+      clarification: 'I need a little more detail to answer that.',
+      unsupported: 'I can only help with read-only ledger questions.'
+    })
+  })
+
   it('rejects a successful response without a model-written assistant message', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({

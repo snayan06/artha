@@ -156,7 +156,18 @@ AssistantWidget = Annotated[
     Field(discriminator="type"),
 ]
 
-ASSISTANT_INTENT_MESSAGES: dict[AssistantIntent, str] = {
+AssistantMessage = Literal[
+    "Here is your current account overview.",
+    "Here is your spending overview.",
+    "Here is your income overview.",
+    "Here is your cash-flow overview.",
+    "Here are your shared balances.",
+    "Here is your recent ledger activity.",
+    "I need a little more detail to answer that.",
+    "I can only help with read-only ledger questions.",
+]
+
+ASSISTANT_INTENT_MESSAGES: dict[AssistantIntent, AssistantMessage] = {
     AssistantIntent.SUMMARY: "Here is your current account overview.",
     AssistantIntent.SPENDING: "Here is your spending overview.",
     AssistantIntent.INCOME: "Here is your income overview.",
@@ -169,7 +180,7 @@ ASSISTANT_INTENT_MESSAGES: dict[AssistantIntent, str] = {
 
 
 class AssistantCompletion(StrictModel):
-    message: str = Field(min_length=1, max_length=400)
+    message: AssistantMessage = Field(min_length=1, max_length=400)
     intent: AssistantIntent
     widgets: list[AssistantWidget] = Field(min_length=1, max_length=5)
 
