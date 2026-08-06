@@ -198,11 +198,15 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
     assert wrong.numeric_mismatch is True
 
 
-def test_assistant_eval_rejects_numeric_prose_before_scoring() -> None:
+@pytest.mark.parametrize(
+    "message",
+    ["Your available balance is 15000.", "Your balance is ९९ crore.", "INR one hundred."],
+)
+def test_assistant_eval_rejects_unsafe_prose_before_scoring(message: str) -> None:
     # Schema validation rejects unsafe model prose before the scoring layer receives it.
     with pytest.raises(ValidationError):
         AssistantCompletion(
-            message="Your available balance is 15000.",
+            message=message,
             intent=AssistantIntent.SUMMARY,
             widgets=[
                 MetricWidget(

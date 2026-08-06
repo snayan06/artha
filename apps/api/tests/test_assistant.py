@@ -173,6 +173,12 @@ def test_assistant_completion_accepts_a_400_character_model_message() -> None:
     "message",
     [
         "Your balance is 99 crore.",
+        "Your balance is ninety nine crore.",
+        "Your balance is ninety-nine crore.",
+        "Your balance is ९९ crore.",
+        "Your balance is one lakh rupees.",
+        "Your savings rate is fifty percent.",
+        "INR one hundred is shown below.",
         "Your balance is ₹crore.",
         "Your balance is $high.",
         "Your balance is €high.",
@@ -281,6 +287,7 @@ async def test_gemini_uses_private_stateless_structured_output(
         "must contain no amounts, dates, percentages, numeric digits, or currency symbols"
         in normalized_prompt
     )
+    assert "written number words, unicode digits, or financial units" in normalized_prompt
     assert "tools" not in body
 
 

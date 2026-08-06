@@ -1,6 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TransactionDraft } from '../types'
 
+function assistantEnvelope(widget: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'gemini',
+    model: 'gemini-3.5-flash-lite',
+    mode: 'model',
+    result: {
+      message: 'Your ledger view is shown below.',
+      intent: 'summary',
+      widgets: [widget]
+    },
+    ...overrides
+  }
+}
+
 describe('FastAPI adapter', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -342,6 +356,50 @@ describe('FastAPI adapter', () => {
     }]
   ])('rejects an invalid assistant envelope with %s', async (_case, payload) => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it.each([
+    ['malformed metric fields', { type: 'metric', title: 123, value_paise: 'oops' }],
+    ['metric extra key', { type: 'metric', title: 'Balance', value_paise: 12345, sql: 'select 1' }],
+    ['invalid chart type', { type: 'chart', title: 'Trend', chart_type: 'area', points: [{ label: 'Now', value_paise: 1 }] }],
+    ['oversized chart points', { type: 'chart', title: 'Trend', chart_type: 'line', points: Array.from({ length: 13 }, (_, index) => ({ label: `P${index}`, value_paise: index })) }],
+    ['invalid chart point label', { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 123, value_paise: 1 }] }],
+    ['invalid chart point value', { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Now', value_paise: 'oops' }] }],
+    ['empty table rows', { type: 'table', title: 'Activity', rows: [] }],
+    ['oversized table rows', { type: 'table', title: 'Activity', rows: Array.from({ length: 13 }, (_, index) => ({ label: `R${index}`, amount_paise: index })) }],
+    ['invalid table date', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, date: '7 Aug' }] }],
+    ['invalid table kind', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, kind: 'forecast' }] }],
+    ['blank insight body', { type: 'insight', title: 'Note', body: '   ' }],
+    ['overlong insight body', { type: 'insight', title: 'Note', body: 'x'.repeat(401) }],
+    ['overlong clarification question', { type: 'clarification', question: 'x'.repeat(241), choices: [] }],
+    ['too many clarification choices', { type: 'clarification', question: 'Choose a period', choices: ['A', 'B', 'C', 'D', 'E'] }],
+    ['invalid clarification choice', { type: 'clarification', question: 'Choose a period', choices: ['   '] }]
+  ])('rejects malformed assistant widget schema: %s', async (_case, widget) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(assistantEnvelope(widget)), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it.each([
+    ['unknown provider', { provider: 'disabled' }],
+    ['missing model', { model: undefined }],
+    ['blank model', { model: '   ' }],
+    ['overlong model', { model: 'x'.repeat(81) }]
+  ])('rejects invalid assistant provider metadata: %s', async (_case, overrides) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope({ type: 'metric', title: 'Balance', value_paise: 12345 }, overrides)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
