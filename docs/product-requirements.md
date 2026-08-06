@@ -36,7 +36,11 @@ Money trackers fail because recording every payment feels like work. They also c
 2. Know how much money exists across accounts.
 3. Know what was spent, where, how it was paid, and whether it was shared.
 4. Know who owes whom and why.
-5. Ask questions such as “How much did I spend on food?”, “What does each family member owe?”, or “Can I spend ₹10,000 this weekend?”
+5. Ask current-snapshot questions about balances, spending, income, cash flow,
+   shared balances and recent activity.
+6. **Future job:** ask affordability questions such as “Can I spend ₹10,000
+   this weekend?” after budgets, recurring commitments and source-linked
+   evidence exist.
 
 ## 4. Product principles
 
@@ -49,9 +53,9 @@ Money trackers fail because recording every payment feels like work. They also c
 5. **Answers are calculated, not guessed:** the language model interprets the question; database functions calculate the result.
 6. **Private by default:** household data is visible only to authorized members.
 
-## 5. MVP scope
+## 5. Product scope
 
-### P0 — required for first usable release
+### Shipped V1
 
 - Email magic-link authentication.
 - Household creation with zero or more configurable non-login split participants.
@@ -60,21 +64,28 @@ Money trackers fail because recording every payment feels like work. They also c
 - Natural-language debit/credit capture.
 - Parsed review: amount, type, merchant, category, account, date, notes, and split.
 - Manual edit and confirm.
-- Production category suggestion through Gemini, constrained to existing
-  household categories, with manual selection on failure. Merchant-rule-first
-  behavior is currently local/demo only; production integration is planned.
+- Quick Add category selection through Gemini capture output, constrained to
+  existing household categories and surfaced in the unsaved draft, with manual
+  selection on failure. Merchant-rule-first behavior is currently local/demo
+  only; production integration is planned.
 - Dashboard: available balance, month income, month spend, and pending shared balance.
 - Transaction list, search, filters, edit, and soft delete.
-- Equal, percentage, or exact shared split.
+- Equal expense splits across selected participants.
 - Settlement recording.
 - Read-only conversational assistant with approved narratives and safe inline
   metrics, charts and transaction tables; all financial values are calculated
   by server/database code.
-- CSV export and monthly statement CSV import for reconciliation.
-- Installable PWA with an offline draft queue.
+- Installable PWA.
+- Client-side encrypted export plus preview-before-restore recovery.
 
-### P1 — friction reducers after the core is stable
+### Planned next
 
+- Production merchant-rule matching and prospective learning.
+- Percentage and custom per-person split editing.
+- CSV export/import and statement reconciliation.
+- Offline draft queue; offline entries must never become confirmed transactions
+  until synchronized and reviewed.
+- Post-onboarding account, card and participant management.
 - Voice capture: “Paid 850 for dinner from ICICI, shared with two family members.”
 - Favorite one-tap entries such as rent, maid, and groceries.
 - Recurring rules with review reminders.
@@ -84,7 +95,7 @@ Money trackers fail because recording every payment feels like work. They also c
 - Optional WhatsApp Cloud API capture.
 - Budget and unusual-spend alerts.
 
-### Later
+### Future
 
 - V2 member invites so selected family members can sign in, inspect shared items and record settlements.
 - Richer assistant filtering, user-selected date ranges, source-linked evidence
@@ -128,12 +139,18 @@ Draft:
 - Amount: ₹1,840
 - Category: groceries
 - Paid from: HDFC UPI
-- Shared: selected household members, equal or custom amounts
+- Shared: selected household members, split equally in V1
 - Account movement: −₹1,840
 - the user’s spending: ₹920
 - Per-member receivable: calculated from the confirmed split
 
-### Reducing repeated effort
+### Shipped convenience
+
+- When no date is mentioned, review visibly defaults to today. Relative dates
+  such as `yesterday`, `3 days ago`, and explicit unambiguous dates are parsed;
+  Today/Yesterday and a date picker remain one-tap corrections.
+
+### Planned friction reducers
 
 - On the local/demo path, “Reliance Fresh” can learn category `groceries` after
   confirmation; production learning remains planned.
@@ -142,9 +159,6 @@ Draft:
 - Recent merchants and common amounts appear as suggestions, not forced guesses.
 - Recurring items create drafts, not final transactions.
 - CSV import proposes matches and highlights missing transactions instead of duplicating existing ones.
-- When no date is mentioned, the review visibly defaults to today. Relative dates
-  such as `yesterday`, `3 days ago`, and explicit unambiguous dates are parsed;
-  Today/Yesterday and a date picker remain one-tap corrections.
 - When production merchant learning ships, confirmed corrections may update a
   prospective rule and must never rewrite old transactions.
 
@@ -153,11 +167,12 @@ Draft:
 1. **Onboarding:** collect display name, household name, and zero or more family members; add bank/cash/wallet accounts with their current balances; add credit cards with current outstanding, credit limit, statement day and payment due day; review total assets, card liabilities and net opening position. Never collect account numbers, card numbers, PINs, CVVs or OTPs.
 2. **Home:** available money, month spend, shared pending, recent activity, top categories.
 3. **Quick add:** conversational field, parsed draft, uncertainty indicators, confirm.
-4. **Transactions:** searchable ledger with account/category/member/date filters.
+4. **Transactions:** searchable ledger with transaction-type and account filters.
 5. **Ask:** fixed-intent read-only assistant preview with canonical metrics,
    charts, tables and clarification states.
 6. **Family:** per-member net owed/owing, expense details, and settlement actions.
-7. **Settings:** accounts, categories, rules, members, export, delete account.
+7. **Settings:** shipped theme and encrypted recovery controls. Post-onboarding
+   account/category/rule/member management and permanent deletion are planned.
 
 ## 8. Key business rules
 
@@ -222,27 +237,34 @@ drill-down. Those remain explicit future capabilities.
 
 ## 10. Data model
 
+### Shipped V1 entities
+
 - `profiles`: user identity and preferences.
 - `households`: private shared space.
 - `household_members`: member, role, status.
 - `accounts`: name, type, currency, owner, active state.
 - `transactions`: household, account, type, amount, date, merchant, note, source, status.
 - `categories`: household categories and parent category.
-- `transaction_splits`: responsible member, amount or percentage.
+- `transaction_splits`: responsible member and exact integer-paise share; the V1
+  interface derives equal shares across selected participants.
 - `settlements`: from member, to member, amount, linked transaction.
 - `transfer_links`: connects the two sides of account transfers.
 - `merchant_rules`: remembered merchant/category/account defaults.
-- `recurring_rules`: schedule and draft template.
-- `attachments`: receipt reference and OCR status.
 - `audit_events`: who changed what and when.
 
 All money values use integer paise, never floating-point numbers.
 
+### Planned entities
+
+- `recurring_rules`: schedule and draft template.
+- `attachments`: receipt reference and OCR status.
+
 ## 11. Free-first architecture
+
+### Shipped V1 architecture
 
 | Layer | Choice | Why |
 |---|---|---|
-| Product design | Figma Starter | Free personal drafts, components, Auto Layout, clickable prototype |
 | Client | React + TypeScript + Vite PWA | Fast, installable, familiar ecosystem |
 | UI | Tailwind CSS + repository UI components | Accessible controls and quick iteration without an unused framework dependency |
 | Hosting | Vercel Hobby | Two personal projects for the Vite PWA and FastAPI monorepo roots |
@@ -250,14 +272,19 @@ All money values use integer paise, never floating-point numbers.
 | API | Python 3.13 + FastAPI + Pydantic v2 on Vercel | Typed APIs without a minute-long container wake-up |
 | Assistant | Gemini via the official Google SDK, strict Pydantic schemas and server-owned canonical bundles | Fixed-intent read-only preview; exact titles, values, rows, order and cardinality come from bounded database context |
 | Natural-language capture | Gemini via the official Google SDK, grounded in authenticated household context | Strict validated unsaved drafts; preserved text and manual form when interpretation is unavailable |
-| Auto-tagging | Production Gemini suggestion; merchant-rule-first matching remains local/demo pending Supabase integration | Only existing household categories may be selected; manual selection on failure |
-| Voice | Cloudflare Workers AI Whisper, capped | Free allocation is sufficient for a private pilot |
-| OCR | Client-side OCR first | Keeps screenshots private and avoids API cost |
+| Category grounding | Gemini capture plus a bounded standalone API | Server-owned authenticated household categories; standalone API is not called by V1 web |
 | Source + CI | GitHub Free + GitHub Actions | Version control and automated checks |
-| Monitoring | Sentry free tier or structured server logs | Enough for an MVP |
+| Observability | Privacy-filtered Vercel analytics and structured server logs | Current private-pilot visibility without financial payloads |
 | Domain | `*.vercel.app` initially | ₹0; a custom domain is optional and normally paid |
 
-Current free-tier evidence:
+### Planned architecture additions
+
+- Production merchant-rule matching/learning in the Supabase Quick Add path.
+- Voice transcription and on-device OCR.
+- Optional error aggregation beyond the current analytics/server logs.
+- A custom domain only if the owner accepts its cost.
+
+Free-plan reference evidence (does not imply shipped integration):
 
 - [Supabase Free](https://supabase.com/pricing) currently includes 500 MB database, 1 GB storage, 50,000 MAU, and two active free projects; inactive free projects may pause after a week.
 - [Vercel Hobby](https://vercel.com/docs/plans/hobby) supports personal non-commercial projects within included usage limits.
@@ -276,18 +303,24 @@ WhatsApp Business Platform pricing and policies are changing and cannot be treat
 
 ## 12. Security and privacy
 
+### Shipped V1 controls
+
 - Supabase Row Level Security on every household table.
 - Household membership checked server-side for every write and query.
 - Service-role and AI keys only in server-side secrets.
-- Magic links in MVP; passkeys can follow.
+- Magic-link authentication.
 - Raw account numbers and card numbers are never needed or stored.
-- Mask household/member/account names before sending text to an external model where possible.
 - LLM output validated against a strict schema.
-- Rate limit capture and Ask endpoints.
-- Export and permanent-delete flows.
-- Automated database backup export to the owner’s device until managed backups are affordable.
+- Client-side encrypted export plus validated empty-household restore.
 
-## 13. Figma prototype plan
+### Planned security hardening
+
+- Endpoint rate limiting for capture and Ask.
+- Permanent account/data deletion.
+- Automated backup export to the owner's device.
+- Passkeys and stronger masking of model-bound household labels where practical.
+
+## 13. Historical prototype plan (not shipped runtime scope)
 
 Use one Figma Draft file named `Artha — MVP`. Starter is suitable for a personal prototype, but View-seat MCP automation is heavily rate-limited; design work may need to continue manually or after quota renewal.
 
@@ -330,7 +363,7 @@ Prototype these tasks:
 
 > Design a mobile-first personal and shared money tracker named Artha for a configurable household with zero or more family members. Use a calm, trustworthy green-neutral visual system, INR formatting, 390x844 mobile frames, accessible contrast, and bottom navigation: Home, Add, Insights, Family. The primary action is a conversational field labeled “What happened?” that turns “Paid 1840 for groceries from HDFC UPI, split equally with two family members, 3 days ago” into a review card showing debit, amount, groceries, HDFC UPI, date, selected members, account movement, personal expense, and per-member receivables. Never auto-save; include a clear Confirm button and uncertainty states. Create Home with a six-month spending chart, onboarding/opening balances, quick-add text and form modes, parsed review, transactions, family settlement, and correction screens. Also show a read-only assistant chat that can render approved inline charts, cards and transaction tables. Keep the interface compact, friendly, and data-first; avoid crypto visuals and dense finance dashboards.
 
-## 14. Framer’s role
+## 14. Future optional Framer role
 
 Framer is optional and should not be used to build the actual money application. Use its free plan only to test a simple public landing page with:
 
@@ -342,56 +375,38 @@ Framer is optional and should not be used to build the actual money application.
 
 The application itself needs database transactions, authentication, offline behavior, and row-level security, which belong in the React/Supabase build.
 
-## 15. Four-week MVP plan
+## 15. Delivery status
 
-### Week 0 — validate the interaction (2–3 days)
+The original four-week roadmap has been superseded by the explicit
+**Shipped V1**, **Planned next** and **Future** groups in section 5. It must not be
+used as evidence that offline drafts, CSV reconciliation, production merchant
+learning, rate limiting or custom splits have shipped.
 
-- Figma foundation and eight mobile frames.
-- Clickable capture/shared/Ask prototype.
-- Test with the owner first, then validate shared-language clarity with multiple household members.
+## 16. Product contract and remaining acceptance
 
-### Week 1 — trustworthy ledger
+### Implemented V1 contract
 
-- Repo, CI, PWA shell, authentication and the FastAPI service.
-- Accounts, opening balances, transaction model, row-level security.
-- Dashboard and manual transaction entry.
-
-### Week 2 — five-second capture (original roadmap)
-
-- Gemini interpretation, strict draft validation and manual recovery.
-- Review/confirm/edit flow.
-- Merchant memory, categories, recurring favorites.
-- Offline drafts and installation.
-
-### Week 3 — shared money and Ask
-
-- Splits, receivables, settlements.
-- Fixed-intent Ask preview with bounded context and canonical server-owned bundles.
-- CSV export/import and reconciliation.
-
-### Week 4 — hardening and private launch
-
-- Mobile QA, accessibility, error states, audit trail, rate limits.
-- Security review and backup/export test.
-- Deploy the PWA and FastAPI as separate Vercel projects; connect the fresh Supabase project and onboard the user.
-- Observe capture time and missing-transaction rate for two weeks.
-
-## 16. MVP acceptance gate
-
-The MVP is ready only when:
-
-- the owner can sign in and see only their household; multiple participants are represented correctly in shared splits without a V1 login.
 - Opening balances reconcile with dashboard totals.
 - Natural debit, credit, transfer, and shared entries parse into drafts.
 - No transaction is saved without confirmation.
 - Full account movement and personal share are both correct.
-- Editing/deleting a shared expense recalculates all balances atomically.
+- Editing/deleting a shared expense recalculates balances atomically.
 - Settlement does not inflate income or expense.
 - Assistant narratives and canonical bundles match the selected intent and
   bounded server context exactly.
-- CSV export can reconstruct the ledger.
-- Installed PWA works on Android and iPhone; offline entries remain drafts until synced.
-- The service operates at ₹0 within documented quotas, excluding an optional custom domain and WhatsApp.
+- Equal V1 splits are represented through exact integer-paise member shares.
+- Client-side encrypted export/restore preserves the ledger contract.
+
+### Planned acceptance gates
+
+- Prove two independent owners cannot read or write each other's households on
+  the final production domain.
+- Complete final-domain restore into a fresh/empty production household.
+- Validate CSV reconstruction only after CSV export/import ships.
+- Validate offline draft synchronization only after the offline queue ships.
+- Validate percentage/custom split correction only after that UI ships.
+- Continue operating within documented free-plan quotas; a custom domain and
+  messaging integrations remain optional and potentially paid.
 
 ## 17. Product metrics
 

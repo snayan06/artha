@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
   <title id="title">Artha review-before-save architecture</title>
   <desc id="desc">A hand-drawn system diagram showing natural-language input interpreted by Gemini, a required review and confirmation checkpoint before the ledger, manual recovery without guessing, code-owned guardrails, the read-only assistant value flow, and the Vercel, FastAPI, Supabase and Gemini deployment topology.</desc>
   <style>
@@ -34,11 +34,11 @@
       }
     }
     text { font-family: ui-rounded, "SF Pro Rounded", "Segoe UI", Arial, sans-serif; fill: var(--ink); }
-    .title { font-size: 25px; font-weight: 700; }
-    .label { font-size: 18px; font-weight: 700; }
-    .body { font-size: 15px; font-weight: 500; }
-    .small { font-size: 13px; font-weight: 500; fill: var(--muted); }
-    .tiny { font-size: 12px; font-weight: 600; }
+    .title { font-size: 27px; font-weight: 700; }
+    .label { font-size: 20px; font-weight: 700; }
+    .body { font-size: 18px; font-weight: 500; }
+    .small { font-size: 16px; font-weight: 500; fill: var(--muted); }
+    .tiny { font-size: 15px; font-weight: 600; }
     .marker-line { stroke: var(--line); }
     .marker-amber { stroke: var(--amber); }
     .rough { fill: none; stroke: var(--line); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -163,5 +163,6 @@
   <text x="562" y="602" class="body">Supabase Postgres / RLS</text>
   <path d="M475 585 C541 553 733 550 822 584" class="arrow-soft"/>
   <text x="842" y="602" class="body">Gemini</text>
-  <text x="944" y="602" class="small">AI never connects to the ledger</text>
+  <text x="946" y="591" class="small">AI never connects</text>
+  <text x="946" y="612" class="small">to the ledger</text>
 </svg>

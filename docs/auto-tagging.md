@@ -13,11 +13,14 @@ draft. If interpretation is unavailable or invalid, category selection remains
 manual.
 
 The standalone `POST /api/v1/assistant/tag-suggestion` endpoint is a bounded
-Gemini API contract: it accepts minimum merchant/description context, permits
-only an exact existing category and returns no suggestion when the model is
-missing, unavailable or invalid. The V1 web application does not call this
-endpoint, so its result must not be described as part of the web review flow.
-Neither path creates a fallback category.
+Gemini API contract. The caller sends only description, amount and direction;
+it cannot supply a category allow-list. FastAPI loads up to 200 active categories
+from the authenticated household, keeps only categories eligible for the
+transaction direction, and accepts only an exact ID/name pair from that set.
+The endpoint returns no suggestion when the model is missing, unavailable or
+invalid. The V1 web application does not call this endpoint, so its result must
+not be described as part of the web review flow. Neither path creates a fallback
+category.
 
 Only explicit transaction confirmation can save the reviewed draft.
 
@@ -33,36 +36,36 @@ Production Supabase integration for matching and learning these rules is
 planned. Until it ships, rule-first categorization must not be presented as a
 production capability.
 
-## Model input
+## Production API contract
 
-The model receives only the minimum needed fields:
+Request body:
+
+```json
+{"description":"weekly groceries at reliance fresh","amount_paise":184000,"direction":"expense"}
+```
+
+Successful response envelope:
 
 ```json
 {
-  "merchant": "reliance fresh",
-  "description": "weekly groceries",
-  "direction": "expense",
-  "amount_paise": 184000,
-  "allowed_categories": ["Groceries", "Dining", "Transport", "Utilities"]
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "mode": "model",
+  "result": {
+    "category_id": "<existing-household-category-id>",
+    "category_name": "Groceries",
+    "confidence": 0.96,
+    "reason": "The description indicates a grocery purchase."
+  }
 }
 ```
 
-It does not receive account numbers, card numbers, database credentials or raw
-household history.
+The API rejects caller-supplied extra fields, unknown/mismatched categories,
+malformed model output and out-of-range confidence. It does not receive account
+numbers, card numbers, database credentials or raw household history.
 
-## Model output
-
-```json
-{
-  "category": "Groceries",
-  "confidence": 0.96,
-  "reason": "The merchant is a grocery retailer."
-}
-```
-
-The API rejects unknown categories, malformed JSON, and out-of-range confidence.
-A high-confidence result is preselected but remains an unsaved draft. A lower
-confidence result is presented as a suggestion or clarification question.
+The internal local/demo assistant contract may accept an explicit category
+allow-list for isolated tests. That is not the public production request schema.
 
 ## Learning contract
 
@@ -75,11 +78,11 @@ preview and confirmation workflow.
 ## Provider behavior
 
 The production private pilot uses `gemini-3.5-flash-lite` through Google's
-official SDK. Gemini receives an allow-list and may select only an existing
-category. When it is missing, rate-limited, unavailable or invalid, Artha leaves
-the category for manual selection without blocking transaction entry. Explicit
-Ollama selection may be used in local development, but it is not a production
-provider or recovery path.
+official SDK. For the standalone endpoint, server code supplies the authenticated
+household category allow-list to Gemini. When Gemini is missing, rate-limited,
+unavailable or invalid, no category is selected. Explicit Ollama selection may
+be used in local development, but it is not a production provider or recovery
+path.
 
 Gemini requests use `store=false`; provider storage does not replace Artha's
 household-scoped, consent-controlled audit design.

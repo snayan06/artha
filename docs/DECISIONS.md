@@ -28,29 +28,24 @@ The assistant cannot alter the ledger or render arbitrary model code.
 
 **Decision date:** 7 August 2026
 
-The production private pilot uses `gemini-3.5-flash-lite` through Google's
-official server-side SDK for natural-language capture, allow-listed category
-suggestions and the read-only assistant. One hosted path keeps deployment,
-privacy review and failure handling explicit, while strict schemas performed
-well across the fictional capture, tagging and assistant gates.
+**Decision:** Use Gemini as the only hosted production LLM for the private
+pilot. Keep explicit Ollama selection development-only.
 
-Gemini interpretation never writes the ledger. Capture output must pass schema,
-household allow-list, integer-paise and split validation before it becomes an
-unsaved review draft; only explicit confirmation writes. If interpretation is
-unavailable or invalid, Artha preserves the exact text and opens the manual form
-without guessing.
+**Rationale:** One hosted path keeps deployment, privacy review and failure
+handling explicit. Gemini passed the fictional capture, tagging and assistant
+schema gates while preserving Artha's review-before-write boundary.
 
-Merchant-rule-first matching and learning remain available in the local
-SQLAlchemy demo path. Production Supabase Quick Add and category suggestion call
-Gemini directly today; production merchant-rule integration is planned. Gemini
-may select only an existing category, and failure leaves the choice to the user.
+**Consequences:** Model output remains untrusted and fail-closed. Capture can
+create only a validated unsaved draft; category suggestions must match
+server-owned authenticated household categories; assistant output must equal an
+intent's canonical server-owned bundle. Unavailable or invalid output never
+creates a guessed ledger fact or fabricated answer. Production merchant-rule
+integration remains planned.
 
-For the assistant, server code owns the bounded context and exact canonical
-bundle for every supported intent. Gemini selects an intent and must copy its
-approved narrative and bundle without changing titles, labels, values, rows,
-points, order or cardinality. Invalid or unavailable output produces a sanitized
-`503`, not a fabricated answer. An explicitly configured Ollama adapter may be
-used for local development only and is not part of the production decision.
+Mutable provider configuration, bounded contexts and failure flows belong in
+the [system architecture](system-architecture.md) and
+[LLM usage map](artifacts/architecture/v1-llm-usage-map.md), not this decision
+record.
 
 ## ADR-007: Vercel Hobby and Supabase Free for the private pilot
 

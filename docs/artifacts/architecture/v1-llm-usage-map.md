@@ -8,7 +8,7 @@ Status: Gemini production paths implemented and deployed for the private pilot
 | Feature | Gemini job | Code-owned boundary | Failure behavior | May write? |
 | --- | --- | --- | --- | --- |
 | Quick Add | Interpret authenticated natural text into a proposed structured draft | Strict Pydantic schema; account/member/category allow-lists; integer paise; date and split validation | Preserve exact text and open the manual form | No |
-| Auto-tagging | Suggest one existing category | Production calls Gemini directly; returned category ID must already belong to the household | Leave category for manual selection | No |
+| Auto-tagging | Suggest one existing category | Caller supplies description/amount/direction only; server loads up to 200 authenticated household categories and validates the returned ID/name pair | Return no suggestion | No |
 | Assistant | Select a supported intent and copy its exact approved narrative/widget bundle | Server owns titles, labels, values, rows, points, order and cardinality; strict equality validation; React-owned rendering | Sanitized `503` and honest UI error | No |
 
 The current pilot configuration is `gemini-3.5-flash-lite`, called server-side
@@ -43,10 +43,14 @@ and transfer direction. It may not invent an account, member or category,
 calculate an authoritative balance, bypass confirmation or alter the ledger.
 Production recovery never substitutes the local demo/evaluation parser.
 
-Production Quick Add and production tag suggestion currently call Gemini without
-loading `merchant_rules`. Merchant-rule-first matching and prospective learning
-exist on the local SQLAlchemy demo path; Supabase production integration remains
-planned.
+Production Quick Add and production tag suggestion call Gemini without loading
+`merchant_rules`. For the standalone tag endpoint, FastAPI—not the caller—loads
+up to 200 active, direction-eligible categories from the authenticated household
+and supplies that allow-list to the model. The V1 web app does not call this
+endpoint; its Quick Add category is separate capture output. Merchant-rule-first
+matching and prospective learning exist on the local SQLAlchemy demo path;
+Supabase production integration remains planned. An explicit allow-list remains
+available only to the internal local/demo contract for isolated testing.
 
 ## Assistant value flow
 

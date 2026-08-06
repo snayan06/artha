@@ -86,7 +86,7 @@ the assistant shows an honest error when its model is unavailable.
 - Installable React and TypeScript PWA with responsive bottom navigation.
 - Dashboard balances, six-month cash-flow chart and recent activity.
 - First-run setup for multiple bank, cash, wallet and credit-card accounts.
-- Configurable household participants and exact per-person expense splits.
+- Equal expense splits across the selected household participants.
 - Read-only Gemini assistant with safe inline metrics, charts and tables.
 - Light, dark and system theme support across mobile and desktop.
 
@@ -250,7 +250,7 @@ Previous release evidence (recorded before the current documentation pass):
 | `GET` | `/api/v1/shared-balances` | Per-member receivables and payables |
 | `GET` | `/api/v1/assistant/status` | Report configured assistant provider without exposing secrets |
 | `POST` | `/api/v1/assistant/chat` | Return validated read-only cards, charts or tables |
-| `POST` | `/api/v1/assistant/tag-suggestion` | Suggest an allow-listed category without saving it |
+| `POST` | `/api/v1/assistant/tag-suggestion` | Bounded server-grounded category API; not called by V1 web |
 | `GET` | `/api/v1/recovery/export` | Export the authenticated household bundle for client-side encryption |
 | `POST` | `/api/v1/recovery/preview` | Validate and summarize a decrypted bundle without writing it |
 | `POST` | `/api/v1/recovery/restore` | Atomically restore a validated bundle into a fresh/empty household |

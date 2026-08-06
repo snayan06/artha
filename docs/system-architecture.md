@@ -75,11 +75,13 @@ recovery, and nothing is saved.
 
 Production Quick Add currently asks Gemini to select from existing household
 categories as part of capture; it does not load or apply `merchant_rules`.
-Likewise, the production tag-suggestion endpoint asks Gemini directly and leaves
-selection to the user when the response is unavailable or invalid. The local
-SQLAlchemy demo path can match and learn merchant rules before model suggestion.
-Connecting that learned rule behavior to Supabase production capture is planned,
-not a live production claim.
+The standalone production tag-suggestion endpoint accepts only description,
+amount and direction; FastAPI loads up to 200 active, direction-eligible
+categories from the authenticated household and supplies that allow-list to
+Gemini. The V1 web app does not call this endpoint. The local SQLAlchemy demo
+path can match and learn merchant rules before model suggestion. Connecting that
+learned rule behavior to Supabase production capture is planned, not a live
+production claim.
 
 ## Assistant and generative UI
 
@@ -128,8 +130,8 @@ Important V1 routes include:
 - `GET /api/v1/shared-balances`: calculate participant receivables/payables.
 - `POST /api/v1/assistant/chat`: return a validated read-only narrative/widget
   response or sanitized unavailability.
-- `POST /api/v1/assistant/tag-suggestion`: suggest an existing allow-listed
-  category without saving it.
+- `POST /api/v1/assistant/tag-suggestion`: bounded server-grounded category API;
+  it is not called by V1 web.
 - Recovery export, preview and restore routes: protect client-side encrypted,
   explicit recovery operations.
 
