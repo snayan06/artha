@@ -18,6 +18,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   const [error, setError] = useState('')
   const [usedFallback, setUsedFallback] = useState(false)
   const [accounts, setAccounts] = useState<LedgerAccount[]>([])
+  const accountsRef = useRef<LedgerAccount[]>([])
   const confirmationAttempt = useRef<{ fingerprint: string; key: string } | null>(null)
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null)
   const manualRecoveryFocusPending = useRef(false)
@@ -25,6 +26,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
   useEffect(() => {
     void getAccounts().then((loadedAccounts) => {
+      accountsRef.current = loadedAccounts
       setAccounts(loadedAccounts)
       setDraft((current) => current && current.sourceAccountId === undefined && loadedAccounts[0]
         ? { ...current, account: loadedAccounts[0].name, sourceAccountId: loadedAccounts[0].id }
@@ -99,7 +101,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   }
 
   function startManualEntry(sourceText = '') {
-    const firstAccount = accounts[0]
+    const firstAccount = accountsRef.current[0]
     setDraft({ kind: 'debit', amountPaise: 0, merchant: '', category: 'Other', account: firstAccount?.name ?? 'Primary account', sourceAccountId: firstAccount?.id, occurredAt: localDateOffset(0), note: '', memberSplits: [], confidence: 'review', sourceText })
     setUsedFallback(false)
     setError('')

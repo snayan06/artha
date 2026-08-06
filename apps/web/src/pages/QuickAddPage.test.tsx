@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../lib/api'
@@ -113,6 +113,54 @@ describe('QuickAddPage', () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
     expect(onConfirm.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       sourceAccountId: 'account-1',
+      sourceText
+    }))
+  })
+
+  it('uses accounts that load before an in-flight capture becomes unavailable', async () => {
+    const user = userEvent.setup()
+    const sourceText = '  Paid 450 for lunch  '
+    let resolveAccounts!: (accounts: LedgerAccount[]) => void
+    const accountsPromise = new Promise<LedgerAccount[]>((resolve) => {
+      resolveAccounts = resolve
+    })
+    let rejectParse!: (reason?: unknown) => void
+    const parsePromise = new Promise<Awaited<ReturnType<typeof api.parseDraft>>>((_, reject) => {
+      rejectParse = reject
+    })
+    vi.spyOn(api, 'getAccounts').mockReturnValue(accountsPromise)
+    const parseSpy = vi.spyOn(api, 'parseDraft').mockReturnValue(parsePromise)
+    const onConfirm = vi.fn().mockResolvedValue({
+      id: 'loaded-before-recovery', kind: 'debit', amountPaise: 45_000, personalSharePaise: 45_000,
+      merchant: 'Lunch', category: 'Other', account: 'HDFC', occurredAt: localDateOffset(0),
+      memberSplits: [], status: 'confirmed'
+    } satisfies Transaction)
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), sourceText)
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await waitFor(() => expect(parseSpy).toHaveBeenCalledWith(sourceText, []))
+
+    await act(async () => {
+      resolveAccounts([{ id: 'account-2', name: 'HDFC', kind: 'bank' }])
+      await accountsPromise
+    })
+    await act(async () => {
+      rejectParse(new api.CaptureDraftUnavailableError(sourceText))
+      await Promise.resolve()
+    })
+
+    await screen.findByRole('alert')
+    expect(screen.getByRole('combobox', { name: 'Paid from account' })).toHaveDisplayValue('HDFC')
+    await user.type(screen.getByLabelText('Amount in rupees'), '450')
+    await user.type(screen.getByLabelText('Description'), 'Lunch')
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    expect(confirmButton).toBeEnabled()
+    await user.click(confirmButton)
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    expect(onConfirm.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      sourceAccountId: 'account-2',
       sourceText
     }))
   })
