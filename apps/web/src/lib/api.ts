@@ -7,6 +7,8 @@ const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'
 const TIMEOUT_MS = 10_000
 const RETRY_DELAY_MS = 250
 const TRANSIENT_STATUSES = new Set([502, 503, 504])
+const ASSISTANT_INTENTS = new Set(['summary', 'spending', 'income', 'cashflow', 'shared', 'transactions', 'clarification', 'unsupported'])
+const ASSISTANT_WIDGET_TYPES = new Set(['metric', 'chart', 'table', 'insight', 'clarification'])
 const RETRYABLE_POST_PATHS = new Set([
   '/api/v1/drafts/parse',
   '/api/v1/assistant/chat'
@@ -415,18 +417,33 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
     method: 'POST',
     body: JSON.stringify({ message })
   })
-  if (!response.result || typeof response.result !== 'object' || Array.isArray(response.result)) {
-    throw new Error('Assistant response did not include a valid result object.')
+  if (response.mode !== 'model' || !response.result || typeof response.result !== 'object' || Array.isArray(response.result)) {
+    throw new Error('Assistant response was invalid.')
   }
   const result = response.result as JsonObject
+  const rawWidgets = result.widgets
+  const rawMessage = result.message
+  const intent = safeText(result.intent)
+  if (
+    !ASSISTANT_INTENTS.has(intent)
+    || !Array.isArray(rawWidgets)
+    || rawWidgets.length < 1
+    || rawWidgets.length > 5
+    || rawWidgets.some((widget) => !widget || typeof widget !== 'object' || Array.isArray(widget) || !ASSISTANT_WIDGET_TYPES.has(safeText((widget as JsonObject).type)))
+    || typeof rawMessage !== 'string'
+  ) {
+    throw new Error('Assistant response was invalid.')
+  }
+  const assistantMessage = rawMessage.trim().replace(/\s+/g, ' ')
+  if (!assistantMessage || assistantMessage.length > 400) throw new Error('Assistant response was invalid.')
+  const widgets = mapAssistantWidgets(rawWidgets)
+  if (widgets.length !== rawWidgets.length) throw new Error('Assistant response was invalid.')
   const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
   const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
   const model = safeText(response.model, '', 80)
-  const assistantMessage = safeText(result.message, '', 400)
-  if (!assistantMessage.trim()) throw new Error('Assistant response did not include a valid model message.')
   return {
     message: assistantMessage,
-    widgets: mapAssistantWidgets(result.widgets),
+    widgets,
     provider: model ? `${provider} · ${model}` : provider
   }
 }

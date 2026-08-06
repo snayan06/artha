@@ -169,6 +169,50 @@ def test_assistant_completion_accepts_a_400_character_model_message() -> None:
     assert len(completion.message) == 400
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Your balance is 99 crore.",
+        "Your balance is ₹crore.",
+        "Your balance is $high.",
+        "Your balance is €high.",
+        "Your balance is £high.",
+        "Your savings rate is %high.",
+    ],
+)
+def test_assistant_completion_rejects_numeric_or_financial_symbols(
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        AssistantCompletion(
+            message=message,
+            intent=AssistantIntent.SUMMARY,
+            widgets=[
+                MetricWidget(
+                    type="metric",
+                    title="Available balance",
+                    value_paise=1_500_000,
+                )
+            ],
+        )
+
+
+def test_assistant_completion_accepts_normalized_qualitative_message() -> None:
+    completion = AssistantCompletion(
+        message="  Your   current balance is shown below.  ",
+        intent=AssistantIntent.SUMMARY,
+        widgets=[
+            MetricWidget(
+                type="metric",
+                title="Available balance",
+                value_paise=1_500_000,
+            )
+        ],
+    )
+
+    assert completion.message == "Your current balance is shown below."
+
+
 @pytest.mark.asyncio
 async def test_disabled_assistant_is_unavailable(
     financial_context: AssistantFinancialContext,
@@ -233,6 +277,10 @@ async def test_gemini_uses_private_stateless_structured_output(
     assert "cashflow comparison must use a chart" in normalized_prompt
     assert "one concise plain-language message" in normalized_prompt
     assert "financial numbers only in allow-listed widgets" in normalized_prompt
+    assert (
+        "must contain no amounts, dates, percentages, numeric digits, or currency symbols"
+        in normalized_prompt
+    )
     assert "tools" not in body
 
 

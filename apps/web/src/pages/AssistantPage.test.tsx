@@ -106,4 +106,17 @@ describe('AssistantPage generated UI', () => {
     expect(screen.getByRole('button', { name: 'Send question' })).toBeDisabled()
     expect(chatAssistant).not.toHaveBeenCalled()
   })
+
+  it('disables the textarea while an assistant request is pending', async () => {
+    vi.mocked(chatAssistant).mockReturnValue(new Promise(() => undefined))
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+    const input = screen.getByLabelText('Ask Artha')
+
+    await user.type(input, 'Show my balance')
+    await user.click(screen.getByRole('button', { name: 'Send question' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Reviewing your ledger…')
+    expect(input).toBeDisabled()
+  })
 })

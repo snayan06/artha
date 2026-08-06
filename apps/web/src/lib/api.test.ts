@@ -252,12 +252,11 @@ describe('FastAPI adapter', () => {
   it('maps only approved assistant widgets from the strict API response', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      provider: 'gemini', model: 'gemini-3.5-flash-lite',
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
       result: { message: 'Your spending view is ready.', intent: 'spending', widgets: [
         { type: 'metric', title: 'Spend', value_paise: 12345, caption: 'This month', tone: 'neutral' },
         { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Aug', value_paise: 5000 }] },
-        { type: 'clarification', question: 'Which period?', choices: ['This month'] },
-        { type: 'html', content: '<img src=x onerror=alert(1)>' }
+        { type: 'clarification', question: 'Which period?', choices: ['This month'] }
       ] }
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
@@ -275,7 +274,7 @@ describe('FastAPI adapter', () => {
   it('rejects a successful response without a model-written assistant message', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      provider: 'gemini', model: 'gemini-3.5-flash-lite',
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
       result: {
         intent: 'summary',
         widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }]
@@ -283,7 +282,7 @@ describe('FastAPI adapter', () => {
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
     const { chatAssistant } = await import('./api')
 
-    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response did not include a valid model message')
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
   })
 
   it('rejects a legacy top-level assistant payload without a result envelope', async () => {
@@ -291,12 +290,65 @@ describe('FastAPI adapter', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       provider: 'gemini',
       model: 'gemini-3.5-flash-lite',
+      mode: 'model',
       message: 'Legacy top-level model copy.',
       widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }]
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
     const { chatAssistant } = await import('./api')
 
-    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response did not include a valid result object')
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it.each([
+    ['missing mode', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite',
+      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['deterministic mode', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'deterministic_fallback',
+      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['missing intent', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['unknown intent', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', intent: 'forecast', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['missing widgets', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', intent: 'summary' }
+    }],
+    ['empty widgets', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [] }
+    }],
+    ['overlong message', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'x'.repeat(401), intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['unknown widget', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'html', content: '<b>unsafe</b>' }] }
+    }],
+    ['legacy widget alias', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'bar_chart', title: 'Trend', data: [{ label: 'Now', value: 1 }] }] }
+    }],
+    ['invalid chart widget', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Your balance is shown below.', intent: 'summary', widgets: [{ type: 'chart', title: 'Trend', chart_type: 'line', points: [] }] }
+    }]
+  ])('rejects an invalid assistant envelope with %s', async (_case, payload) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
   })
 
   it('propagates assistant provider failures in demo mode without fabricating local widgets', async () => {

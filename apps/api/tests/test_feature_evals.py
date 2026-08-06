@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from artha_api.assistant import (
     AssistantCompletion,
@@ -195,6 +196,22 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
     wrong = score_assistant_case(case, wrong_number)
     assert wrong.passed is False
     assert wrong.numeric_mismatch is True
+
+
+def test_assistant_eval_rejects_numeric_prose_before_scoring() -> None:
+    # Schema validation rejects unsafe model prose before the scoring layer receives it.
+    with pytest.raises(ValidationError):
+        AssistantCompletion(
+            message="Your available balance is 15000.",
+            intent=AssistantIntent.SUMMARY,
+            widgets=[
+                MetricWidget(
+                    type="metric",
+                    title="Balance",
+                    value_paise=1_500_000,
+                )
+            ],
+        )
 
 
 def test_decision_rejects_any_safety_failure_and_requires_full_coverage() -> None:
