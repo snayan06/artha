@@ -28,6 +28,8 @@ from artha_api.assistant import (
     MetricWidget,
     TagCategory,
     TagSuggestionRequest,
+    _allowed_widgets_for_intent,
+    _ground_completion,
 )
 
 
@@ -111,7 +113,8 @@ def financial_context() -> AssistantFinancialContext:
         current_month_spend_paise=250_000,
         current_month_income_paise=800_000,
         member_balances=[
-            ContextMemberBalance(member_name="Avery", balance_paise=40_000)
+            ContextMemberBalance(member_name="Avery", balance_paise=40_000),
+            ContextMemberBalance(member_name="Blair", balance_paise=-15_000),
         ],
         top_categories=[ContextCategory(category="Food", amount_paise=120_000)],
         monthly=[ContextMonth(month="Aug", income_paise=800_000, spend_paise=250_000)],
@@ -123,6 +126,147 @@ def financial_context() -> AssistantFinancialContext:
                 category="Food",
             )
         ],
+    )
+
+
+def canonical_widgets(
+    intent: AssistantIntent,
+    context: AssistantFinancialContext,
+) -> list[dict[str, object]]:
+    bundles: dict[AssistantIntent, list[dict[str, object]]] = {
+        AssistantIntent.SUMMARY: [
+            {
+                "type": "metric",
+                "title": "Total account balance",
+                "value_paise": context.total_balance_paise,
+                "caption": None,
+                "tone": "neutral",
+            },
+            {
+                "type": "metric",
+                "title": "Spending this month",
+                "value_paise": context.current_month_spend_paise,
+                "caption": None,
+                "tone": "warning",
+            },
+            {
+                "type": "metric",
+                "title": "Income this month",
+                "value_paise": context.current_month_income_paise,
+                "caption": None,
+                "tone": "positive",
+            },
+        ],
+        AssistantIntent.SPENDING: [
+            {
+                "type": "metric",
+                "title": "Spending this month",
+                "value_paise": context.current_month_spend_paise,
+                "caption": None,
+                "tone": "warning",
+            },
+            {
+                "type": "chart",
+                "title": "Top spending categories",
+                "chart_type": "bar",
+                "points": [
+                    {"label": item.category, "value_paise": item.amount_paise}
+                    for item in context.top_categories
+                ],
+            },
+        ],
+        AssistantIntent.INCOME: [
+            {
+                "type": "metric",
+                "title": "Income this month",
+                "value_paise": context.current_month_income_paise,
+                "caption": None,
+                "tone": "positive",
+            }
+        ],
+        AssistantIntent.CASHFLOW: [
+            {
+                "type": "chart",
+                "title": "Monthly income",
+                "chart_type": "line",
+                "points": [
+                    {"label": item.month, "value_paise": item.income_paise}
+                    for item in context.monthly
+                ],
+            },
+            {
+                "type": "chart",
+                "title": "Monthly spending",
+                "chart_type": "line",
+                "points": [
+                    {"label": item.month, "value_paise": item.spend_paise}
+                    for item in context.monthly
+                ],
+            },
+        ],
+        AssistantIntent.SHARED: [
+            {
+                "type": "table",
+                "title": "Household balances",
+                "rows": [
+                    {
+                        "label": item.member_name,
+                        "amount_paise": item.balance_paise,
+                        "date": None,
+                        "kind": None,
+                    }
+                    for item in context.member_balances
+                ],
+            }
+        ],
+        AssistantIntent.TRANSACTIONS: [
+            {
+                "type": "table",
+                "title": "Recent activity",
+                "rows": [
+                    {
+                        "label": item.category,
+                        "amount_paise": item.personal_share_paise,
+                        "date": item.occurred_on,
+                        "kind": item.kind,
+                    }
+                    for item in context.recent_transactions
+                ],
+            }
+        ],
+        AssistantIntent.CLARIFICATION: [
+            {
+                "type": "clarification",
+                "question": "What would you like to review?",
+                "choices": [
+                    "Account balance",
+                    "Monthly spending",
+                    "Income",
+                    "Shared balances",
+                ],
+            }
+        ],
+        AssistantIntent.UNSUPPORTED: [
+            {
+                "type": "clarification",
+                "question": "Would you like to review your ledger instead?",
+                "choices": ["Account balance", "Monthly spending", "Recent activity"],
+            }
+        ],
+    }
+    return bundles[intent]
+
+
+def completion_with_widgets(
+    intent: AssistantIntent,
+    widgets: list[dict[str, object]],
+) -> AssistantCompletion:
+    return AssistantCompletion.model_validate(
+        {
+            "message": ASSISTANT_INTENT_MESSAGES[intent],
+            "intent": intent,
+            "widgets": widgets,
+        }
     )
 
 
@@ -281,15 +425,7 @@ async def test_gemini_uses_private_stateless_structured_output(
     completion = {
         "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
         "intent": "spending",
-        "widgets": [
-            {
-                "type": "metric",
-                "title": "Spending this month",
-                "value_paise": 250000,
-                "caption": None,
-                "tone": "neutral",
-            }
-        ],
+        "widgets": canonical_widgets(AssistantIntent.SPENDING, financial_context),
     }
     gemini = FakeGeminiClient(json.dumps(completion))
 
@@ -319,6 +455,8 @@ async def test_gemini_uses_private_stateless_structured_output(
     for intent, message in ASSISTANT_INTENT_MESSAGES.items():
         assert f'intent={intent.value}: message="{message.casefold()}"' in normalized_prompt
     assert "tools" not in body
+    assert "Allowed widget bundles by intent" in body["input"]
+    assert '"spending":[{"type":"metric","title":"Spending this month"' in body["input"]
 
 
 @pytest.mark.parametrize(
@@ -385,55 +523,348 @@ async def test_chat_rejects_ungrounded_model_widgets(
         await assistant.chat("Show my ledger", financial_context)
 
 
-@pytest.mark.parametrize(
-    "widget",
-    [
-        {"type": "metric", "title": "Balance", "value_paise": 1_500_000},
-        {
-            "type": "chart",
-            "title": "Grounded chart",
-            "chart_type": "bar",
-            "points": [
-                {"label": "Food", "value_paise": 120_000},
-                {"label": "Aug", "value_paise": 800_000},
-            ],
-        },
-        {
-            "type": "table",
-            "title": "Grounded table",
-            "rows": [
-                {"label": "Avery", "amount_paise": 40_000},
-                {
-                    "label": "Food",
-                    "amount_paise": 42_000,
-                    "date": "2026-08-04",
-                    "kind": "expense",
-                },
-            ],
-        },
-    ],
-)
-@pytest.mark.asyncio
-async def test_chat_accepts_server_grounded_model_widgets(
-    widget: dict[str, object],
+@pytest.mark.parametrize("intent", list(AssistantIntent))
+def test_grounding_accepts_the_exact_canonical_bundle_for_every_intent(
+    intent: AssistantIntent,
     financial_context: AssistantFinancialContext,
 ) -> None:
-    completion = {
-        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
-        "intent": "summary",
-        "widgets": [widget],
-    }
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(
-            provider=LlmProvider.GEMINI,
-            gemini_api_key="gemini-test-key",
+    completion = completion_with_widgets(
+        intent,
+        canonical_widgets(intent, financial_context),
+    )
+    allowed = _allowed_widgets_for_intent(intent, financial_context)
+
+    assert [item.model_dump(mode="json") for item in allowed] == canonical_widgets(
+        intent, financial_context
+    )
+    assert _ground_completion(completion, financial_context) is completion
+
+
+@pytest.mark.parametrize(
+    ("intent", "widgets"),
+    [
+        (
+            AssistantIntent.SUMMARY,
+            [
+                {
+                    "type": "metric",
+                    "title": "Total account balance",
+                    "value_paise": 250_000,
+                    "tone": "neutral",
+                },
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 1_500_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "tone": "positive",
+                },
+            ],
         ),
-        gemini_client=FakeGeminiClient(json.dumps(completion)),
+        (
+            AssistantIntent.INCOME,
+            [
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "caption": "Invented caption",
+                    "tone": "positive",
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Renamed categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                        {"label": "Bills", "value_paise": 50_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SHARED,
+            [
+                {
+                    "type": "table",
+                    "title": "Renamed balances",
+                    "rows": [
+                        {"label": "Avery", "amount_paise": 40_000},
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                        {"label": "Bills", "value_paise": 50_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.TRANSACTIONS,
+            [
+                {
+                    "type": "table",
+                    "title": "Recent activity",
+                    "rows": [
+                        {
+                            "label": "Food",
+                            "amount_paise": 42_000,
+                            "date": "2026-08-04",
+                            "kind": "expense",
+                        },
+                        {
+                            "label": "Food",
+                            "amount_paise": 42_000,
+                            "date": "2026-08-04",
+                            "kind": "expense",
+                        },
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SHARED,
+            [
+                {
+                    "type": "table",
+                    "title": "Household balances",
+                    "rows": [{"label": "Avery", "amount_paise": 40_000}],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Bills", "value_paise": 50_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                        {"label": "Food", "value_paise": 120_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SHARED,
+            [
+                {
+                    "type": "table",
+                    "title": "Household balances",
+                    "rows": [
+                        {"label": "Blair", "amount_paise": -15_000},
+                        {"label": "Avery", "amount_paise": 40_000},
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Aug", "value_paise": 800_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SUMMARY,
+            [
+                {
+                    "type": "metric",
+                    "title": "Total account balance",
+                    "value_paise": 1_500_000,
+                    "tone": "neutral",
+                }
+            ],
+        ),
+        (
+            AssistantIntent.INCOME,
+            [
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "tone": "positive",
+                },
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "tone": "positive",
+                },
+            ],
+        ),
+        (
+            AssistantIntent.CASHFLOW,
+            [
+                {
+                    "type": "chart",
+                    "title": "Monthly cash flow",
+                    "chart_type": "line",
+                    "points": [
+                        {"label": "Jul", "value_paise": 750_000},
+                        {"label": "Jul", "value_paise": 300_000},
+                        {"label": "Aug", "value_paise": 800_000},
+                        {"label": "Aug", "value_paise": 250_000},
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.CLARIFICATION,
+            [
+                {
+                    "type": "clarification",
+                    "question": "Tell me anything.",
+                    "choices": ["Everything"],
+                }
+            ],
+        ),
+    ],
+)
+def test_grounding_rejects_semantic_widget_mutations(
+    intent: AssistantIntent,
+    widgets: list[dict[str, object]],
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = completion_with_widgets(intent, widgets)
+
+    with pytest.raises(ValueError, match="canonical bundle"):
+        _ground_completion(completion, financial_context)
+
+
+@pytest.mark.parametrize(
+    ("intent", "question"),
+    [
+        (
+            AssistantIntent.SHARED,
+            "No household balances are available. What would you like to review?",
+        ),
+        (
+            AssistantIntent.TRANSACTIONS,
+            "No recent activity is available. What would you like to review?",
+        ),
+    ],
+)
+def test_empty_context_uses_exact_safe_clarification_bundle(
+    intent: AssistantIntent,
+    question: str,
+    financial_context: AssistantFinancialContext,
+) -> None:
+    empty_context = financial_context.model_copy(
+        update={
+            "member_balances": []
+            if intent is AssistantIntent.SHARED
+            else financial_context.member_balances,
+            "recent_transactions": []
+            if intent is AssistantIntent.TRANSACTIONS
+            else financial_context.recent_transactions,
+        }
+    )
+    completion = completion_with_widgets(
+        intent,
+        [
+            {
+                "type": "clarification",
+                "question": question,
+                "choices": ["Account balance", "Monthly spending"],
+            }
+        ],
     )
 
-    response = await assistant.chat("Show my ledger", financial_context)
+    assert _ground_completion(completion, empty_context) is completion
 
-    assert response.result.widgets[0].model_dump(mode="json", exclude_defaults=True) == widget
+
+def test_shared_bundle_includes_all_twenty_bounded_context_members(
+    financial_context: AssistantFinancialContext,
+) -> None:
+    context = financial_context.model_copy(
+        update={
+            "member_balances": [
+                ContextMemberBalance(member_name=f"Member {index}", balance_paise=index)
+                for index in range(20)
+            ]
+        }
+    )
+
+    widgets = _allowed_widgets_for_intent(AssistantIntent.SHARED, context)
+
+    assert len(widgets) == 1
+    assert len(widgets[0].model_dump(mode="json")["rows"]) == 20
 
 
 @pytest.mark.asyncio
@@ -595,15 +1026,7 @@ async def test_gemini_failure_can_use_opt_in_ollama_fallback(
         completion = {
             "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SHARED],
             "intent": "shared",
-            "widgets": [
-                {
-                    "type": "metric",
-                    "title": "Shared balance",
-                    "value_paise": 40000,
-                    "caption": None,
-                    "tone": "neutral",
-                }
-            ],
+            "widgets": canonical_widgets(AssistantIntent.SHARED, financial_context),
         }
         return httpx.Response(
             200,

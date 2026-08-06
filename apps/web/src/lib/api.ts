@@ -211,7 +211,7 @@ function parseAssistantWidget(raw: unknown): AssistantWidget | null {
       || !isBoundedText(raw.title, 80)
       || !Array.isArray(raw.rows)
       || raw.rows.length < 1
-      || raw.rows.length > 12
+      || raw.rows.length > 20
     ) return null
     const rows = raw.rows.flatMap((row) => {
       if (

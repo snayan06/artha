@@ -200,6 +200,68 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
 
 
 @pytest.mark.parametrize(
+    "values",
+    [
+        (1, 2, 3, 3),
+        (1, 2),
+        (3, 2, 1),
+    ],
+)
+def test_assistant_scoring_requires_exact_value_order_and_multiplicity(
+    values: tuple[int, ...],
+) -> None:
+    case = AssistantEvalCase(
+        id="AST-ORDER",
+        message="Overview",
+        expected_intent="summary",
+        required_widget_types=("metric", "metric", "metric"),
+        expected_values_paise=(1, 2, 3),
+        tags=("summary",),
+    )
+    completion = AssistantCompletion(
+        message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        intent=AssistantIntent.SUMMARY,
+        widgets=[
+            MetricWidget(type="metric", title=f"Metric {index}", value_paise=value)
+            for index, value in enumerate(values)
+        ],
+    )
+
+    score = score_assistant_case(case, completion)
+
+    assert score.passed is False
+    assert score.numeric_mismatch is True
+
+
+def test_assistant_scoring_requires_exact_widget_order() -> None:
+    case = AssistantEvalCase(
+        id="AST-WIDGET-ORDER",
+        message="Spending",
+        expected_intent="spending",
+        required_widget_types=("metric", "chart"),
+        expected_values_paise=(250_000, 120_000),
+        tags=("spending",),
+    )
+    completion = AssistantCompletion.model_validate(
+        {
+            "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
+            "intent": AssistantIntent.SPENDING,
+            "widgets": [
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [{"label": "Food", "value_paise": 120_000}],
+                },
+                {"type": "metric", "title": "Spending", "value_paise": 250_000},
+            ],
+        }
+    )
+
+    assert score_assistant_case(case, completion).passed is False
+
+
+@pytest.mark.parametrize(
     "widget",
     [
         {

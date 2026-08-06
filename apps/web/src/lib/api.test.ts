@@ -301,6 +301,29 @@ describe('FastAPI adapter', () => {
     })])
   })
 
+  it('accepts all twenty server-bounded household table rows', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope({
+      type: 'table',
+      title: 'Household balances',
+      rows: Array.from({ length: 20 }, (_, index) => ({
+        label: `Member ${index}`,
+        amount_paise: index
+      }))
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    const reply = await chatAssistant('Show shared balances')
+
+    expect(reply.widgets[0]?.type).toBe('table')
+    if (reply.widgets[0]?.type !== 'table') throw new Error('Expected a table widget')
+    expect(reply.widgets[0].rows).toHaveLength(20)
+  })
+
   it.each([
     ['arbitrary financial prose', 'summary', 'Your balance is a grand.'],
     ['approved message for the wrong intent', 'summary', 'Here is your spending overview.'],
@@ -422,7 +445,7 @@ describe('FastAPI adapter', () => {
     ['invalid chart point label', { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 123, value_paise: 1 }] }],
     ['invalid chart point value', { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Now', value_paise: 'oops' }] }],
     ['empty table rows', { type: 'table', title: 'Activity', rows: [] }],
-    ['oversized table rows', { type: 'table', title: 'Activity', rows: Array.from({ length: 13 }, (_, index) => ({ label: `R${index}`, amount_paise: index })) }],
+    ['oversized table rows', { type: 'table', title: 'Activity', rows: Array.from({ length: 21 }, (_, index) => ({ label: `R${index}`, amount_paise: index })) }],
     ['invalid table date', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, date: '7 Aug' }] }],
     ['invalid table kind', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, kind: 'forecast' }] }],
     ['ungrounded insight widget', { type: 'insight', title: 'Note', body: 'An arbitrary second narrative.' }],

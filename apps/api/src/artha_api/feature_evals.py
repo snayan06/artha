@@ -247,8 +247,8 @@ def score_assistant_case(
 ) -> AssistantScore:
     widget_types = tuple(widget.type for widget in completion.widgets)
     values = _assistant_values(completion)
-    numeric_mismatch = any(value not in values for value in case.expected_values_paise)
-    widget_mismatch = any(required not in widget_types for required in case.required_widget_types)
+    numeric_mismatch = values != case.expected_values_paise
+    widget_mismatch = widget_types != case.required_widget_types
     passed = (
         completion.intent == case.expected_intent and not widget_mismatch and not numeric_mismatch
     )

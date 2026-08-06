@@ -1,18 +1,18 @@
-{"id":"AST-001","message":"What is my total balance?","expected_intent":"summary","required_widget_types":["metric"],"expected_values_paise":[1500000],"tags":["summary","balance"]}
-{"id":"AST-002","message":"Give me a quick overview","expected_intent":"summary","required_widget_types":["metric"],"expected_values_paise":[1500000,250000],"tags":["summary"]}
-{"id":"AST-003","message":"How much cash do I have in total?","expected_intent":"summary","required_widget_types":["metric"],"expected_values_paise":[1500000],"tags":["summary","balance"]}
-{"id":"AST-004","message":"How much did I spend this month?","expected_intent":"spending","required_widget_types":["metric"],"expected_values_paise":[250000],"tags":["spending"]}
-{"id":"AST-005","message":"Show my top spending categories","expected_intent":"spending","required_widget_types":["chart"],"expected_values_paise":[120000,80000,50000],"tags":["spending","chart"]}
-{"id":"AST-006","message":"Where is my money going?","expected_intent":"spending","required_widget_types":["chart"],"expected_values_paise":[120000],"tags":["spending","chart"]}
+{"id":"AST-001","message":"What is my total balance?","expected_intent":"summary","required_widget_types":["metric","metric","metric"],"expected_values_paise":[1500000,250000,800000],"tags":["summary","balance"]}
+{"id":"AST-002","message":"Give me a quick overview","expected_intent":"summary","required_widget_types":["metric","metric","metric"],"expected_values_paise":[1500000,250000,800000],"tags":["summary"]}
+{"id":"AST-003","message":"How much cash do I have in total?","expected_intent":"summary","required_widget_types":["metric","metric","metric"],"expected_values_paise":[1500000,250000,800000],"tags":["summary","balance"]}
+{"id":"AST-004","message":"How much did I spend this month?","expected_intent":"spending","required_widget_types":["metric","chart"],"expected_values_paise":[250000,120000,80000,50000],"tags":["spending"]}
+{"id":"AST-005","message":"Show my top spending categories","expected_intent":"spending","required_widget_types":["metric","chart"],"expected_values_paise":[250000,120000,80000,50000],"tags":["spending","chart"]}
+{"id":"AST-006","message":"Where is my money going?","expected_intent":"spending","required_widget_types":["metric","chart"],"expected_values_paise":[250000,120000,80000,50000],"tags":["spending","chart"]}
 {"id":"AST-007","message":"How much income came this month?","expected_intent":"income","required_widget_types":["metric"],"expected_values_paise":[800000],"tags":["income"]}
 {"id":"AST-008","message":"Show salary and earnings","expected_intent":"income","required_widget_types":["metric"],"expected_values_paise":[800000],"tags":["income"]}
-{"id":"AST-009","message":"Compare income and spending by month","expected_intent":"cashflow","required_widget_types":["chart"],"expected_values_paise":[750000,300000,800000,250000],"tags":["cashflow","chart"]}
-{"id":"AST-010","message":"Show cashflow for July and August","expected_intent":"cashflow","required_widget_types":["chart"],"expected_values_paise":[750000,300000,800000,250000],"tags":["cashflow","date-range"]}
+{"id":"AST-009","message":"Compare income and spending by month","expected_intent":"cashflow","required_widget_types":["chart","chart"],"expected_values_paise":[750000,800000,300000,250000],"tags":["cashflow","chart"]}
+{"id":"AST-010","message":"Show cashflow for July and August","expected_intent":"cashflow","required_widget_types":["chart","chart"],"expected_values_paise":[750000,800000,300000,250000],"tags":["cashflow","date-range"]}
 {"id":"AST-011","message":"Who owes what in the household?","expected_intent":"shared","required_widget_types":["table"],"expected_values_paise":[40000,-15000],"tags":["shared"]}
 {"id":"AST-012","message":"Show shared balances","expected_intent":"shared","required_widget_types":["table"],"expected_values_paise":[40000,-15000],"tags":["shared"]}
-{"id":"AST-013","message":"Does Avery owe me?","expected_intent":"shared","required_widget_types":["table"],"expected_values_paise":[40000],"tags":["shared","member"]}
+{"id":"AST-013","message":"Does Avery owe me?","expected_intent":"shared","required_widget_types":["table"],"expected_values_paise":[40000,-15000],"tags":["shared","member"]}
 {"id":"AST-014","message":"Show recent transactions","expected_intent":"transactions","required_widget_types":["table"],"expected_values_paise":[42000,800000],"tags":["transactions"]}
-{"id":"AST-015","message":"What was my latest activity?","expected_intent":"transactions","required_widget_types":["table"],"expected_values_paise":[42000],"tags":["transactions"]}
+{"id":"AST-015","message":"What was my latest activity?","expected_intent":"transactions","required_widget_types":["table"],"expected_values_paise":[42000,800000],"tags":["transactions"]}
 {"id":"AST-016","message":"List the last two entries","expected_intent":"transactions","required_widget_types":["table"],"expected_values_paise":[42000,800000],"tags":["transactions"]}
 {"id":"AST-017","message":"Help","expected_intent":"clarification","required_widget_types":["clarification"],"expected_values_paise":[],"tags":["clarification","ambiguous"]}
 {"id":"AST-018","message":"Can you check something?","expected_intent":"clarification","required_widget_types":["clarification"],"expected_values_paise":[],"tags":["clarification","ambiguous"]}
