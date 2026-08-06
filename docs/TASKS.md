@@ -182,7 +182,8 @@ For the current ordered delivery view, blockers and user actions, see
   - [ ] Cover empty, duplicate-name, outstanding-over-limit and archived-account edge cases.
   - [ ] Verify the management screens at 320 px, 390 px and desktop in light and dark modes.
 - [ ] Invite selected participants as authenticated household members.
-- [x] Add Gemini, hosted Groq/open-weight and local Ollama provider adapters.
+- [x] Add Gemini through the official server-side SDK and retain explicit local
+  Ollama for development; retire hosted alternate providers from active runtime.
 - [x] Add analytics assistant with user-scoped read-only summaries.
 - [x] Return validated metric, chart and transaction-table schemas.
 - [ ] Show evidence date range, source count and matching transactions.

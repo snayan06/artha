@@ -111,9 +111,12 @@ Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliabil
 - Money is integer paise. Transfers and card payments are not spending or income.
 - Natural-language and LLM parsing only create unsaved review drafts. A user must
   explicitly confirm every ledger write.
-- Deterministic parsing remains available without a model. Gemini is selected
-  for the fictional private-pilot evaluation after full capture, auto-tag and
-  assistant gates; free-tier Gemini must not receive real family-finance text.
+- Production natural-language capture requires Gemini and opens the manual form
+  with exact text when interpretation is unavailable; it never substitutes a
+  language-parser guess. The local parser remains demo/evaluation-only. Gemini
+  is selected for the fictional private-pilot evaluation after full capture,
+  auto-tag and assistant gates; free-tier Gemini must not receive real family-
+  finance text.
 - Private capture learning history is planned as default-on with clear notice,
   Settings disable/delete/export controls and no external training/public use
   without separate consent.

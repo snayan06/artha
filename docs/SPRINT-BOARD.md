@@ -92,7 +92,8 @@ Sprint 1 dependency.
 - [x] Gate 22 common/safety-critical deterministic drafts plus negative, ambiguous and unknown-member input.
 - [x] Add a hosted-model evaluation runner with field/outcome/tag slices and sanitized reports.
 - [x] Preserve the Qwen/Groq baseline as historical provider evidence.
-- [x] Add Gemini through the official server-side SDK with `store=false` and deterministic fallback.
+- [x] Add Gemini through the official server-side SDK with `store=false`, strict
+  validation and exact-text manual recovery when interpretation is unavailable.
 - [x] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
 - [x] Respect `Retry-After`, back off safely, checkpoint progress and resume unfinished cases.
 - [x] Pass the hosted fictional gates: capture 50/50, auto-tag 30/30 and assistant 24/24.

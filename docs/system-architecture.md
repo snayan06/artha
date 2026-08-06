@@ -1,149 +1,161 @@
-# Artha — Overall System Architecture and Deployment Plan
+# Artha — System architecture and deployment
 
-Status: V1 implemented; personal-account deployment pending
-Date: 4 August 2026
+Status: V1 private pilot deployed; current runtime documented
+Date: 7 August 2026
 
 ## Architecture decision
 
-Build Artha as an installable React PWA, styled with Tailwind CSS, backed by a Python FastAPI service and Supabase Postgres. Keep transaction capture deterministic and confirmation-based. Ship the agent behind a separate read-only, provider-independent boundary so the ledger remains usable when AI is unavailable.
+Artha is an installable React PWA backed by FastAPI and Supabase Postgres. In
+production, Gemini interprets natural-language capture and assistant questions.
+Application and database code retain authority over identity, allowed entities,
+money, splits and writes.
 
-This is the complete product architecture: user interface, API, authentication, database, agent, hosting, security and deployment. Python is only the backend and agent layer; it does not replace the React user interface.
+The key product boundary is review before save. Quick Add creates an unsaved,
+strictly validated draft; only explicit confirmation reaches the ledger. If
+Gemini is unavailable or cannot return a valid interpretation, Artha preserves
+the user's exact text and opens the manual form. Production does not substitute
+a language parser or manufacture a likely draft.
 
 ## Chosen stack
 
-| Layer | Choice | Decision reason |
+| Layer | Choice | Responsibility |
 |---|---|---|
-| Web application | React + TypeScript + Vite PWA | App screens, state, routing, forms, offline drafts and installation |
-| Styling and UI system | Tailwind CSS + repository UI components | Layout, colours, spacing and accessible reusable controls |
-| Charts | Recharts | Controlled dashboard and agent-generated charts |
-| API | Python 3.13, FastAPI, Pydantic v2, Uvicorn | Typed contracts, async APIs, automatic OpenAPI docs |
-| Assistant | Strict Pydantic schemas with a model-provider adapter | Typed tool schemas and structured output without coupling the ledger to a provider |
-| Auth | Supabase Auth magic link | Simple private pilot authentication |
-| Database | Supabase Postgres with RLS | Relational integrity, atomic split accounting and household isolation |
-| Migrations | Supabase CLI SQL migrations | Keeps policies, functions and schema versioned together |
-| Frontend hosting | Vercel Hobby | Static Vite PWA under the same personal provider as the API |
-| Python hosting | Vercel Python runtime | FastAPI function without Render's minute-long idle wake-up |
-| AI inference | Gemini 3.5 Flash-Lite via the official SDK; Groq and local Qwen alternatives | Strong structured extraction, provider portability, private local option, no required AI dependency |
-| Files | Supabase Storage Free | Receipt images later, protected by household policy |
-| CI | GitHub Actions Free | Lint, types, tests and migration checks |
+| Web application | React 19 + TypeScript + Vite PWA | Screens, review/edit state, approved assistant widgets and installation |
+| Styling and charts | Tailwind CSS + repository UI components + Recharts | Accessible presentation controlled by application code |
+| API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async | Authenticated orchestration, schemas, allow-lists and business services |
+| Authentication | Supabase Auth magic link | Private-pilot identity and short-lived access tokens |
+| Production database | Supabase Postgres with RLS | Ledger truth, relational integrity, atomic RPCs and household isolation |
+| Local database | SQLite + aiosqlite | Keyless local demo and development |
+| Production AI | Gemini 3.5 Flash-Lite via Google's official SDK | Structured capture interpretation, category suggestions and assistant selection |
+| Hosting | Separate Vercel projects for the PWA and FastAPI | Current private-pilot deployment |
+| CI | GitHub Actions | Lint, types, tests and migration checks |
 
-## Runtime shape
+An explicit Ollama provider remains available for local development. It is not
+part of the production deployment, production evaluation gate or user-facing
+recovery path.
+
+## Runtime topology
 
 ```text
-React PWA
+React PWA / Vercel
    │ Supabase access token
    ▼
-FastAPI API
-   ├── capture parser → transaction draft → user confirmation
-   ├── ledger service → atomic Postgres RPC functions
-   ├── read models → dashboard, charts, shared balance
-   └── assistant → approved read-only tools → validated UI schema
-                          │
-                 provider adapter
-                  ├── Gemini 3.5 Flash-Lite
-                  ├── Groq
-                  └── Ollama / Qwen3 4B
-                         │
-                         ▼
-              Supabase Postgres + RLS
+FastAPI / Vercel ───── server-side only ─────► Gemini
+   │
+   ├── capture orchestration ─► validated unsaved draft ─► review ─► confirm
+   ├── ledger and read models ─► atomic database functions
+   └── assistant contract ─────► approved narrative and widget selection
+   │
+   ▼
+Supabase Postgres / RLS
 ```
 
-The browser signs in through Supabase and sends its short-lived access token to FastAPI. FastAPI verifies the token and performs normal queries with the user's authorization context so database RLS remains effective. A service-role key is not used in user request paths.
+The browser signs in through Supabase and sends its short-lived access token to
+FastAPI. FastAPI verifies the token and uses the authenticated database context
+so RLS remains effective. Gemini credentials and calls stay server-side. A
+service-role key is not used in normal user request paths.
 
-## API boundaries
+## Quick Add trust flow
 
-### V1 endpoints
+1. The authenticated user sends natural text to
+   `POST /api/v1/drafts/parse`.
+2. FastAPI loads grounded household context: current date/timezone and allowed
+   account, member and category identifiers.
+3. Gemini interprets the text into the strict capture schema.
+4. Application code rejects malformed values, invented IDs, invalid dates,
+   floating-point money and inconsistent splits.
+5. A valid result becomes an unsaved draft in the review UI. The user may edit
+   any field.
+6. Only `POST /api/v1/transactions/confirm`, with an idempotency key, can invoke
+   the atomic ledger write.
 
-- `POST /api/v1/drafts/parse`: turn natural language into an unsaved `TransactionDraft`.
-- `POST /api/v1/transactions/confirm`: confirm and atomically save a reviewed draft.
-- `GET /api/v1/dashboard`: balances, monthly totals, category mix and spend trend.
-- `GET /api/v1/transactions`: searchable and filterable ledger.
-- `PATCH /api/v1/transactions/{id}`: audited correction with balance recalculation.
-- `DELETE /api/v1/transactions/{id}`: soft delete only.
-- `GET /api/v1/shared-balances`: calculated balances for every household member.
+If step 3 or 4 fails, the exact source text is retained and the manual form
+opens. No deterministic language-parser guess is promoted as production
+recovery, and nothing is saved.
 
-Settlement and complete user-owned export endpoints remain launch-gate work and
-must not be represented as complete production APIs.
-
-Every write accepts an idempotency key. Amounts are integer paise. Shared expense creation, edit and settlement run in database transactions.
-
-### Capture pipeline
-
-1. A local parser extracts amount, debit/credit language, date, known account and common split phrases.
-2. Merchant rules fill learned category/account defaults.
-3. Only unresolved fields go to the model fallback, constrained to the household's existing categories.
-4. Pydantic validates the returned draft and marks uncertain fields.
-5. The user reviews and confirms; parsing never writes to the ledger.
-
-This keeps common entries fast and makes the app usable when the free AI quota is unavailable.
+Merchant categorization has a narrower deterministic layer. A household's
+learned merchant rule may select its remembered category. When no rule matches,
+Gemini may suggest one existing category ID; an unavailable or invalid model
+response leaves category selection to the user. It never creates a category.
 
 ## Assistant and generative UI
 
-Use one analytics assistant, not a multi-agent system. Introduce a workflow engine only if later investment workflows require durable, branching approvals.
+The assistant is read-only and LLM-powered. It has three deliberately separated
+responsibilities:
 
-Approved agent tools:
+1. Database functions calculate balances, totals, comparisons and matching
+   transaction IDs from authenticated ledger data.
+2. Gemini selects the supported intent, one approved intent-matched qualitative
+   narrative and an allow-listed set of widgets.
+3. FastAPI validates the complete response, then React renders repository-owned
+   metric, chart and table components.
 
-- `get_spending_summary(date_range, group_by)`
-- `compare_periods(current_range, previous_range, category?)`
-- `get_account_balances(as_of?)`
-- `get_member_balances(member_ids?)`
-- `list_matching_transactions(filters, limit)`
-- `evaluate_spending_room(amount, date_range, savings_buffer)`
+Gemini does not execute SQL, receive a write tool, calculate authoritative
+financial values, return arbitrary numeric prose or render HTML/JavaScript. A
+numeric value shown to the user must come from the server/database result and
+pass the response contract. Narrative text must match the selected intent and
+an approved qualitative template. When Gemini is unavailable or its output is
+invalid, the API returns a sanitized `503` and the UI shows an honest error; it
+does not fall back to fabricated cards or an assistant answer.
 
-The tools call predefined read-only database functions. The agent cannot receive a write tool, execute SQL, change a date range silently, or calculate money from prose.
+## Ledger and security rules
 
-The model returns a validated discriminated union such as:
+- Money is integer paise throughout the contract and database.
+- Transfers and card payments are account movements, not new spending.
+- Shared cash movement and personal expense share remain separate.
+- Every financial write is explicit, validated, idempotent and atomic.
+- RLS is enabled on exposed household tables.
+- Account, member and category references are resolved against authenticated
+  household allow-lists.
+- Model output is untrusted input; arbitrary model HTML, JavaScript and SQL are
+  never executed.
+- Raw account/card numbers are neither required nor stored.
+- Free-tier Gemini must receive fictional data only; real financial text needs
+  an appropriate paid privacy configuration.
 
-```json
-{
-  "answer": "August spending is 8% lower than July.",
-  "components": [
-    {"type": "metric_card", "label": "August spend", "value_paise": 4268000},
-    {"type": "bar_chart", "title": "Top categories", "series": []},
-    {"type": "transaction_table", "transaction_ids": []}
-  ],
-  "evidence": {"date_range": "2026-08-01/2026-08-31", "transaction_count": 37}
-}
-```
+## API boundaries
 
-The React app maps these types to reviewed components: `MetricCard`, `LineChart`, `BarChart`, `DonutChart`, `TransactionTable` and `InsightBanner`. It never executes model-generated HTML, JavaScript or SQL.
+Important V1 routes include:
 
-## Security rules
+- `POST /api/v1/drafts/parse`: interpret natural language into an unsaved draft,
+  or return manual-recovery context without guessing.
+- `POST /api/v1/transactions/confirm`: atomically save a reviewed draft.
+- `GET /api/v1/dashboard`: return server-derived balances and chart data.
+- `GET /api/v1/transactions`: return searchable logical ledger activity.
+- `PATCH/DELETE /api/v1/transactions/{id}`: audited correction or soft delete.
+- `GET /api/v1/shared-balances`: calculate participant receivables/payables.
+- `POST /api/v1/assistant/chat`: return a validated read-only narrative/widget
+  response or sanitized unavailability.
+- `POST /api/v1/assistant/tag-suggestion`: suggest an existing allow-listed
+  category without saving it.
+- Recovery export, preview and restore routes: protect client-side encrypted,
+  explicit recovery operations.
 
-- RLS is enabled on every exposed table and checks household/user membership.
-- User JWTs are verified by FastAPI; service-role credentials stay out of user-facing routes.
-- Agent tools receive the authenticated user and household from server context, never from model arguments.
-- All agent answers include a date range, transaction count and linkable source IDs.
-- Raw account/card numbers are never stored; account names are user-defined labels.
-- Model-bound text is minimized and identifiers are replaced where possible.
-- Audit events record transaction edits, deletes, settlements and agent tool calls.
-- Rate limits, request-size limits and strict CORS apply at the API.
+## Current deployment
 
-## ₹0 deployment choice
+- PWA: Vercel Hobby project rooted at `apps/web`.
+- API: separate Vercel Hobby project rooted at `apps/api`.
+- Auth and ledger: the `artha-production` Supabase project with Postgres and
+  RLS.
+- AI: Gemini called by FastAPI through the official Google SDK; the browser
+  never receives the provider key.
+- Source and CI: public GitHub repository and GitHub Actions.
 
-### Pilot deployment
+Manual entry, dashboards and confirmed ledger history remain available when the
+LLM is not configured. Natural-language capture and the assistant do not: Quick
+Add opens manual recovery with preserved text, while assistant requests fail
+closed with a sanitized error.
 
-- PWA: Vercel Hobby project rooted at `apps/web` on a `vercel.app` URL.
-- API: separate Vercel Hobby project rooted at `apps/api` on a `vercel.app` URL.
-- Auth/database/storage: Supabase Free.
-- AI: Gemini's free developer tier for fictional evaluation, with Groq, local Ollama and manual fallbacks.
-- Source/CI: public GitHub repository and GitHub Actions.
+The checked-in Render blueprint remains an optional container-hosting fallback,
+not the current production topology. Free plans have usage and privacy limits;
+they must fail closed and must never silently enable billing.
 
-This is genuinely usable at ₹0 for the user's private pilot. The limitations are explicit:
-
-- Vercel Hobby is restricted to personal non-commercial use and its Python runtime is beta.
-- Vercel functions have usage, duration and bundle-size limits; the API must fail explicitly when unavailable.
-- Supabase can pause a free project after one inactive week and does not include managed backups.
-- Free hosted AI capacity is capped and provider policies can change; capture still works through rules and manual review.
-- Free-tier Gemini data terms are not appropriate for real family finance; use a paid privacy configuration or keep hosted AI disabled.
-- A custom domain and WhatsApp Business messaging are not included in the ₹0 promise.
-
-The checked-in Render blueprint remains a container fallback, but its free service
-spins down after 15 idle minutes and can take about a minute to wake. Google Cloud
-Run is another later option, but it requires billing setup and can charge beyond
-quota, so neither is the strict no-billing default.
-
-Current official references: [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Vercel FastAPI](https://vercel.com/docs/frameworks/backend/fastapi), [Vercel monorepos](https://vercel.com/docs/monorepos), [Supabase pricing](https://supabase.com/pricing), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Render Free fallback](https://render.com/docs/free), [Groq rate limits](https://console.groq.com/docs/rate-limits), [Qwen3.6-27B model card](https://huggingface.co/Qwen/Qwen3.6-27B), and [Ollama structured output](https://docs.ollama.com/capabilities/structured-outputs).
+Current official references: [Vercel Hobby](https://vercel.com/docs/plans/hobby),
+[Vercel FastAPI](https://vercel.com/docs/frameworks/backend/fastapi),
+[Vercel monorepos](https://vercel.com/docs/monorepos),
+[Supabase pricing](https://supabase.com/pricing),
+[Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security),
+and [Ollama structured output](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## Repository shape
 
@@ -152,22 +164,14 @@ artha/
   apps/
     web/                 # React PWA
     api/                 # FastAPI application
-  packages/
-    contracts/           # generated TypeScript API types
   supabase/
-    migrations/          # schema, RLS, RPC functions
-    seed.sql
+    migrations/          # schema, RLS and atomic RPC functions
+    tests/               # SQL contract assertions
   docs/
-    architecture/
-  .github/workflows/
+    assets/              # repository-owned architecture visual
+    artifacts/           # versioned architecture and QA evidence
+  evals/                 # fictional model evaluation data
+  .github/workflows/     # continuous integration
 ```
 
-## Build sequence
-
-1. Week 1: repo, auth, RLS, accounts, opening balances and ledger invariants.
-2. Week 2: parse/review/confirm capture, dashboard charts and offline draft queue.
-3. Week 3: multi-member shared calculations, corrections, settlements and CSV export.
-4. Week 4: mobile QA, security tests, Vercel/Supabase deployment and private use.
-5. V2: read-only agent tools, inline UI schema, evaluation set and source-linked answers.
-
-The first implementation milestone is not the chatbot. It is a ledger whose balances, transfers, credit cards and shared splits remain correct under edits and retries.
+The ledger, not the model, is Artha's source of financial truth.

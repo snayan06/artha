@@ -30,34 +30,44 @@ shared family expenses consistent.
 
 ## Why Artha?
 
-Most expense trackers make capture slower than the purchase itself. Artha is
-built around a five-second workflow:
+Money tracking often fails at the exact moment it asks you to stop and do
+bookkeeping. Artha starts with the sentence already in your head:
 
-1. Write `Paid 1840 for groceries from HDFC UPI, split with family, 3 days ago`.
-2. Review the parsed amount, account, category and split.
-3. Confirm explicitly.
-4. See account movement, personal spending and the shared balance update.
+> `Paid ₹1,840 for groceries from HDFC, split with Krima, three days ago.`
 
-The important product rule is simple: **understanding is automated; saving is
-not**. Parsing never writes directly to the ledger. Common capture works through
-a deterministic parser, while Gemini can propose a structured draft grounded
-only in the user's existing accounts, categories and household participants.
-Every write still requires review and confirmation.
+Or simply:
+
+> `self transfer 25k ICICI -> HDFC`
+
+Artha turns that into an **unsaved draft** containing the amount, transaction
+type, accounts, date, category and sharing details. Review it, correct anything,
+then confirm. Only confirmation changes the ledger.
+
+That gives you one private view across bank accounts, cards, internal transfers,
+personal spending and expenses shared with family or friends—without making
+capture itself feel like accounting.
+
+> **AI interprets. Artha validates. You decide what gets saved.**
 
 ## Core journeys
 
 1. **Set up once.** Add multiple bank, cash, wallet and credit-card accounts,
    opening balances, card details and people you split expenses with.
 2. **Write naturally.** Try `self transfer 25k ICICI -> HDFC` or
-   `Paid 1840 for groceries from HDFC, split with Mira, 3 days ago`.
+   `Paid 1840 for groceries from HDFC, split with Krima, 3 days ago`.
 3. **Review before saving.** Check the amount, date, type, account, category and
    split. Nothing reaches the ledger until confirmation.
 4. **Understand the result.** See balances, personal spending, income, account
    activity, shared receivables and a six-month trend.
-5. **Ask the ledger.** The read-only Gemini assistant returns approved metric,
-   chart and table components—never model-authored HTML or direct writes.
+5. **Ask the ledger.** Gemini selects an approved answer pattern and safe
+   widgets around values calculated by Artha—never model-authored HTML, model-
+   calculated balances or direct writes.
 6. **Keep control.** Export a client-side encrypted backup whose passphrase never
    reaches the API.
+
+If Gemini cannot interpret Quick Add, Artha keeps the exact text and opens the
+manual form. It does not guess. Dashboard and manual entry remain available;
+the assistant shows an honest error when its model is unavailable.
 
 ## What V1 includes
 
@@ -96,19 +106,17 @@ paise rather than floating-point values.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    PWA["React PWA"] -->|"validated draft and confirmation"| API["FastAPI"]
-    API --> PARSER["Deterministic capture parser"]
-    API -. "optional structured interpretation" .-> GEMINI["Gemini via official SDK"]
-    API --> LEDGER["Ledger service"]
-    LEDGER --> LOCAL["SQLite local demo"]
-    LEDGER --> DB["Supabase Postgres and RLS"]
-    API --> ASSISTANT["Validated assistant UI"]
-    ASSISTANT -. "hosted model" .-> GEMINI
-    ASSISTANT -. "optional open-weight provider" .-> GROQ["Groq"]
-    ASSISTANT -. "local fallback" .-> OLLAMA["Ollama and Qwen3 4B"]
-```
+![Artha review-before-save architecture](docs/assets/artha-architecture.svg)
+
+Gemini interprets authenticated household context, but strict application code
+owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
+authentication, RLS, idempotency and ledger invariants. A draft is not a
+transaction; only the reviewed confirmation can write.
+
+The assistant follows the same separation. Database code calculates financial
+values, Gemini chooses an approved qualitative narrative and allow-listed
+widgets, and React renders them. Model failure produces no guessed draft or
+assistant answer.
 
 | Layer | Technology |
 |---|---|
@@ -116,7 +124,7 @@ flowchart LR
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async |
 | Local data | SQLite and aiosqlite |
 | Production data | Supabase Postgres, Auth, RLS and REST/RPC adapter |
-| Optional AI | Gemini via the official Google SDK, with Groq or local Ollama alternatives; validated output and deterministic fallback |
+| Production AI | Gemini via the official Google SDK; strict schemas and allow-lists; manual recovery when interpretation is unavailable |
 | Quality | Vitest, pytest, ESLint, Ruff and strict mypy |
 | CI | GitHub Actions |
 
@@ -134,7 +142,7 @@ artha/
 ├── supabase/
 │   ├── migrations/       # Schema, constraints, RLS and RPC functions
 │   └── tests/            # SQL catalog assertions
-├── docs/                 # PRD, architecture, deployment and decisions
+├── docs/                 # PRD, architecture, deployment, decisions and assets
 ├── evals/                # Versioned fictional model/parser evaluation data
 ├── scripts/              # Repository contract and evaluation helpers
 ├── .github/workflows/    # CI
@@ -172,11 +180,12 @@ make dev-web
 Open <http://127.0.0.1:5173>. Interactive API documentation is available at
 <http://127.0.0.1:8000/docs>.
 
-### Optional Gemini assistant
+### Gemini in the private pilot
 
-Capture and manual analytics work without an LLM. The private pilot uses
-`gemini-3.5-flash-lite` behind the provider adapter; it is not trusted to write
-or calculate ledger values. Keep the API key only in the server environment:
+Production natural-language capture and the assistant require configured
+Gemini. The current pilot model is `gemini-3.5-flash-lite`, called only from the
+server through the official SDK. It is not trusted to write or calculate ledger
+values. Keep the API key only in the server environment:
 
 ```dotenv
 ARTHA_LLM_PROVIDER=gemini
@@ -185,12 +194,16 @@ ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 Gemini requests are stateless (`store=false`) and model output is validated by
-Artha before use. Google's free tier may use submitted content to improve its
-products, so use fictional data on the free tier; real family finance should use
-an appropriate paid privacy configuration. For a private local fallback, install
-Ollama, pull `qwen3:4b-instruct`, and set `ARTHA_LLM_PROVIDER=ollama`. Provider
-failure falls back to deterministic cards and manual tagging; it never blocks
-ledger capture.
+Artha before use. If capture interpretation fails, the exact input is preserved
+and the manual transaction form opens; no guessed draft is created. If the
+assistant model fails, Artha returns a sanitized unavailable response rather
+than fabricating an answer. Manual entry and database-backed dashboards remain
+available without an LLM.
+
+Google's free tier may use submitted content to improve its products, so use
+fictional data on the free tier; real family finance should use an appropriate
+paid privacy configuration. Developers may explicitly select Ollama for local
+experimentation, but it is not part of the production pilot path.
 
 ## Quality gate
 
@@ -204,7 +217,7 @@ This runs web linting, TypeScript checks, Vitest, the production PWA build,
 Ruff, strict mypy, pytest, every SQL syntax contract, and both keyless validators
 for the 50-case capture dataset and hosted-model runner.
 
-Current release evidence:
+Previous release evidence (recorded before the current documentation pass):
 
 | Gate | Result |
 | --- | --- |

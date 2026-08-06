@@ -16,20 +16,36 @@ Natural language produces a `TransactionDraft`. Only the confirmation endpoint m
 
 Account balances, spending and shared receivables are derived from immutable-style ledger facts. Corrections are audited and deletes are soft.
 
-## ADR-005: constrained V2 agent
+## ADR-005: constrained read-only assistant
 
-The V2 agent receives only predefined read-only analytics tools. It cannot execute SQL or render arbitrary code. Its structured output maps to reviewed React components.
+The assistant receives only predefined read-only analytics capabilities. It
+cannot execute SQL, receive write tools or render arbitrary code. Its strict
+structured output maps to reviewed React components, while database code owns
+all financial values.
 
-## ADR-006: experimental Qwen default and deferred model benchmark
+## ADR-006: Gemini is the production private-pilot model
 
-The private pilot uses `qwen/qwen3.6-27b` through Groq as its experimental
-hosted model because it supports text, images, reasoning, tool use and structured
-JSON through one provider. Deterministic parsing and merchant rules still run
-first, and the model cannot write transactions or calculate ledger totals.
+**Decision date:** 7 August 2026
 
-A representative Artha evaluation and comparison against other hosted models is
-required before a production model is locked. That evaluation is backlog work
-and does not block the V1 private pilot.
+The production private pilot uses `gemini-3.5-flash-lite` through Google's
+official server-side SDK for natural-language capture, allow-listed category
+suggestions and the read-only assistant. One hosted path keeps deployment,
+privacy review and failure handling explicit, while strict schemas performed
+well across the fictional capture, tagging and assistant gates.
+
+Gemini interpretation never writes the ledger. Capture output must pass schema,
+household allow-list, integer-paise and split validation before it becomes an
+unsaved review draft; only explicit confirmation writes. If interpretation is
+unavailable or invalid, Artha preserves the exact text and opens the manual form
+without guessing.
+
+Merchant rules remain the learned deterministic auto-tag layer. With no matching
+rule, Gemini may suggest only an existing category; failure leaves the choice to
+the user. For the assistant, database code calculates every financial value and
+Gemini selects a supported intent, approved qualitative narrative and allow-
+listed widgets. Invalid or unavailable output produces a sanitized `503`, not a
+fabricated answer. An explicitly configured Ollama adapter may be used for local
+development only and is not part of the production decision.
 
 ## ADR-007: Vercel Hobby and Supabase Free for the private pilot
 

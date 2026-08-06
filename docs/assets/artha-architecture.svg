@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Artha review-before-save architecture</title>
+  <desc id="desc">A hand-drawn system diagram showing natural-language input interpreted by Gemini, a required review and confirmation checkpoint before the ledger, manual recovery without guessing, code-owned guardrails, the read-only assistant value flow, and the Vercel, FastAPI, Supabase and Gemini deployment topology.</desc>
+  <style>
+    :root {
+      --paper: #fbfaf6;
+      --ink: #17352b;
+      --muted: #4d675e;
+      --line: #315b4b;
+      --green: #2f7d57;
+      --green-soft: #dff1e7;
+      --blue: #3e7390;
+      --blue-soft: #e2f0f5;
+      --amber: #a96816;
+      --amber-soft: #fff0cc;
+      --neutral: #f1eee4;
+      --shadow: #c5d0c8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #12231d;
+        --ink: #eef8f2;
+        --muted: #bed1c7;
+        --line: #9bc4b1;
+        --green: #6fc598;
+        --green-soft: #1b4432;
+        --blue: #80bdd8;
+        --blue-soft: #183d4d;
+        --amber: #f0bb63;
+        --amber-soft: #4a3516;
+        --neutral: #26362f;
+        --shadow: #07120e;
+      }
+    }
+    text { font-family: ui-rounded, "SF Pro Rounded", "Segoe UI", Arial, sans-serif; fill: var(--ink); }
+    .title { font-size: 25px; font-weight: 700; }
+    .label { font-size: 18px; font-weight: 700; }
+    .body { font-size: 15px; font-weight: 500; }
+    .small { font-size: 13px; font-weight: 500; fill: var(--muted); }
+    .tiny { font-size: 12px; font-weight: 600; }
+    .marker-line { stroke: var(--line); }
+    .marker-amber { stroke: var(--amber); }
+    .rough { fill: none; stroke: var(--line); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .rough2 { fill: none; stroke: var(--line); stroke-width: 1; opacity: .42; stroke-linecap: round; stroke-linejoin: round; }
+    .arrow { fill: none; stroke: var(--line); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+    .arrow-soft { fill: none; stroke: var(--amber); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 7 6; marker-end: url(#arrow-amber); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" class="marker-line" fill="none" stroke="#315b4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" class="marker-amber" fill="none" stroke="#a96816" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <filter id="soft-shadow" x="-10%" y="-15%" width="125%" height="135%">
+      <feDropShadow dx="3" dy="4" stdDeviation="2" flood-color="var(--shadow)" flood-opacity=".38"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="650" rx="24" fill="var(--paper)"/>
+  <path d="M26 49 C286 42 535 54 786 46 C922 42 1061 47 1172 43" class="rough2"/>
+  <text x="38" y="39" class="title">From a sentence to ledger truth — with a human checkpoint</text>
+
+  <!-- Primary trust flow -->
+  <g filter="url(#soft-shadow)">
+    <rect x="38" y="80" width="178" height="105" rx="19" fill="var(--blue-soft)"/>
+    <rect x="39" y="81" width="176" height="103" rx="18" class="rough"/>
+    <rect x="42" y="78" width="176" height="104" rx="20" class="rough2"/>
+  </g>
+  <text x="127" y="116" text-anchor="middle" class="label">Say or type</text>
+  <text x="127" y="143" text-anchor="middle" class="body">“Paid ₹1,840…”</text>
+  <text x="127" y="164" text-anchor="middle" class="small">natural language</text>
+
+  <path d="M218 132 C238 129 246 136 267 132" class="arrow"/>
+
+  <g filter="url(#soft-shadow)">
+    <rect x="275" y="80" width="196" height="105" rx="19" fill="var(--blue-soft)"/>
+    <rect x="276" y="81" width="194" height="103" rx="18" class="rough"/>
+    <rect x="272" y="83" width="197" height="102" rx="20" class="rough2"/>
+  </g>
+  <text x="373" y="116" text-anchor="middle" class="label">Gemini interprets</text>
+  <text x="373" y="143" text-anchor="middle" class="body">grounded household</text>
+  <text x="373" y="164" text-anchor="middle" class="small">context + strict output</text>
+
+  <path d="M472 132 C491 136 506 127 527 132" class="arrow"/>
+
+  <g filter="url(#soft-shadow)">
+    <rect x="535" y="72" width="235" height="121" rx="22" fill="var(--green-soft)" stroke="var(--green)" stroke-width="5"/>
+    <rect x="539" y="76" width="227" height="113" rx="19" fill="none" stroke="var(--green)" stroke-width="2" opacity=".75"/>
+  </g>
+  <text x="652" y="111" text-anchor="middle" class="label">Review + confirm</text>
+  <text x="652" y="139" text-anchor="middle" class="body">edit every field</text>
+  <text x="652" y="164" text-anchor="middle" class="tiny" fill="var(--green)">THE REQUIRED CHECKPOINT</text>
+
+  <path d="M771 132 C791 128 802 138 821 132" class="arrow"/>
+
+  <g filter="url(#soft-shadow)">
+    <rect x="830" y="80" width="184" height="105" rx="19" fill="var(--green-soft)"/>
+    <rect x="831" y="81" width="182" height="103" rx="18" class="rough"/>
+    <rect x="827" y="78" width="186" height="106" rx="21" class="rough2"/>
+  </g>
+  <text x="922" y="116" text-anchor="middle" class="label">Ledger truth</text>
+  <text x="922" y="143" text-anchor="middle" class="body">atomic + idempotent</text>
+  <text x="922" y="164" text-anchor="middle" class="small">saved only now</text>
+
+  <text x="1043" y="106" class="small">AI interprets.</text>
+  <text x="1043" y="131" class="small">Artha validates.</text>
+  <text x="1043" y="156" class="small">You decide.</text>
+
+  <!-- Failure branch -->
+  <path d="M373 186 C371 209 369 220 369 239" class="arrow-soft"/>
+  <text x="388" y="218" class="tiny" fill="var(--amber)">unavailable or unsure</text>
+  <g filter="url(#soft-shadow)">
+    <rect x="254" y="246" width="310" height="112" rx="19" fill="var(--amber-soft)"/>
+    <rect x="255" y="247" width="308" height="110" rx="18" class="rough"/>
+    <rect x="251" y="250" width="312" height="106" rx="20" class="rough2"/>
+  </g>
+  <text x="409" y="282" text-anchor="middle" class="label">Keep text + open the form</text>
+  <text x="409" y="312" text-anchor="middle" class="body">The original sentence stays intact.</text>
+  <text x="409" y="338" text-anchor="middle" class="tiny" fill="var(--amber)">NO GUESSING. NOTHING SAVED.</text>
+
+  <!-- Guardrail note -->
+  <g filter="url(#soft-shadow)">
+    <rect x="610" y="229" width="550" height="145" rx="20" fill="var(--neutral)"/>
+    <rect x="611" y="230" width="548" height="143" rx="19" class="rough"/>
+    <rect x="608" y="233" width="549" height="139" rx="21" class="rough2"/>
+  </g>
+  <text x="634" y="263" class="label">Strict code owns the guardrails</text>
+  <circle cx="637" cy="291" r="4" fill="var(--green)"/><text x="650" y="296" class="body">schema + account / member / category allow-lists</text>
+  <circle cx="637" cy="319" r="4" fill="var(--green)"/><text x="650" y="324" class="body">integer paise + split maths + ledger invariants</text>
+  <circle cx="637" cy="347" r="4" fill="var(--green)"/><text x="650" y="352" class="body">authentication + RLS + idempotency</text>
+
+  <!-- Assistant note -->
+  <g>
+    <rect x="38" y="400" width="1122" height="118" rx="20" fill="var(--blue-soft)" opacity=".78"/>
+    <rect x="39" y="401" width="1120" height="116" rx="19" class="rough"/>
+    <rect x="36" y="404" width="1124" height="112" rx="21" class="rough2"/>
+  </g>
+  <text x="62" y="431" class="label">Ask Artha is read-only</text>
+  <rect x="65" y="451" width="238" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
+  <text x="184" y="478" text-anchor="middle" class="body">Database computes values</text>
+  <path d="M305 473 C326 468 340 477 360 473" class="arrow"/>
+  <rect x="368" y="451" width="320" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
+  <text x="528" y="478" text-anchor="middle" class="body">Gemini selects approved narrative + widgets</text>
+  <path d="M690 473 C711 477 725 468 746 473" class="arrow"/>
+  <rect x="754" y="451" width="220" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
+  <text x="864" y="478" text-anchor="middle" class="body">React safely renders</text>
+  <text x="1001" y="465" class="tiny" fill="var(--blue)">NO WRITES</text>
+  <text x="1001" y="486" class="small">no model HTML</text>
+
+  <!-- Deployment strip -->
+  <text x="40" y="552" class="label">Production path · FastAPI calls Gemini server-side only</text>
+  <rect x="38" y="565" width="1122" height="65" rx="18" fill="var(--neutral)"/>
+  <rect x="39" y="566" width="1120" height="63" rx="17" class="rough"/>
+  <text x="75" y="602" class="body">React PWA / Vercel</text>
+  <path d="M244 597 C269 593 282 602 306 597" class="arrow"/>
+  <text x="326" y="602" class="body">FastAPI / Vercel</text>
+  <path d="M475 597 C501 602 516 593 542 597" class="arrow"/>
+  <text x="562" y="602" class="body">Supabase Postgres / RLS</text>
+  <path d="M475 585 C541 553 733 550 822 584" class="arrow-soft"/>
+  <text x="842" y="602" class="body">Gemini</text>
+  <text x="944" y="602" class="small">AI never connects to the ledger</text>
+</svg>

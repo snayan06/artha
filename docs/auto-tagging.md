@@ -9,11 +9,12 @@ without confirmation.
    remove payment-network noise that does not identify the merchant.
 2. Match an active household `merchant_rules` entry by priority (`exact`, then
    `contains`, then carefully validated `regex`).
-3. Apply safe built-in signals for obvious income, transfers, and settlements.
-4. If the category is still unresolved, request a structured suggestion from
-   the configured model provider.
-5. Validate that the returned category already exists in the household and show
+3. If no rule matches, ask Gemini for a structured suggestion constrained to
+   the household's existing categories.
+4. Validate that the returned category already exists in the household and show
    its confidence and reason in the draft review.
+5. If Gemini is unavailable or its answer is invalid, leave category selection
+   to the user. Never generate a new fallback category.
 6. Save only after the user confirms. When the user corrects the category, offer
    to remember that merchant-to-category rule for future drafts.
 
@@ -58,10 +59,12 @@ and confirmation workflow.
 
 ## Provider behavior
 
-The private-pilot candidate is `gemini-3.5-flash-lite` through Google's official
-SDK. Groq and local Qwen through Ollama remain provider alternatives. All
-providers implement the same internal interface, constrained schema and
-allow-list grounding. When a provider is missing, rate-limited, unavailable or
-returns invalid output, Artha falls back to manual category selection without
-blocking transaction entry. Gemini requests use `store=false`; provider storage
-does not replace Artha's household-scoped, consent-controlled audit design.
+The production private pilot uses `gemini-3.5-flash-lite` through Google's
+official SDK. Gemini receives an allow-list and may select only an existing
+category. When it is missing, rate-limited, unavailable or invalid, Artha leaves
+the category for manual selection without blocking transaction entry. Explicit
+Ollama selection may be used in local development, but it is not a production
+provider or recovery path.
+
+Gemini requests use `store=false`; provider storage does not replace Artha's
+household-scoped, consent-controlled audit design.

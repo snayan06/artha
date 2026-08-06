@@ -1,7 +1,7 @@
 # Artha — MVP Product Requirements Document
 
-Status: Draft v1
-Date: 4 August 2026
+Status: V1 private pilot; current product contract
+Date: 7 August 2026
 Product type: Private, shared money-tracking PWA with conversational capture
 
 ## 1. Product decision
@@ -63,7 +63,9 @@ Money trackers fail because recording every payment feels like work. They also c
 - Transaction list, search, filters, edit, and soft delete.
 - Equal, percentage, or exact shared split.
 - Settlement recording.
-- Deterministic insights for supported questions; the full conversational agent is V2.
+- Read-only conversational assistant with approved narratives and safe inline
+  metrics, charts and transaction tables; all financial values are calculated
+  by server/database code.
 - CSV export and monthly statement CSV import for reconciliation.
 - Installable PWA with an offline draft queue.
 
@@ -99,9 +101,15 @@ Money trackers fail because recording every payment feels like work. They also c
 
 1. User opens the app directly to a persistent “What happened?” field.
 2. User types or speaks one sentence.
-3. Artha displays a compact draft in under two seconds.
-4. High-confidence fields are prefilled; uncertain fields are visibly marked.
-5. User taps **Confirm**. The dashboard and shared balance update together.
+3. Gemini interprets the sentence against the authenticated household's known
+   accounts, members and categories.
+4. A valid result becomes a compact unsaved draft. If interpretation is
+   unavailable or invalid, Artha preserves the exact text and opens the manual
+   form without guessing.
+5. The user reviews and edits the amount, type, accounts, date, category and
+   split.
+6. User taps **Confirm**. Only then do the ledger, dashboard and shared balance
+   update together.
 
 ### Example
 
@@ -169,9 +177,9 @@ A card purchase increases card liability. Paying the card is an account transfer
 
 Edits preserve an audit record. Deletes are soft deletes. Recalculations happen transactionally so balances, splits, and settlements cannot diverge.
 
-## 9. V2 Ask Artha design
+## 9. Ask Artha design
 
-Supported V2 intents:
+Supported intents:
 
 - spending total by time, category, merchant, account, or person;
 - income total;
@@ -182,13 +190,18 @@ Supported V2 intents:
 
 Pipeline:
 
-1. Interpret the question into a strict JSON intent.
+1. Gemini interprets the question into a strict, supported intent.
 2. Validate allowed dimensions and date range.
 3. Run a predefined database function.
-4. Generate a short explanation from the returned values.
-5. Show the date range and a link to matching transactions.
+4. Gemini selects an approved intent-matched qualitative narrative and allow-
+   listed widgets around the server-derived values.
+5. Validate the complete response and render repository-owned React components
+   with the date range and source transactions.
 
-The model never generates SQL, calculates the amount itself, or receives write tools. It returns a validated UI schema that the app maps to approved charts, cards and tables.
+The model never generates SQL, calculates authoritative financial values,
+receives write tools, emits arbitrary numeric prose or supplies executable HTML.
+If it is unavailable or returns an invalid contract, the API returns a sanitized
+`503` and the interface shows an honest error rather than a generated fallback.
 
 ## 10. Data model
 
@@ -218,8 +231,9 @@ All money values use integer paise, never floating-point numbers.
 | Hosting | Vercel Hobby | Two personal projects for the Vite PWA and FastAPI monorepo roots |
 | Auth + database | Supabase Free | Managed Postgres, magic links, row-level security, realtime, storage |
 | API | Python 3.13 + FastAPI + Pydantic v2 on Vercel | Typed APIs without a minute-long container wake-up |
-| Assistant | Strict Pydantic schemas and approved read-only tools | Structured UI output without giving the model write access |
-| AI parsing | Merchant rules, then experimental Qwen3.6-27B via Groq; local Qwen3 4B fallback | One multimodal open-weight pilot model, provider portability, and manual fallback at quota |
+| Assistant | Gemini via the official Google SDK, strict Pydantic schemas and approved read-only tools | Model-selected intent/narrative/widgets around database-derived values, without write access |
+| Natural-language capture | Gemini via the official Google SDK, grounded in authenticated household context | Strict validated unsaved drafts; preserved text and manual form when interpretation is unavailable |
+| Auto-tagging | Learned merchant rules first; Gemini suggestion second | Only existing household categories may be selected; manual selection on failure |
 | Voice | Cloudflare Workers AI Whisper, capped | Free allocation is sufficient for a private pilot |
 | OCR | Client-side OCR first | Keeps screenshots private and avoids API cost |
 | Source + CI | GitHub Free + GitHub Actions | Version control and automated checks |
@@ -324,9 +338,9 @@ The application itself needs database transactions, authentication, offline beha
 - Accounts, opening balances, transaction model, row-level security.
 - Dashboard and manual transaction entry.
 
-### Week 2 — five-second capture
+### Week 2 — five-second capture (original roadmap)
 
-- Rules-based parser and strict AI fallback.
+- Gemini interpretation, strict draft validation and manual recovery.
 - Review/confirm/edit flow.
 - Merchant memory, categories, recurring favorites.
 - Offline drafts and installation.
@@ -355,7 +369,7 @@ The MVP is ready only when:
 - Full account movement and personal share are both correct.
 - Editing/deleting a shared expense recalculates all balances atomically.
 - Settlement does not inflate income or expense.
-- V1 deterministic insight totals match direct database queries and show their date range/source count.
+- Assistant financial values match direct database queries and show their date range/source count.
 - CSV export can reconstruct the ledger.
 - Installed PWA works on Android and iPhone; offline entries remain drafts until synced.
 - The service operates at ₹0 within documented quotas, excluding an optional custom domain and WhatsApp.
