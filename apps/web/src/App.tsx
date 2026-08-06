@@ -29,6 +29,39 @@ const emptyDashboard: Dashboard = {
   recentTransactions: []
 }
 
+export function applyConfirmedTransaction(current: Dashboard, transaction: Transaction): Dashboard {
+  const sharedDeltaPaise = transaction.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0)
+  const occurredAt = new Date(`${transaction.occurredAt}T12:00:00`)
+  const transactionMonth = Number.isNaN(occurredAt.getTime())
+    ? null
+    : new Intl.DateTimeFormat('en-IN', { month: 'short' }).format(occurredAt)
+
+  return {
+    ...current,
+    availablePaise: current.availablePaise + (transaction.kind === 'transfer' ? 0 : transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise),
+    incomePaise: current.incomePaise + (transaction.kind === 'credit' ? transaction.amountPaise : 0),
+    spendPaise: current.spendPaise + (transaction.kind === 'debit' ? transaction.personalSharePaise : 0),
+    sharedBalancePaise: current.sharedBalancePaise + sharedDeltaPaise,
+    memberBalances: current.memberBalances.map((balance) => {
+      const memberDeltaPaise = transaction.memberSplits
+        .filter((split) => split.memberId === balance.id)
+        .reduce((sum, split) => sum + split.amountPaise, 0)
+      const balancePaise = balance.balancePaise + memberDeltaPaise
+      return {
+        ...balance,
+        balancePaise,
+        status: balancePaise > 0 ? 'owes you' : balancePaise < 0 ? 'you owe' : 'settled'
+      }
+    }),
+    monthly: current.monthly.map((point) => point.month === transactionMonth ? {
+      ...point,
+      incomePaise: point.incomePaise + (transaction.kind === 'credit' ? transaction.amountPaise : 0),
+      spendPaise: point.spendPaise + (transaction.kind === 'debit' ? transaction.personalSharePaise : 0)
+    } : point),
+    recentTransactions: [transaction, ...current.recentTransactions].slice(0, 4)
+  }
+}
+
 export type LedgerLoadIssue = {
   title: string
   message: string
@@ -193,14 +226,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   async function addTransaction(draft: TransactionDraft, idempotencyKey?: string): Promise<Transaction> {
     const transaction = await confirmDraft(draft, idempotencyKey)
     setTransactions((current) => [transaction, ...current])
-    setDashboard((current) => ({
-      ...current,
-      availablePaise: current.availablePaise + (transaction.kind === 'transfer' ? 0 : transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise),
-      incomePaise: current.incomePaise + (transaction.kind === 'credit' ? transaction.amountPaise : 0),
-      spendPaise: current.spendPaise + (transaction.kind === 'debit' ? transaction.personalSharePaise : 0),
-      sharedBalancePaise: current.sharedBalancePaise + transaction.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0),
-      recentTransactions: [transaction, ...current.recentTransactions].slice(0, 4)
-    }))
+    setDashboard((current) => applyConfirmedTransaction(current, transaction))
     return transaction
   }
 

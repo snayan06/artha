@@ -23,7 +23,8 @@ const api = vi.hoisted(() => ({
 
 vi.mock('./lib/api', () => api)
 
-import App, { LedgerLoadError, ledgerLoadIssue } from './App'
+import App, { applyConfirmedTransaction, LedgerLoadError, ledgerLoadIssue } from './App'
+import type { Dashboard, Transaction } from './types'
 
 describe('first-run gate', () => {
   beforeEach(() => {
@@ -77,5 +78,62 @@ describe('ledger recovery states', () => {
     await user.click(screen.getByRole('button', { name: 'Retry connection' }))
     expect(retry).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  })
+})
+
+describe('confirmed transaction dashboard updates', () => {
+  const dashboard: Dashboard = {
+    availablePaise: 13_800_000,
+    incomePaise: 0,
+    spendPaise: 0,
+    sharedBalancePaise: 0,
+    memberBalances: [{ id: 'member-1', name: 'Mira QA', balancePaise: 0, status: 'settled' }],
+    monthly: [{ month: 'Aug', incomePaise: 0, spendPaise: 0 }],
+    recentTransactions: []
+  }
+
+  it('updates the chart and member balance immediately for a shared expense', () => {
+    const transaction: Transaction = {
+      id: 'expense-1',
+      kind: 'debit',
+      amountPaise: 184_000,
+      personalSharePaise: 92_000,
+      merchant: 'Groceries',
+      category: 'Groceries',
+      account: 'HDFC QA',
+      occurredAt: '2026-08-04',
+      memberSplits: [{ memberId: 'member-1', memberName: 'Mira QA', amountPaise: 92_000 }],
+      status: 'confirmed'
+    }
+
+    expect(applyConfirmedTransaction(dashboard, transaction)).toMatchObject({
+      availablePaise: 13_616_000,
+      spendPaise: 92_000,
+      sharedBalancePaise: 92_000,
+      memberBalances: [{ id: 'member-1', balancePaise: 92_000, status: 'owes you' }],
+      monthly: [{ month: 'Aug', incomePaise: 0, spendPaise: 92_000 }]
+    })
+  })
+
+  it('updates income immediately while keeping transfers out of totals', () => {
+    const income: Transaction = {
+      id: 'income-1', kind: 'credit', amountPaise: 2_500_000, personalSharePaise: 2_500_000,
+      merchant: 'Salary', category: 'Salary', account: 'ICICI QA', occurredAt: '2026-08-06', memberSplits: [], status: 'confirmed'
+    }
+    const transfer: Transaction = {
+      id: 'transfer-1', kind: 'transfer', amountPaise: 2_500_000, personalSharePaise: 2_500_000,
+      merchant: 'Self transfer', category: 'Transfer', account: 'ICICI QA', destinationAccount: 'HDFC QA',
+      occurredAt: '2026-08-07', memberSplits: [], status: 'confirmed'
+    }
+
+    const afterIncome = applyConfirmedTransaction(dashboard, income)
+    const afterTransfer = applyConfirmedTransaction(afterIncome, transfer)
+
+    expect(afterTransfer).toMatchObject({
+      availablePaise: 16_300_000,
+      incomePaise: 2_500_000,
+      spendPaise: 0,
+      monthly: [{ month: 'Aug', incomePaise: 2_500_000, spendPaise: 0 }]
+    })
   })
 })

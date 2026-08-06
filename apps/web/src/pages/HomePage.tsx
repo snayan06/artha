@@ -81,7 +81,7 @@ export function HomePage({ dashboard, demoMode, profile }: { dashboard: Dashboar
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-[.92fr_1.08fr]">
-        <Card className="p-5 sm:p-6">
+        <Card className="min-w-0 p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-display text-lg font-bold tracking-[-0.02em]">Six-month rhythm</h2>
@@ -91,7 +91,7 @@ export function HomePage({ dashboard, demoMode, profile }: { dashboard: Dashboar
           <div className="mt-3"><SpendChart data={dashboard.monthly} /></div>
         </Card>
 
-        <Card className="p-5 sm:p-6">
+        <Card className="min-w-0 p-5 sm:p-6">
           <div className="mb-1 flex items-center justify-between">
             <h2 className="font-display text-lg font-bold tracking-[-0.02em]">Recent activity</h2>
             <AppLink to="/transactions" className="inline-flex min-h-11 items-center text-xs font-semibold text-moss-700 hover:text-moss-900">View all</AppLink>
