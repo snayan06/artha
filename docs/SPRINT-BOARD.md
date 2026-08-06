@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 6 August 2026
+Updated: 7 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -27,8 +27,9 @@ Sprint 1 dependency.
 | Server-owned onboarding/profile | Deployed; acceptance pending | Profile, household and members hydrate from the server; final-domain cross-device acceptance remains |
 | ₹25k self-transfer flow | Deployed | Parser, review UI, atomic backend and history projection are live; authenticated smoke remains |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
-| Structured Qwen capture | Hosted baseline run | Qwen key/model work; 16 valid responses passed and 34 cases were unavailable, so availability diagnostics and a paced resume are next |
+| Structured Gemini features | Release candidate | Capture 50/50, auto-tag 30/30 and assistant 24/24 fictional hosted gates passed; production variables are configured and deployment verification is next |
 | Parser evaluation dataset | Done | 50 fictional cases plus an automated contract checker are in the repository |
+| Private AI learning/eval ledger | Priority next | Audited private interactions, user corrections, token budgets and eval runs need RLS-backed storage, export/delete controls and sanitized dataset promotion |
 | Accounts & family | Next implementation track | Product contract and secure architecture are complete; owner maintenance ships before invitations |
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
@@ -76,7 +77,7 @@ Sprint 1 dependency.
 
 ### Structured LLM parsing and evaluation
 
-- [x] Define a strict Qwen capture schema for kind, paise, accounts, category, members and date.
+- [x] Define a strict provider-neutral capture schema for kind, paise, accounts, category, members and date.
 - [x] Ground every model-selected ID against server-provided allow-lists.
 - [x] Reject invented account, category or member IDs.
 - [x] Represent `draft`, `clarify` and `reject` as separate model outcomes.
@@ -88,11 +89,12 @@ Sprint 1 dependency.
 - [x] Validate dataset IDs, allow-listed entities, outcomes and integer-paise values in CI.
 - [x] Gate 22 common/safety-critical deterministic drafts plus negative, ambiguous and unknown-member input.
 - [x] Add a hosted-model evaluation runner with field/outcome/tag slices and sanitized reports.
-- [x] Configure a local server-only Groq key and verify `qwen/qwen3.6-27b` availability.
-- [x] Run the first hosted baseline: 16 valid responses passed and 34 cases were unavailable.
-- [ ] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
-- [ ] Respect `Retry-After`, back off safely, checkpoint progress and resume the unfinished cases.
-- [ ] Publish final field/error slices only after all 50 cases receive a valid scored outcome.
+- [x] Preserve the Qwen/Groq baseline as historical provider evidence.
+- [x] Add Gemini through the official server-side SDK with `store=false` and deterministic fallback.
+- [x] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
+- [x] Respect `Retry-After`, back off safely, checkpoint progress and resume unfinished cases.
+- [x] Pass the hosted fictional gates: capture 50/50, auto-tag 30/30 and assistant 24/24.
+- [ ] Verify the deployed production API reports Gemini and completes one fictional request for each feature path.
 
 ## Sprint 2 — Accounts & family
 
@@ -129,19 +131,26 @@ and [`artifacts/architecture/v2-accounts-family-management.md`](artifacts/archit
 | S2-10 | Planned | Store private capture feedback: original text, parser/model/version, proposed JSON and user-confirmed JSON | Privacy/schema review | Enabled by default with clear onboarding disclosure; never written before review |
 | S2-11 | Planned | Add Settings toggle plus export and delete-all controls | S2-10 | Household can disable, export and permanently remove learning history |
 | S2-12 | Planned | Promote reviewed, sanitized examples into versioned eval cases | S2-10 | No automatic external training or public dataset use without separate consent |
+| S2-13 | Priority next | Add token-budget scheduler and per-case checkpoints for capture, auto-tagging and assistant evals | Hosted benchmark evidence | RPM/RPD/TPM/TPD headers are respected; unfinished cases resume without repeated completed calls |
+| S2-14 | Priority next | Add RLS-backed `ai_interactions` and append-only `ai_interaction_reviews` audit tables | Privacy contract | Only the owning household can read/export/delete; no keys, provider prose or account numbers are stored |
+| S2-15 | Planned | Add `model_eval_runs` and `model_eval_cases` with versioned model/prompt/schema metadata | S2-13 | Every benchmark and failure is queryable without storing private input text |
+
+Detailed schema and privacy rules: [`artifacts/architecture/private-ai-learning-eval-ledger.md`](artifacts/architecture/private-ai-learning-eval-ledger.md).
 
 ## Sprint 3 — recovery, production quality and measured AI
 
 ### Recovery and corrections
 
-- [ ] Define a versioned export bundle with schema version and checksums.
-- [ ] Add client-side encrypted export; the passphrase never reaches Artha.
-- [ ] Restore first into a new or empty household with a full preview and atomic validation.
+- [x] Define a versioned export bundle with schema version and checksums.
+- [x] Add client-side encrypted export; the passphrase never reaches Artha.
+- [x] Restore first into a new or empty household with a full preview and atomic validation.
 - [ ] Add correction, soft-delete, settlement and dedicated per-account activity UI.
-- [ ] Prove restored balances, transfers, splits and audit facts match the source ledger.
+- [x] Prove restored balances, transfers, splits and audit facts match in local SQL round-trip acceptance.
+- [ ] Repeat the encrypted export/restore drill with fictional data on the final domain.
 
 ### Production quality
 
+- [x] Add Vercel Web Analytics and Speed Insights with query/fragment redaction tests.
 - [ ] Record cold/warm authenticated latency after the Mumbai deployment.
 - [ ] Add privacy-first Sentry error monitoring after explicit approval: error events only, no Session Replay, financial payloads, emails or IP collection, with client/server redaction tests.
 - [ ] Add a deliberate per-user rate-limit policy.
@@ -160,7 +169,7 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 
 - [x] Add deterministic and hosted-model scoring runners for the 50-case dataset.
 - [ ] Publish separate amount/date/account/transfer/split/Hinglish error slices.
-- [ ] Enable hosted Qwen only if the agreed critical-field thresholds pass.
+- [x] Select hosted Gemini for fictional pilot traffic after all critical-field gates pass.
 - [ ] Show assistant evidence range, source count and matching transactions.
 - [ ] Prove assistant totals equal deterministic database calculations.
 
@@ -195,7 +204,8 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 
 1. Complete one final-domain sign-in link in the same browser that requested it.
 2. Provide a second test email identity for isolation testing; do not share passwords or email tokens.
-3. Create a Groq API key when ready; enter it directly in Vercel, never in chat or source control.
+3. Production Gemini variables are configured. Save the key in the ignored local
+   `.env` only if local hosted evaluation is required; never commit it.
 
 ## Completion update format
 

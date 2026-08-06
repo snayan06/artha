@@ -12,6 +12,9 @@ Current feature artifacts:
 
 - [Atomic account-transfer contract](v1-atomic-transfer.md)
 - [LLM usage map and safety boundary](v1-llm-usage-map.md)
+- [Encrypted ledger recovery](v1-encrypted-ledger-recovery.md)
+- [Gemini provider evaluation and safety decision](2026-08-06-gemini-provider-evaluation.md)
+- [Private AI learning and evaluation ledger](private-ai-learning-eval-ledger.md)
 - [Sprint 2 Accounts & family product contract](sprint-2-accounts-family-contract.md)
 - [Accounts & family implementation architecture](v2-accounts-family-management.md)
 

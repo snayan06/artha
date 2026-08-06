@@ -59,11 +59,16 @@ SUPABASE_URL=https://vggvufukkkirlwxqkjhz.supabase.co
 SUPABASE_ANON_KEY=<publishable-or-anon-key>
 SUPABASE_JWT_AUDIENCE=authenticated
 ARTHA_LLM_PROVIDER=disabled
+# Add only after the fictional-data model gate passes:
+# ARTHA_LLM_PROVIDER=gemini
+# ARTHA_GEMINI_API_KEY=<server-side-key>
+# ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 Use the actual PWA origin if Vercel assigns a different name. Do not add the
 service-role key. Keep the hosted model disabled until the ledger acceptance gate
-passes; later, add the Groq key only to `artha-api`.
+passes; later, add the Gemini key only to `artha-api`. Never add it to the web
+project or any `VITE_` variable.
 
 ## 3. React PWA on Vercel Hobby
 

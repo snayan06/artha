@@ -22,19 +22,30 @@ REQUIRED_RPCS = {
         "p_limit": 1,
         "p_offset": 0,
     },
+    "export_household_bundle": {},
+    "restore_household_bundle": {
+        "p_bundle": {},
+        "p_idempotency_key": "catalog-probe",
+    },
 }
 
 
 def probe_rpc(base_url: str, anon_key: str, name: str, payload: dict[str, object]) -> None:
+    headers = {
+        "apikey": anon_key,
+        "Content-Type": "application/json",
+    }
+    # Legacy anon keys are JWTs and may also act as the anonymous bearer token.
+    # New sb_publishable keys authenticate only through the apikey header; using
+    # one as a bearer token fails at the gateway before PostgREST can resolve the
+    # RPC, which would make a missing function look healthy.
+    if anon_key.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {anon_key}"
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/rest/v1/rpc/{name}",
         data=json.dumps(payload).encode(),
         method="POST",
-        headers={
-            "apikey": anon_key,
-            "Authorization": f"Bearer {anon_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(request, timeout=15) as response:

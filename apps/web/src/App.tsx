@@ -13,6 +13,7 @@ import { QuickAddPage } from './pages/QuickAddPage'
 import { SharedPage } from './pages/SharedPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { AssistantPage } from './pages/AssistantPage'
+import { SettingsPage } from './pages/SettingsPage'
 import type { AccountSetupInput, Dashboard, Transaction, TransactionDraft, UserProfile } from './types'
 
 const SETUP_KEY = 'artha.setup.complete'
@@ -205,7 +206,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
 
   if (checkingSetup) return <SessionLoadingPage />
   if (setupIssue) return <LedgerLoadError issue={setupIssue} onRetry={checkSetup} onSignOut={onSignOut} />
-  if (!setupComplete) return <OnboardingPage onSave={finishSetup} onExploreDemo={exploreDemo} allowDemo={localDemo} />
+  if (!setupComplete) return <OnboardingPage onSave={finishSetup} onExploreDemo={exploreDemo} onRestored={checkSetup} allowDemo={localDemo} />
   if (loadingLedger) return <SessionLoadingPage />
   if (ledgerIssue) return <LedgerLoadError issue={ledgerIssue} onRetry={refreshLedger} onSignOut={onSignOut} />
 
@@ -214,6 +215,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   if (path === '/shared') page = <SharedPage transactions={transactions} sharedBalancePaise={dashboard.sharedBalancePaise} memberBalances={dashboard.memberBalances} demoMode={demoMode} profile={profile} />
   if (path === '/add') page = <QuickAddPage onConfirm={addTransaction} members={profile.members} />
   if (path === '/assistant') page = <AssistantPage />
+  if (path === '/settings') page = <SettingsPage />
 
   return <Shell userEmail={userEmail} onSignOut={onSignOut}>{page}</Shell>
 }

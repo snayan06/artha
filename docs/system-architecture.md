@@ -23,7 +23,7 @@ This is the complete product architecture: user interface, API, authentication, 
 | Migrations | Supabase CLI SQL migrations | Keeps policies, functions and schema versioned together |
 | Frontend hosting | Vercel Hobby | Static Vite PWA under the same personal provider as the API |
 | Python hosting | Vercel Python runtime | FastAPI function without Render's minute-long idle wake-up |
-| AI inference | Experimental Qwen3.6-27B on Groq; local Qwen3 4B on Ollama fallback | Multimodal open-weight pilot model, private local option, no required AI dependency |
+| AI inference | Gemini 3.5 Flash-Lite via the official SDK; Groq and local Qwen alternatives | Strong structured extraction, provider portability, private local option, no required AI dependency |
 | Files | Supabase Storage Free | Receipt images later, protected by household policy |
 | CI | GitHub Actions Free | Lint, types, tests and migration checks |
 
@@ -40,7 +40,8 @@ FastAPI API
    └── assistant → approved read-only tools → validated UI schema
                           │
                  provider adapter
-                  ├── Groq / Qwen3.6-27B
+                  ├── Gemini 3.5 Flash-Lite
+                  ├── Groq
                   └── Ollama / Qwen3 4B
                          │
                          ▼
@@ -125,7 +126,7 @@ The React app maps these types to reviewed components: `MetricCard`, `LineChart`
 - PWA: Vercel Hobby project rooted at `apps/web` on a `vercel.app` URL.
 - API: separate Vercel Hobby project rooted at `apps/api` on a `vercel.app` URL.
 - Auth/database/storage: Supabase Free.
-- AI: Groq's free-plan hosted Qwen allowance, with local Ollama and manual fallbacks.
+- AI: Gemini's free developer tier for fictional evaluation, with Groq, local Ollama and manual fallbacks.
 - Source/CI: public GitHub repository and GitHub Actions.
 
 This is genuinely usable at ₹0 for the user's private pilot. The limitations are explicit:
@@ -134,7 +135,7 @@ This is genuinely usable at ₹0 for the user's private pilot. The limitations a
 - Vercel functions have usage, duration and bundle-size limits; the API must fail explicitly when unavailable.
 - Supabase can pause a free project after one inactive week and does not include managed backups.
 - Free hosted AI capacity is capped and provider policies can change; capture still works through rules and manual review.
-- Qwen3.6-27B is an experimental pilot choice; a Artha-specific model evaluation is required before production lock-in.
+- Free-tier Gemini data terms are not appropriate for real family finance; use a paid privacy configuration or keep hosted AI disabled.
 - A custom domain and WhatsApp Business messaging are not included in the ₹0 promise.
 
 The checked-in Render blueprint remains a container fallback, but its free service

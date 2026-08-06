@@ -1,4 +1,4 @@
-import { Bot, Home, List, LogOut, Plus, UsersRound, WifiOff } from 'lucide-react'
+import { Bot, Home, List, LogOut, Plus, Settings, UsersRound, WifiOff } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useOnlineStatus } from '../lib/network'
 import { AppLink, type AppPath, useRouter } from '../lib/router'
@@ -26,7 +26,7 @@ export function Shell({ children, userEmail, onSignOut }: { children: ReactNode;
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-moss-900 font-display text-lg font-bold text-white dark:bg-[#27604e]">H</span>
             <div className="text-left"><p className="font-display text-lg font-bold leading-none tracking-[-0.03em]">Artha</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
           </AppLink>
-          <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">{overviewLabel} overview</span><ThemeControl />{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:border-moss-300 hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Sign out"><LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Sign out</span></button>}</div>
+          <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">{overviewLabel} overview</span><ThemeControl /><AppLink to="/settings" className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-line bg-white text-[#66736d] tone-muted transition hover:border-moss-300 hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-surface" aria-label="Open settings"><Settings className="h-4 w-4" aria-hidden="true" /></AppLink>{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:border-moss-300 hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:border-night-border dark:bg-night-surface" aria-label="Sign out"><LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Sign out</span></button>}</div>
         </div>
       </header>
 

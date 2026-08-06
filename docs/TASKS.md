@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff and release guard.
 
-Updated: 5 August 2026
+Updated: 7 August 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
@@ -51,7 +51,7 @@ For the current ordered delivery view, blockers and user actions, see
    - [ ] Keep same-household member invitations disabled until the V2 authorization flow is complete.
    - Done when: the final-domain isolation scenario passes with two real test identities.
 5. **Complete recovery and production QA.**
-   - [ ] Implement encrypted export and tested restore.
+   - [x] Implement encrypted export and tested local restore.
    - [ ] Execute every production-pending row in the V1 QA matrix.
    - [ ] Recheck 320 px, 390 px and desktop layouts in light and dark modes.
    - Done when: recovery evidence, final URLs and the signed-off QA report are recorded.
@@ -59,12 +59,12 @@ For the current ordered delivery view, blockers and user actions, see
 ### P1 — private-pilot improvements
 
 - [x] Add a versioned 50-case fictional capture/parser dataset and CI contract checker.
-- [x] Add deterministic and hosted-Qwen scoring runners with sanitized accuracy/error slices.
+- [x] Add deterministic and hosted-provider scoring runners with sanitized accuracy/error slices.
 - [ ] Add edit, correction and soft-delete controls to the UI for the existing API operations.
 - [ ] Show assistant evidence date range, source count and matching transactions.
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
-- [ ] Run the 50-case hosted-model benchmark before locking the production model.
-- [ ] Configure the selected hosted Qwen provider only after the benchmark and privacy review.
+- [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the pilot model.
+- [x] Select Gemini 3.5 Flash-Lite for fictional pilot traffic and configure it server-side only.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
 
 ### P2 — expansion after the private pilot
@@ -159,10 +159,11 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Create a fresh Artha Supabase project and apply all versioned migrations.
 - [ ] Repeat anonymous-denial and two-household RLS isolation against the fresh project.
 - [x] Deploy the FastAPI API and React PWA, then configure exact CORS and magic-link redirect origins.
-- [ ] Add the server-side Groq key and enable experimental Qwen3.6-27B without exposing it to the browser.
+- [x] Add the server-side Gemini key and model configuration without exposing it to the browser.
 - [ ] Test login, onboarding, four bank accounts, multiple cards, backdated capture and family splits on the final domain.
 - [ ] Verify mobile layouts at 320 px and 390 px plus desktop, including light and dark modes.
-- [ ] Implement encrypted export/restore and complete a recovery drill before entering real financial data.
+- [x] Implement encrypted export/restore and pass the local recovery drill.
+- [ ] Repeat the encrypted recovery drill with fictional data on the final domain before entering real financial data.
 - [x] Record final URLs, ownership and environment inventory in `docs/artifacts/qa/`; keep adding acceptance evidence as tests pass.
 
 ## Assistant preview and V2
@@ -176,11 +177,11 @@ For the current ordered delivery view, blockers and user actions, see
   - [ ] Cover empty, duplicate-name, outstanding-over-limit and archived-account edge cases.
   - [ ] Verify the management screens at 320 px, 390 px and desktop in light and dark modes.
 - [ ] Invite selected participants as authenticated household members.
-- [x] Add hosted Qwen3.6-27B and local Qwen3 4B provider adapters.
+- [x] Add Gemini, hosted Groq/open-weight and local Ollama provider adapters.
 - [x] Add analytics assistant with user-scoped read-only summaries.
 - [x] Return validated metric, chart and transaction-table schemas.
 - [ ] Show evidence date range, source count and matching transactions.
 - [ ] Add evaluation cases for totals, comparisons and affordability questions.
-- [ ] Build a representative 50-case Artha model benchmark covering Indian merchants, backdated entries, account selection, family splits, categories, tool choice and structured UI; compare Qwen3.6-27B with at least two current hosted alternatives before production lock-in.
+- [x] Build versioned fictional capture, auto-tag and assistant benchmarks and select Gemini for the pilot from measured results.
 - [ ] Add optional Telegram/WhatsApp capture adapter.
 - [ ] Add investments, liabilities and net-worth model.

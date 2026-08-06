@@ -32,6 +32,10 @@ Use lowercase kebab-case and include the milestone or date when useful:
 
 - [Natural-language transfer review](ui/v1-natural-language-transfer.md)
 - [Magic-link recovery states](ui/v1-auth-recovery.md)
+- [Encrypted export and restore UI](ui/v1-encrypted-recovery.md)
+- [Encrypted recovery architecture](architecture/v1-encrypted-ledger-recovery.md)
+- [Recovery and isolation acceptance](qa/2026-08-06-encrypted-recovery.md)
+- [Consolidated Gemini, recovery and telemetry release](qa/2026-08-07-consolidated-gemini-recovery-release.md)
 - [Account activity filter](ui/v1-account-activity-filter.md)
 - [Atomic transfer contract](architecture/v1-atomic-transfer.md)
 - [LLM usage and safety map](architecture/v1-llm-usage-map.md)
