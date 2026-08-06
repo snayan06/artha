@@ -1,0 +1,23 @@
+{
+  "currency": "INR",
+  "total_balance_paise": 1500000,
+  "current_month_spend_paise": 250000,
+  "current_month_income_paise": 800000,
+  "member_balances": [
+    {"member_name": "Avery", "balance_paise": 40000},
+    {"member_name": "Blair", "balance_paise": -15000}
+  ],
+  "top_categories": [
+    {"category": "Food", "amount_paise": 120000},
+    {"category": "Transport", "amount_paise": 80000},
+    {"category": "Bills", "amount_paise": 50000}
+  ],
+  "monthly": [
+    {"month": "Jul", "income_paise": 750000, "spend_paise": 300000},
+    {"month": "Aug", "income_paise": 800000, "spend_paise": 250000}
+  ],
+  "recent_transactions": [
+    {"occurred_on": "2026-08-04", "kind": "expense", "personal_share_paise": 42000, "category": "Food"},
+    {"occurred_on": "2026-08-03", "kind": "income", "personal_share_paise": 800000, "category": "Income"}
+  ]
+}

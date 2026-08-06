@@ -26,8 +26,8 @@ built around a five-second workflow:
 4. See account movement, personal spending and the shared balance update.
 
 Parsing never writes directly to the ledger. Common capture remains usable
-without an AI provider through a deterministic parser. When enabled, Qwen may
-propose a strict structured draft grounded only in the user's existing accounts,
+without an AI provider through a deterministic parser. When enabled, Gemini may
+propose a structured draft grounded only in the user's existing accounts,
 categories and family participants; the user still reviews it before any write.
 
 ## V1 features
@@ -56,12 +56,13 @@ categories and family participants; the user still reviews it before any write.
 flowchart LR
     PWA["React PWA"] -->|"validated draft and confirmation"| API["FastAPI"]
     API --> PARSER["Deterministic capture parser"]
-    API -. "optional structured interpretation" .-> QWEN["Qwen via provider adapter"]
+    API -. "optional structured interpretation" .-> GEMINI["Gemini via official SDK"]
     API --> LEDGER["Ledger service"]
     LEDGER --> LOCAL["SQLite local demo"]
     LEDGER --> DB["Supabase Postgres and RLS"]
     API --> ASSISTANT["Validated assistant UI"]
-    ASSISTANT -. "experimental hosted default" .-> GROQ["Groq and Qwen3.6-27B"]
+    ASSISTANT -. "hosted model" .-> GEMINI
+    ASSISTANT -. "optional open-weight provider" .-> GROQ["Groq"]
     ASSISTANT -. "local fallback" .-> OLLAMA["Ollama and Qwen3 4B"]
 ```
 
@@ -71,7 +72,7 @@ flowchart LR
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async |
 | Local data | SQLite and aiosqlite |
 | Production data | Supabase Postgres, Auth, RLS and REST/RPC adapter |
-| Optional AI | Open-weight Qwen via Groq or local Ollama; strict schema and deterministic fallback |
+| Optional AI | Gemini via the official Google SDK, with Groq or local Ollama alternatives; validated output and deterministic fallback |
 | Quality | Vitest, pytest, ESLint, Ruff and strict mypy |
 | CI | GitHub Actions |
 
@@ -127,22 +128,25 @@ make dev-web
 Open <http://127.0.0.1:5173>. Interactive API documentation is available at
 <http://127.0.0.1:8000/docs>.
 
-### Optional experimental open-weight assistant
+### Optional Gemini assistant
 
 Capture and manual analytics work without an LLM. The private pilot uses
-Qwen3.6-27B as an experimental hosted default; it remains behind the provider
-adapter and is not trusted to write or calculate ledger values. To enable it,
-create a Groq API key and keep it only in the API environment:
+`gemini-3.5-flash-lite` behind the provider adapter; it is not trusted to write
+or calculate ledger values. Keep the API key only in the server environment:
 
 ```dotenv
-ARTHA_LLM_PROVIDER=groq
-ARTHA_GROQ_API_KEY=your-server-side-key
-ARTHA_GROQ_MODEL=qwen/qwen3.6-27b
+ARTHA_LLM_PROVIDER=gemini
+ARTHA_GEMINI_API_KEY=your-server-side-key
+ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-For a private local fallback, install Ollama, pull `qwen3:4b-instruct`, and set
-`ARTHA_LLM_PROVIDER=ollama`. Provider failure falls back to deterministic cards
-and manual tagging; it never blocks ledger capture.
+Gemini requests are stateless (`store=false`) and model output is validated by
+Artha before use. Google's free tier may use submitted content to improve its
+products, so use fictional data on the free tier; real family finance should use
+an appropriate paid privacy configuration. For a private local fallback, install
+Ollama, pull `qwen3:4b-instruct`, and set `ARTHA_LLM_PROVIDER=ollama`. Provider
+failure falls back to deterministic cards and manual tagging; it never blocks
+ledger capture.
 
 ## Quality gate
 

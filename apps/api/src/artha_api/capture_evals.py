@@ -866,6 +866,10 @@ async def _run_model_evaluation(
         raise RuntimeError(
             "Groq is selected but its server-side key is missing; use --mode validate"
         )
+    if settings.provider is LlmProvider.GEMINI and not settings.gemini_api_key:
+        raise RuntimeError(
+            "Gemini is selected but its server-side key is missing; use --mode validate"
+        )
     assistant = LocalFinancialAssistant(settings)
     initial_scores: tuple[CaseScore, ...] = ()
     if resume:

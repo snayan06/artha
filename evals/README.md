@@ -1,7 +1,7 @@
 # Capture parser evaluation dataset
 
 `capture-parser-v1.jsonl` is the versioned fictional acceptance set for both the
-deterministic parser and hosted Qwen capture interpretation. Every case uses the
+deterministic parser and hosted capture interpretation. Every case uses the
 allow-listed entities in `capture-context-v1.json` and a fixed date/timezone so
 relative-date expectations are reproducible.
 
@@ -56,9 +56,29 @@ checkpoints deliberately omit utterances, provider response bodies and
 model-generated free text. The command exits non-zero when either the strict case
 pass rate or coverage gate is missed.
 
-The Vitest suite imports this same dataset and gates the common and
+`tag-suggestions-v1.jsonl` adds 30 fictional auto-tagging cases. The suite
+measures clear category matches separately from ambiguous/unknown inputs that
+must safely produce no suggestion. `assistant-context-v1.json` and
+`assistant-questions-v1.jsonl` add 24 read-only assistant cases covering
+approved widgets, deterministic financial values, unsupported writes and
+prompt-injection attempts.
+
+Validate all three datasets without calling a model:
+
+```bash
+make eval-capture-validate
+make eval-feature-validate
+```
+
+After configuring the server-only key, run the GPT-OSS 20B feature suites with:
+
+```bash
+ARTHA_LLM_PROVIDER=groq ARTHA_GROQ_MODEL=openai/gpt-oss-20b make eval-feature-hosted
+```
+
+The Vitest suite imports the capture dataset and gates the common and
 safety-critical behavior required from the no-provider browser fallback. The
-hosted runner scores all 50 records before Qwen is enabled in production.
+hosted runners must complete all cases before any model is enabled in production.
 
 No real names, account numbers, emails, merchants tied to the user, tokens or
 financial values are allowed in this directory.

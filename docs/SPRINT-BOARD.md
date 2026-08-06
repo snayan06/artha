@@ -29,6 +29,7 @@ Sprint 1 dependency.
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
 | Structured Qwen capture | Hosted baseline run | Qwen key/model work; 16 valid responses passed and 34 cases were unavailable, so availability diagnostics and a paced resume are next |
 | Parser evaluation dataset | Done | 50 fictional cases plus an automated contract checker are in the repository |
+| Private AI learning/eval ledger | Priority next | Audited private interactions, user corrections, token budgets and eval runs need RLS-backed storage, export/delete controls and sanitized dataset promotion |
 | Accounts & family | Next implementation track | Product contract and secure architecture are complete; owner maintenance ships before invitations |
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
@@ -129,6 +130,11 @@ and [`artifacts/architecture/v2-accounts-family-management.md`](artifacts/archit
 | S2-10 | Planned | Store private capture feedback: original text, parser/model/version, proposed JSON and user-confirmed JSON | Privacy/schema review | Enabled by default with clear onboarding disclosure; never written before review |
 | S2-11 | Planned | Add Settings toggle plus export and delete-all controls | S2-10 | Household can disable, export and permanently remove learning history |
 | S2-12 | Planned | Promote reviewed, sanitized examples into versioned eval cases | S2-10 | No automatic external training or public dataset use without separate consent |
+| S2-13 | Priority next | Add token-budget scheduler and per-case checkpoints for capture, auto-tagging and assistant evals | Hosted benchmark evidence | RPM/RPD/TPM/TPD headers are respected; unfinished cases resume without repeated completed calls |
+| S2-14 | Priority next | Add RLS-backed `ai_interactions` and append-only `ai_interaction_reviews` audit tables | Privacy contract | Only the owning household can read/export/delete; no keys, provider prose or account numbers are stored |
+| S2-15 | Planned | Add `model_eval_runs` and `model_eval_cases` with versioned model/prompt/schema metadata | S2-13 | Every benchmark and failure is queryable without storing private input text |
+
+Detailed schema and privacy rules: [`artifacts/architecture/private-ai-learning-eval-ledger.md`](artifacts/architecture/private-ai-learning-eval-ledger.md).
 
 ## Sprint 3 — recovery, production quality and measured AI
 

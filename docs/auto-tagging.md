@@ -11,7 +11,7 @@ without confirmation.
    `contains`, then carefully validated `regex`).
 3. Apply safe built-in signals for obvious income, transfers, and settlements.
 4. If the category is still unresolved, request a structured suggestion from
-   the configured open-weight model.
+   the configured model provider.
 5. Validate that the returned category already exists in the household and show
    its confidence and reason in the draft review.
 6. Save only after the user confirms. When the user corrects the category, offer
@@ -58,9 +58,10 @@ and confirmation workflow.
 
 ## Provider behavior
 
-The experimental private-pilot default is Qwen3.6-27B through Groq. Local/private
-use can select Qwen3 4B through Ollama. Both providers implement the same
-internal interface and strict response schema. When a provider is missing,
-rate-limited, unavailable or returns invalid output, Artha falls back to manual
-category selection without blocking transaction entry. A representative model
-comparison is tracked in the backlog before any production model is locked.
+The private-pilot candidate is `gemini-3.5-flash-lite` through Google's official
+SDK. Groq and local Qwen through Ollama remain provider alternatives. All
+providers implement the same internal interface, constrained schema and
+allow-list grounding. When a provider is missing, rate-limited, unavailable or
+returns invalid output, Artha falls back to manual category selection without
+blocking transaction entry. Gemini requests use `store=false`; provider storage
+does not replace Artha's household-scoped, consent-controlled audit design.

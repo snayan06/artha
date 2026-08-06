@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -22,6 +24,66 @@ from artha_api.assistant import (
     TagCategory,
     TagSuggestionRequest,
 )
+
+
+class FakeGeminiInteractions:
+    def __init__(self, output_text: str) -> None:
+        self.output_text = output_text
+        self.calls: list[dict[str, object]] = []
+
+    async def create(self, **body: object) -> SimpleNamespace:
+        self.calls.append(body)
+        return SimpleNamespace(output_text=self.output_text, status="completed")
+
+
+class FakeGeminiModels:
+    def __init__(self) -> None:
+        self.requested: list[str] = []
+
+    async def get(self, *, model: str) -> SimpleNamespace:
+        self.requested.append(model)
+        return SimpleNamespace(name=model)
+
+
+class FakeGeminiClient:
+    def __init__(self, output_text: str) -> None:
+        self.aio = SimpleNamespace(
+            interactions=FakeGeminiInteractions(output_text),
+            models=FakeGeminiModels(),
+        )
+
+
+def test_groq_defaults_to_gpt_oss_20b(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "groq")
+    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "test-key")
+    monkeypatch.delenv("ARTHA_GROQ_MODEL", raising=False)
+
+    direct = AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key")
+    from_env = AssistantSettings.from_env()
+
+    assert direct.groq_model == "openai/gpt-oss-20b"
+    assert from_env.groq_model == "openai/gpt-oss-20b"
+    assert "test-key" not in repr(direct)
+    assert "test-key" not in str(asdict(direct) | {"groq_api_key": "redacted"})
+
+
+def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARTHA_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "gemini-test-key")
+    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "groq-test-key")
+    monkeypatch.delenv("ARTHA_GEMINI_MODEL", raising=False)
+
+    direct = AssistantSettings(
+        provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
+    )
+    from_env = AssistantSettings.from_env()
+
+    assert direct.gemini_model == "gemini-3.5-flash-lite"
+    assert from_env.provider is LlmProvider.GEMINI
+    assert from_env.gemini_model == "gemini-3.5-flash-lite"
+    assert "gemini-test-key" not in repr(direct)
 
 
 @pytest.fixture
@@ -109,12 +171,63 @@ async def test_groq_uses_strict_structured_output_without_tools_or_raw_rows(
     assert isinstance(body, dict)
     assert "tools" not in body
     assert body["temperature"] == 0
-    assert body["response_format"] == {"type": "json_object"}
-    assert body["reasoning_effort"] == "none"
+    response_format = body["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["name"] == "artha_assistant_completion"
+    assert response_format["json_schema"]["strict"] is True
+    schema = response_format["json_schema"]["schema"]
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == set(schema["properties"])
+    assert body["reasoning_effort"] == "low"
+    system_prompt = body["messages"][0]["content"]
+    assert "intent=unsupported" in system_prompt
+    assert "cashflow" in system_prompt
+    assert "recent activity" in system_prompt.casefold()
     prompt = body["messages"][1]["content"]
     assert "account_id" not in prompt
     assert "description" not in prompt
     assert "notes" not in prompt
+
+
+@pytest.mark.asyncio
+async def test_gemini_uses_private_stateless_structured_output(
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = {
+        "intent": "spending",
+        "widgets": [
+            {
+                "type": "metric",
+                "title": "Spending this month",
+                "value_paise": 250000,
+                "caption": None,
+                "tone": "neutral",
+            }
+        ],
+    }
+    gemini = FakeGeminiClient(json.dumps(completion))
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(
+            provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
+        ),
+        gemini_client=gemini,
+    )
+    response = await assistant.chat("Show spending", financial_context)
+
+    assert response.mode == "model"
+    assert response.provider == "gemini"
+    body = gemini.aio.interactions.calls[0]
+    assert body["model"] == "gemini-3.5-flash-lite"
+    assert body["store"] is False
+    assert body["generation_config"]["thinking_level"] == "minimal"
+    assert body["response_format"]["mime_type"] == "application/json"
+    assert "schema" not in body["response_format"]
+    assert "intent=unsupported" in body["system_instruction"]
+    normalized_prompt = " ".join(body["system_instruction"].casefold().split())
+    assert "top spending categories must use a chart" in normalized_prompt
+    assert "cashflow comparison must use a chart" in normalized_prompt
+    assert "tools" not in body
 
 
 @pytest.mark.asyncio
@@ -132,6 +245,13 @@ async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_acco
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         assert "25k means 25,000 rupees" in body["messages"][0]["content"]
+        assert "include every field required" in body["messages"][0]["content"]
+        assert "selected outcome schema" in body["messages"][0]["content"]
+        response_format = body["response_format"]
+        assert response_format["type"] == "json_schema"
+        assert response_format["json_schema"]["name"] == "artha_capture_interpretation"
+        assert response_format["json_schema"]["strict"] is True
+        assert body["reasoning_effort"] == "low"
         interpretation = {
             "outcome": "draft",
             "kind": "transfer",
@@ -149,7 +269,11 @@ async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_acco
         }
         return httpx.Response(
             200,
-            json={"choices": [{"message": {"content": json.dumps(interpretation)}}]},
+            json={
+                "choices": [
+                    {"message": {"content": json.dumps({"result": interpretation})}}
+                ]
+            },
         )
 
     assistant = LocalFinancialAssistant(
@@ -165,6 +289,61 @@ async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_acco
     assert response.result.amount_paise == 2_500_000
     assert response.result.source_account_id == "icici-id"
     assert response.result.destination_account_id == "hdfc-id"
+
+
+@pytest.mark.asyncio
+async def test_gemini_capture_interpretation_resolves_25k_transfer() -> None:
+    context = CaptureContext(
+        today="2026-08-04",
+        timezone="Asia/Kolkata",
+        accounts=[
+            CaptureAccount(id="icici-id", name="ICICI Bank", kind="bank"),
+            CaptureAccount(id="hdfc-id", name="HDFC Bank", kind="bank"),
+        ],
+        categories=[CaptureCategory(id="other-id", name="Other", kind="both")],
+    )
+
+    interpretation = {
+        "outcome": "draft",
+        "kind": "transfer",
+        "amount_paise": 2_500_000,
+        "description": "Self transfer",
+        "category_id": None,
+        "category_name": None,
+        "source_account_id": "icici-id",
+        "destination_account_id": "hdfc-id",
+        "member_ids": [],
+        "split_equally": False,
+        "occurred_on": "2026-08-04",
+        "confidence": 0.99,
+        "warnings": [],
+    }
+    gemini = FakeGeminiClient(json.dumps({"result": interpretation}))
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(
+            provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
+        ),
+        gemini_client=gemini,
+    )
+    response = await assistant.interpret_capture(
+        "self transfer 25k ICICI -> HDFC", context
+    )
+
+    assert response is not None
+    assert response.provider == "gemini"
+    assert response.result.amount_paise == 2_500_000
+    assert response.result.source_account_id == "icici-id"
+    assert response.result.destination_account_id == "hdfc-id"
+    body = gemini.aio.interactions.calls[0]
+    assert body["store"] is False
+    assert "25k means 25,000 rupees" in body["system_instruction"]
+    normalized_prompt = " ".join(body["system_instruction"].casefold().split())
+    assert "loans, lending, borrowing, and emis" in normalized_prompt
+    assert "exact schema field identifiers" in normalized_prompt
+    assert "freelance income, refunds, and interest" in normalized_prompt
+    assert "named date such as 2 aug" in normalized_prompt
+    assert "payment to a person" in normalized_prompt
 
 
 @pytest.mark.asyncio
@@ -368,6 +547,14 @@ async def test_status_never_serializes_groq_key() -> None:
 async def test_tag_suggestion_is_grounded_in_allowed_categories() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
+        response_format = body["response_format"]
+        assert response_format["type"] == "json_schema"
+        assert response_format["json_schema"]["name"] == "artha_tag_suggestion"
+        assert response_format["json_schema"]["strict"] is True
+        assert body["reasoning_effort"] == "low"
+        system_prompt = body["messages"][0]["content"]
+        assert "generic payment" in system_prompt
+        assert "transfers and card payments" in system_prompt
         prompt = json.loads(
             body["messages"][1]["content"].split("\nRequired response JSON schema:\n")[0]
         )
@@ -407,6 +594,42 @@ async def test_tag_suggestion_is_grounded_in_allowed_categories() -> None:
     assert response.mode == "model"
     assert response.result.category_id == "food"
     assert response.result.confidence == 0.91
+
+
+@pytest.mark.asyncio
+async def test_gemini_tag_suggestion_is_grounded_in_allowed_categories() -> None:
+    suggestion = {
+        "category_id": "food",
+        "category_name": "Food",
+        "confidence": 0.91,
+        "reason": "The merchant is a restaurant.",
+    }
+    gemini = FakeGeminiClient(json.dumps(suggestion))
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(
+            provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
+        ),
+        gemini_client=gemini,
+    )
+    response = await assistant.suggest_tag(
+        TagSuggestionRequest(
+            description="Corner restaurant",
+            amount_paise=85000,
+            direction="expense",
+            allowed_categories=[
+                TagCategory(id="food", name="Food"),
+                TagCategory(id="travel", name="Travel"),
+            ],
+        )
+    )
+
+    assert response.mode == "model"
+    assert response.provider == "gemini"
+    assert response.result.category_id == "food"
+    body = gemini.aio.interactions.calls[0]
+    assert body["response_format"]["mime_type"] == "application/json"
+    assert "generic payment" in body["system_instruction"]
 
 
 @pytest.mark.asyncio
