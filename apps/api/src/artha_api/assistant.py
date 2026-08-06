@@ -433,7 +433,7 @@ class TagSuggestionRequest(StrictModel):
     description: str = Field(min_length=1, max_length=160)
     amount_paise: int = Field(gt=0)
     direction: Literal["expense", "income"]
-    allowed_categories: list[TagCategory] = Field(min_length=1, max_length=50)
+    allowed_categories: list[TagCategory] = Field(min_length=1, max_length=200)
 
     @field_validator("description")
     @classmethod

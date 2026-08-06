@@ -285,6 +285,58 @@ async def test_production_tag_suggestion_uses_only_eligible_household_categories
     assert [category.id for category in captured[0].allowed_categories] == expected_ids
 
 
+async def test_production_tag_suggestion_passes_more_than_fifty_categories(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeTagSuggestionClient(
+        [
+            {
+                "id": f"category-{index}",
+                "name": f"Category {index}",
+                "category_type": "expense",
+            }
+            for index in range(51)
+        ]
+    )
+    captured: list[TagSuggestionRequest] = []
+
+    class CapturingAssistant:
+        async def suggest_tag(
+            self, payload: TagSuggestionRequest
+        ) -> TagSuggestionResponse:
+            captured.append(payload)
+            category = payload.allowed_categories[-1]
+            return TagSuggestionResponse(
+                provider=LlmProvider.GEMINI,
+                model="test-model",
+                mode="model",
+                result=TagSuggestion(
+                    category_id=category.id,
+                    category_name=category.name,
+                    confidence=0.9,
+                    reason="Grounded in the complete household category list.",
+                ),
+            )
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", CapturingAssistant
+    )
+
+    result = await assistant_tag_suggestion(
+        ProductionTagSuggestionRequest(
+            description="Household transaction",
+            amount_paise=12_000,
+            direction="expense",
+        ),
+        cast(SupabaseRestClient, client),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert len(captured) == 1
+    assert len(captured[0].allowed_categories) == 51
+    assert result.result.category_id == "category-50"
+
+
 async def test_production_tag_suggestion_rejects_when_no_category_is_eligible(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

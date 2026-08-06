@@ -1127,6 +1127,33 @@ async def test_gemini_tag_suggestion_is_grounded_in_allowed_categories() -> None
     assert "generic payment" in body["system_instruction"]
 
 
+def test_tag_suggestion_request_accepts_production_category_capacity() -> None:
+    categories = [
+        TagCategory(id=f"category-{index}", name=f"Category {index}")
+        for index in range(200)
+    ]
+
+    request = TagSuggestionRequest(
+        description="Household transaction",
+        amount_paise=1_000,
+        direction="expense",
+        allowed_categories=categories,
+    )
+
+    assert len(request.allowed_categories) == 200
+
+    with pytest.raises(ValidationError, match="List should have at most 200 items"):
+        TagSuggestionRequest(
+            description="Household transaction",
+            amount_paise=1_000,
+            direction="expense",
+            allowed_categories=[
+                *categories,
+                TagCategory(id="category-200", name="Category 200"),
+            ],
+        )
+
+
 @pytest.mark.asyncio
 async def test_invented_tag_makes_category_suggestion_unavailable() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
