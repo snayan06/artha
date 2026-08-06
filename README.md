@@ -48,6 +48,8 @@ categories and family participants; the user still reviews it before any write.
 - FastAPI, Pydantic and SQLAlchemy API with integer-paise money values.
 - Replay-safe writes using idempotency keys.
 - Supabase Postgres schema with constraints, RLS, audit events and atomic RPCs.
+- Client-side encrypted export and preview-before-restore recovery; the
+  passphrase never leaves the browser.
 - Local SQLite demo that requires no cloud account or paid AI service.
 
 ## Architecture
@@ -204,7 +206,7 @@ The current ordered status and named blockers are in the
 
 ## Roadmap
 
-- Encrypted export/restore and final-domain recovery drills.
+- Final-domain encrypted recovery and two-household isolation drills.
 - Member invitations and collaborative household access.
 - Optional WhatsApp or Telegram draft capture.
 - Read-only analytics agent with validated inline metric, chart and table UI.
