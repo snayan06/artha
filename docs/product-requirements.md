@@ -6,7 +6,9 @@ Product type: Private, shared money-tracking PWA with conversational capture
 
 ## 1. Product decision
 
-Build a mobile-first installable web app first. Its main interaction should feel like WhatsApp: type or speak one sentence, review the interpreted transaction, and confirm.
+Build a mobile-first installable web app first. Its main interaction should feel
+like messaging: type one sentence or use the manual form, review the transaction,
+and confirm.
 
 Do not make WhatsApp the only interface. It cannot be guaranteed to remain free, it adds Meta setup and policy dependency, and it makes detailed review and correction harder. Add WhatsApp later as an optional capture channel. A Telegram bot can be the truly free chat-channel experiment if needed.
 
@@ -123,9 +125,9 @@ Money trackers fail because recording every payment feels like work. They also c
 ### Primary flow
 
 1. User opens the app directly to a persistent “What happened?” field.
-2. User types or speaks one sentence.
-3. Gemini interprets the sentence against the authenticated household's known
-   accounts, members and categories.
+2. User types one sentence for Gemini or chooses manual form entry.
+3. For text capture, Gemini interprets the sentence against the authenticated
+   household's known accounts, members and categories.
 4. A valid result becomes a compact unsaved draft. If interpretation is
    unavailable or invalid, Artha preserves the exact text and opens the manual
    form without guessing.

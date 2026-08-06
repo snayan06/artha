@@ -64,8 +64,9 @@ service-role key is not used in normal user request paths.
 3. Gemini interprets the text into the strict capture schema.
 4. Application code rejects malformed values, invented IDs, invalid dates,
    floating-point money and inconsistent splits.
-5. A valid result becomes an unsaved draft in the review UI. The user may edit
-   any field.
+5. A valid result becomes an unsaved draft in the review UI. The user reviews
+   every detail and may edit the available fields; transaction type remains
+   display-only.
 6. Only `POST /api/v1/transactions/confirm`, with an idempotency key, can invoke
    the atomic ledger write.
 

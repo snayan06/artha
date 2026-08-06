@@ -68,7 +68,7 @@
     <rect x="39" y="81" width="176" height="103" rx="18" class="rough"/>
     <rect x="42" y="78" width="176" height="104" rx="20" class="rough2"/>
   </g>
-  <text x="127" y="116" text-anchor="middle" class="label">Say or type</text>
+  <text x="127" y="116" text-anchor="middle" class="label">Write naturally</text>
   <text x="127" y="143" text-anchor="middle" class="body">“Paid ₹1,840…”</text>
   <text x="127" y="164" text-anchor="middle" class="small">natural language</text>
 
@@ -90,7 +90,7 @@
     <rect x="539" y="76" width="227" height="113" rx="19" fill="none" stroke="var(--green)" stroke-width="2" opacity=".75"/>
   </g>
   <text x="652" y="111" text-anchor="middle" class="label">Review + confirm</text>
-  <text x="652" y="139" text-anchor="middle" class="body">edit every field</text>
+  <text x="652" y="139" text-anchor="middle" class="body">review the details</text>
   <text x="652" y="164" text-anchor="middle" class="tiny" fill="var(--green)">THE REQUIRED CHECKPOINT</text>
 
   <path d="M771 132 C791 128 802 138 821 132" class="arrow"/>

@@ -72,7 +72,8 @@ final-domain restore into a fresh household remain the release guard.
 - Transaction history filtering for banks/cards, including both transfer sides.
 - Truthful offline state and baseline web/API security headers.
 - A 50-case fictional capture dataset plus a provider-neutral hosted evaluation
-  runner, preserving the Qwen baseline and sanitized outcome/field/tag slices.
+  runner. The pre-Gemini Qwen baseline is archived as historical evidence only;
+  it is not a current provider or fallback.
 - A Gemini provider adapter shared by capture, allow-listed auto-tagging and the
   validated read-only assistant, with fictional hosted gates of 50/50, 30/30
   and 24/24 respectively.
@@ -168,5 +169,5 @@ Only ask for these when the engineering work reaches the corresponding gate:
 | 7 Aug 2026 | Implemented encrypted export/restore, Settings recovery UI, recovery RPCs and two-household/round-trip SQL contracts; full local gate passed with 98 web and 112 API tests; production migration and consolidated Gemini release remain |
 | 6 Aug 2026 | Deployed and merged PR #13; full local gate, CodeQL, Vercel, public routing, API health and both live RPC probes passed; GitHub Web/API/SQL runners remained queued during the GitHub Actions outage |
 | 6 Aug 2026 | Recovered the production ledger RPC catalog, verified both required functions through the deployed REST endpoint and added exact-project release guards |
-| 6 Aug 2026 | Logical-ledger migration applied; PR #11 merged; main CI, CodeQL, Vercel and public health/routing checks green; Sprint 2 contract and Qwen baseline recorded |
+| 6 Aug 2026 | Logical-ledger migration applied; PR #11 merged; main CI, CodeQL, Vercel and public health/routing checks green; Sprint 2 contract and superseded pre-Gemini Qwen baseline recorded |
 | 5 Aug 2026 | Release candidate implemented, manually checked, published as PR #11 and fully green; production held for Supabase migration authorization |

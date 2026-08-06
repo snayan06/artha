@@ -91,7 +91,8 @@ Sprint 1 dependency.
 - [x] Validate dataset IDs, allow-listed entities, outcomes and integer-paise values in CI.
 - [x] Gate 22 common/safety-critical deterministic drafts plus negative, ambiguous and unknown-member input.
 - [x] Add a hosted-model evaluation runner with field/outcome/tag slices and sanitized reports.
-- [x] Preserve the Qwen/Groq baseline as historical provider evidence.
+- [x] Archive the superseded Qwen/Groq baseline as historical provider evidence;
+  neither provider is part of the current production runtime or fallback path.
 - [x] Add Gemini through the official server-side SDK with `store=false`, strict
   validation and exact-text manual recovery when interpretation is unavailable.
 - [x] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
