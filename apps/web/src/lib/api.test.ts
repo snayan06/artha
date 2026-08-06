@@ -252,7 +252,7 @@ describe('FastAPI adapter', () => {
   it('maps only approved assistant widgets from the strict API response', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      provider: 'disabled', model: null, mode: 'deterministic_fallback',
+      provider: 'gemini', model: 'gemini-3.5-flash-lite',
       result: { intent: 'spending', widgets: [
         { type: 'metric', title: 'Spend', value_paise: 12345, caption: 'This month', tone: 'neutral' },
         { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Aug', value_paise: 5000 }] },
@@ -265,9 +265,21 @@ describe('FastAPI adapter', () => {
 
     const reply = await chatAssistant('Show spending')
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ message: 'Show spending' })
-    expect(reply.deterministicFallback).toBe(true)
+    expect(reply.provider).toBe('gemini · gemini-3.5-flash-lite')
+    expect(Object.keys(reply).sort()).toEqual(['message', 'provider', 'widgets'])
     expect(reply.widgets.map((widget) => widget.type)).toEqual(['metric', 'line_chart', 'clarification'])
     expect(JSON.stringify(reply)).not.toContain('onerror')
+  })
+
+  it('propagates assistant provider failures in demo mode without fabricating local widgets', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('What is my available balance?')).rejects.toThrow('API request failed (503)')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('previews and restores a recovery bundle with an idempotency key', async () => {

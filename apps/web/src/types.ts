@@ -103,5 +103,4 @@ export interface AssistantReply {
   message: string
   widgets: AssistantWidget[]
   provider: string
-  deterministicFallback: boolean
 }

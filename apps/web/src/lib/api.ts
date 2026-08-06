@@ -411,33 +411,19 @@ export async function getAccounts(): Promise<LedgerAccount[]> {
 }
 
 export async function chatAssistant(message: string): Promise<AssistantReply> {
-  try {
-    const response = await request<JsonObject>('/api/v1/assistant/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message })
-    })
-    const result = response.result && typeof response.result === 'object' ? response.result as JsonObject : response
-    const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
-    const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
-    const model = safeText(response.model, '', 80)
-    const intent = safeText(result.intent, 'ledger', 40).replaceAll('_', ' ')
-    return {
-      message: safeText(response.message ?? response.answer ?? response.content, `Here is your ${intent} view.`, 2000),
-      widgets: mapAssistantWidgets(result.widgets ?? response.widgets),
-      provider: model ? `${provider} · ${model}` : provider,
-      deterministicFallback: response.mode === 'deterministic_fallback' || response.deterministic_fallback === true || providerRaw.deterministic_fallback === true || providerRaw.status === 'fallback'
-    }
-  } catch (error) {
-    if (!DEMO_MODE) throw error
-    return {
-      message: 'The AI provider is unavailable, so this is a deterministic preview using local demo totals.',
-      provider: 'Deterministic local preview',
-      deterministicFallback: true,
-      widgets: [
-        { type: 'metric', title: 'Available balance', value: `₹${(demoDashboard.availablePaise / 100).toLocaleString('en-IN')}`, detail: 'Demo data, not your live ledger' },
-        { type: 'insight', title: 'Safe fallback', body: `Your demo spend is ₹${(demoDashboard.spendPaise / 100).toLocaleString('en-IN')}. Connect the API to ask questions about your own ledger.` }
-      ]
-    }
+  const response = await request<JsonObject>('/api/v1/assistant/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message })
+  })
+  const result = response.result && typeof response.result === 'object' ? response.result as JsonObject : response
+  const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
+  const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
+  const model = safeText(response.model, '', 80)
+  const intent = safeText(result.intent, 'ledger', 40).replaceAll('_', ' ')
+  return {
+    message: safeText(response.message ?? response.answer ?? response.content, `Here is your ${intent} view.`, 2000),
+    widgets: mapAssistantWidgets(result.widgets ?? response.widgets),
+    provider: model ? `${provider} · ${model}` : provider
   }
 }
 
