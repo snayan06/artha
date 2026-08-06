@@ -42,7 +42,9 @@ categories and family participants; the user still reviews it before any write.
 - Light, dark and system theme support.
 - Accounts, opening balances, income, expenses, transfers and settlements.
 - Shared-expense accounting that separates cash movement from personal share.
-- Transaction search and debit, credit and shared filters.
+- Transaction search plus type and per-account activity filters, including both
+  sides of internal transfers.
+- Recoverable magic-link states for expired, reused, wrong-browser and stale sessions.
 - FastAPI, Pydantic and SQLAlchemy API with integer-paise money values.
 - Replay-safe writes using idempotency keys.
 - Supabase Postgres schema with constraints, RLS, audit events and atomic RPCs.
@@ -151,7 +153,8 @@ make check
 ```
 
 This runs web linting, TypeScript checks, Vitest, the production PWA build,
-Ruff, strict mypy, pytest and the 50-case capture-dataset contract checker.
+Ruff, strict mypy, pytest, every SQL syntax contract, and both keyless validators
+for the 50-case capture dataset and hosted-model runner.
 
 ## API surface
 
@@ -215,6 +218,7 @@ screenshots. Report vulnerabilities according to [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
+- [Current project checkpoint](docs/PROJECT-CHECKPOINT.md)
 - [Product requirements](docs/product-requirements.md)
 - [Private-pilot product audit and priority reset](docs/product-audit-2026-08-04.md)
 - [System architecture](docs/system-architecture.md)

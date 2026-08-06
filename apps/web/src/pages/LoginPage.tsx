@@ -2,12 +2,15 @@ import { Mail, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { ThemeControl } from '../components/ThemeControl'
 import { Button, Card } from '../components/ui'
+import type { AuthRecovery } from '../lib/auth'
 
 export function LoginPage({
   configurationError,
+  recovery,
   onSendLink
 }: {
   configurationError?: string | null
+  recovery?: AuthRecovery | null
   onSendLink: (email: string) => Promise<void>
 }) {
   const [email, setEmail] = useState('')
@@ -47,6 +50,13 @@ export function LoginPage({
           <h1 className="font-display mt-5 text-3xl font-bold tracking-[-0.05em]">Sign in to Artha</h1>
           <p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">There is no separate sign-up. We’ll email one secure link: returning users open their existing ledger, while new users start setup.</p>
 
+          {recovery && (
+            <div role="alert" className="mt-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <strong className="block">{recovery.title}</strong>
+              <span className="mt-1 block">{recovery.message}</span>
+            </div>
+          )}
+
           <form className="mt-7" onSubmit={(event) => void submit(event)}>
             <label className="block" htmlFor="login-email">
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#7c8882] tone-muted">Email address</span>
@@ -55,7 +65,7 @@ export function LoginPage({
                 <input id="login-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={Boolean(configurationError)} placeholder="you@example.com" className="min-h-12 w-full rounded-xl border border-line bg-white pl-10 pr-3 text-sm font-semibold outline-none transition focus:border-moss-400 focus:ring-4 focus:ring-moss-100 disabled:cursor-not-allowed disabled:opacity-60" />
               </span>
             </label>
-            <Button type="submit" loading={sending} disabled={Boolean(configurationError) || !email.trim()} className="mt-4 w-full">Email me a sign-in link</Button>
+            <Button type="submit" loading={sending} disabled={Boolean(configurationError) || !email.trim()} className="mt-4 w-full">{recovery ? 'Email me a fresh sign-in link' : 'Email me a sign-in link'}</Button>
           </form>
 
           {configurationError && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{configurationError}</p>}

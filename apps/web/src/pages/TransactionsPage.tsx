@@ -10,12 +10,15 @@ type Filter = 'all' | 'spend' | 'income' | 'transfers' | 'shared'
 export function TransactionsPage({ transactions, demoMode }: { transactions: Transaction[]; demoMode: boolean }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [account, setAccount] = useState('all')
+  const accountOptions = useMemo(() => [...new Set(transactions.flatMap((transaction) => [transaction.account, transaction.destinationAccount].filter((name): name is string => Boolean(name))))].sort((left, right) => left.localeCompare(right)), [transactions])
   const filtered = useMemo(() => transactions.filter((transaction) => {
-    const haystack = `${transaction.merchant} ${transaction.category} ${transaction.account}`.toLowerCase()
+    const haystack = `${transaction.merchant} ${transaction.category} ${transaction.account} ${transaction.destinationAccount ?? ''}`.toLowerCase()
     const matchesSearch = haystack.includes(search.toLowerCase())
     const matchesFilter = filter === 'all' || (filter === 'income' && transaction.kind === 'credit') || (filter === 'spend' && transaction.kind === 'debit') || (filter === 'transfers' && transaction.kind === 'transfer') || (filter === 'shared' && transaction.memberSplits.length > 0)
-    return matchesSearch && matchesFilter
-  }), [filter, search, transactions])
+    const matchesAccount = account === 'all' || transaction.account === account || transaction.destinationAccount === account
+    return matchesSearch && matchesFilter && matchesAccount
+  }), [account, filter, search, transactions])
   const netPaise = filtered.reduce((total, transaction) => total + (transaction.kind === 'transfer' ? 0 : transaction.kind === 'credit' ? transaction.amountPaise : -transaction.amountPaise), 0)
 
   return (
@@ -31,9 +34,18 @@ export function TransactionsPage({ transactions, demoMode }: { transactions: Tra
           <input id="transaction-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search merchant, category or account" className="min-h-12 w-full rounded-2xl border border-line bg-[#fafbf9] pl-11 pr-10 text-sm outline-none focus:border-moss-400 focus:ring-4 focus:ring-moss-100 dark:bg-night-input" />
           {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center text-[#79857f] tone-muted" aria-label="Clear search"><X className="h-4 w-4" /></button>}
         </div>
-        <div className="mt-3 flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <SlidersHorizontal className="mr-1 h-4 w-4 shrink-0 text-[#77837d] tone-muted" />
-          {(['all', 'spend', 'income', 'transfers', 'shared'] as Filter[]).map((item) => <button key={item} onClick={() => setFilter(item)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold capitalize transition ${filter === item ? 'bg-moss-900 text-white dark:bg-[#27604e]' : 'bg-[#f1f3ef] text-[#68746e] tone-muted hover:bg-moss-100 dark:bg-night-raised'}`}>{item}</button>)}
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <SlidersHorizontal className="mr-1 h-4 w-4 shrink-0 text-[#77837d] tone-muted" />
+            {(['all', 'spend', 'income', 'transfers', 'shared'] as Filter[]).map((item) => <button key={item} onClick={() => setFilter(item)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold capitalize transition ${filter === item ? 'bg-moss-900 text-white dark:bg-[#27604e]' : 'bg-[#f1f3ef] text-[#68746e] tone-muted hover:bg-moss-100 dark:bg-night-raised'}`}>{item}</button>)}
+          </div>
+          <label className="grid gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#748079] tone-muted">
+            Account
+            <select aria-label="Filter by account" value={account} onChange={(event) => setAccount(event.target.value)} className="min-h-11 rounded-xl border border-line bg-white px-3 text-sm font-semibold normal-case tracking-normal text-ink outline-none focus:border-moss-400 focus:ring-3 focus:ring-moss-100 dark:bg-night-input">
+              <option value="all">All accounts</option>
+              {accountOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </label>
         </div>
       </Card>
 

@@ -21,3 +21,5 @@ playwright-report/
 test-results/
 supabase/.branches/
 supabase/.temp/
+evals/reports/*
+!evals/reports/README.md

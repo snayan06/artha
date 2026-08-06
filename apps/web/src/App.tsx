@@ -48,7 +48,7 @@ export default function App() {
   const auth = useAuth()
   if (auth.status === 'loading') return <SessionLoadingPage />
   if (auth.status === 'unauthenticated' || auth.status === 'error') {
-    return <LoginPage configurationError={auth.status === 'error' ? auth.error : null} onSendLink={auth.signInWithMagicLink} />
+    return <LoginPage configurationError={auth.status === 'error' ? auth.error : null} recovery={auth.recovery} onSendLink={auth.signInWithMagicLink} />
   }
   const userKey = auth.user?.id
   return <LedgerApp key={userKey ?? 'demo'} userKey={userKey} userEmail={auth.user?.email} onSignOut={auth.status === 'authenticated' ? auth.signOut : undefined} />

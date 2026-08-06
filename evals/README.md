@@ -14,11 +14,38 @@ Run structural validation with:
 
 ```bash
 python scripts/check_capture_evals.py
+make eval-capture-validate
 ```
+
+`make eval-capture-validate` performs a dry validation, writes machine-readable
+JSON and human-readable Markdown metadata under `evals/reports/`, requires no
+key, and never calls a model.
+
+After configuring the server-only provider environment, run the full benchmark:
+
+```bash
+ARTHA_LLM_PROVIDER=groq make eval-capture-hosted
+```
+
+`ARTHA_GROQ_API_KEY` must be supplied through the shell or deployment secret
+store and must never be pasted into documentation, committed, or passed as a
+command-line argument. The runner calls the same `LocalFinancialAssistant`
+capture adapter used by the API, runs sequentially with one-second pacing, and
+retries one unavailable/invalid response. Options can be inspected with:
+
+```bash
+cd apps/api
+uv run python -m artha_api.capture_evals --help
+```
+
+The generated JSON contains overall, outcome, field and tag slices plus only the
+constrained structured values for failed cases. The Markdown report deliberately
+omits utterances and model-generated free text. The command exits non-zero when
+the strict case pass rate is below `--minimum-pass-rate` (100% by default).
 
 The Vitest suite imports this same dataset and gates the common and
 safety-critical behavior required from the no-provider browser fallback. The
-hosted runner will score all 50 records before Qwen is enabled in production.
+hosted runner scores all 50 records before Qwen is enabled in production.
 
 No real names, account numbers, emails, merchants tied to the user, tokens or
 financial values are allowed in this directory.

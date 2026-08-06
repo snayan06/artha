@@ -1,4 +1,4 @@
-.PHONY: setup dev-web dev-api test lint build check
+.PHONY: setup dev-web dev-api test lint build check check-sql eval-capture-validate eval-capture-hosted
 
 setup:
 	npm --prefix apps/web ci
@@ -23,5 +23,15 @@ lint:
 build:
 	npm run build:web
 
-check: lint test build
+check: lint test build check-sql
 	python scripts/check_capture_evals.py
+	$(MAKE) eval-capture-validate
+
+check-sql:
+	uv run --with 'pglast>=7,<8' python scripts/check_sql.py
+
+eval-capture-validate:
+	cd apps/api && uv run python -m artha_api.capture_evals --mode validate
+
+eval-capture-hosted:
+	cd apps/api && uv run python -m artha_api.capture_evals --mode run
