@@ -21,33 +21,35 @@ Sprint 1 dependency.
 
 | Area | Status | What this means |
 | --- | --- | --- |
-| Public repository and CI | Done | GitHub, CI and CodeQL are active |
+| Public repository and CI | Attention | Repository and workflows are configured, but GitHub did not create runs for the latest PRs/pushes; restore reliable triggering before the next code release |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
-| Persistent production login | Deployed; acceptance pending | Expired, reused, wrong-browser and stale-session states are live; final-domain user acceptance remains |
-| Server-owned onboarding/profile | Deployed; acceptance pending | Profile, household and members hydrate from the server; final-domain cross-device acceptance remains |
-| ₹25k self-transfer flow | Deployed | Parser, review UI, atomic backend and history projection are live; authenticated smoke remains |
+| Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
+| Server-owned onboarding/profile | Done for one fictional identity | Profile, household and participants returned from the server without repeating onboarding |
+| ₹25k self-transfer flow | Production verified | `25k` mapped to ₹25,000 with ordered ICICI → HDFC accounts; totals remained unchanged |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
-| Structured Gemini features | Release candidate | Capture 50/50, auto-tag 30/30 and assistant 24/24 fictional hosted gates passed; production variables are configured and deployment verification is next |
+| Structured Gemini features | Production verified | Grounded capture and read-only metric/chart responses passed; hosted fictional gates remain 50/50, 30/30 and 24/24 |
 | Parser evaluation dataset | Done | 50 fictional cases plus an automated contract checker are in the repository |
 | Private AI learning/eval ledger | Priority next | Audited private interactions, user corrections, token budgets and eval runs need RLS-backed storage, export/delete controls and sanitized dataset promotion |
 | Accounts & family | Next implementation track | Product contract and secure architecture are complete; owner maintenance ships before invitations |
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
-| Production acceptance | Blocked | Requires two test identities plus login/link interaction from the user |
+| Production acceptance | In progress | Authenticated happy path and responsive sweep passed; two-owner isolation and encrypted restore remain |
 
 ## Sprint 1 — trust and capture foundation
 
 ### Authentication and onboarding
 
-- [ ] Verify magic-link callback on the final domain in the same browser.
-- [ ] Verify session survives refresh, tab close and browser reopen.
+- [x] Verify magic-link callback on the final domain in the same browser.
+- [x] Verify session survives navigation and a fresh app load.
+- [ ] Verify session survives a full browser process close and reopen.
 - [x] Replace local-only profile hydration with a server profile/household endpoint.
 - [x] Hydrate an existing user's display name, household and participants from the server after setup lookup.
 - [x] Clarify login copy: the same email action creates a first account or signs in a returning user.
-- [ ] Prove on the final domain that an existing user never repeats onboarding on another device.
+- [x] Prove on the final domain that a returning user does not repeat onboarding in the same browser.
+- [ ] Repeat returning-user hydration on a second device/browser profile.
 - [x] Add explicit callback, expired-link and wrong-browser recovery states.
-- [ ] Verify sign-out clears the local session but never deletes ledger data.
+- [x] Verify sign-out clears the local session and returning sign-in restores the same ledger.
 
 ### Natural-language capture and transfers
 
@@ -61,7 +63,7 @@ Sprint 1 dependency.
 - [x] Replace raw-row prefix pagination with a logical ledger activity projection so a transfer pair cannot be split at a page boundary.
 - [x] Add an account activity filter that includes both the source and destination side of transfers.
 - [x] Run the full local web/API test and production-build gate.
-- [ ] Run the production smoke test after deployment.
+- [x] Run the authenticated production transfer, income, expense, card, split and filter smoke tests.
 
 ### Runtime reliability
 
@@ -94,7 +96,7 @@ Sprint 1 dependency.
 - [x] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
 - [x] Respect `Retry-After`, back off safely, checkpoint progress and resume unfinished cases.
 - [x] Pass the hosted fictional gates: capture 50/50, auto-tag 30/30 and assistant 24/24.
-- [ ] Verify the deployed production API reports Gemini and completes one fictional request for each feature path.
+- [x] Verify production Gemini capture plus read-only metric/chart assistant responses; retain the 30/30 hosted auto-tag gate as the current tagging evidence.
 
 ## Sprint 2 — Accounts & family
 
@@ -155,14 +157,16 @@ Detailed schema and privacy rules: [`artifacts/architecture/private-ai-learning-
 - [ ] Add privacy-first Sentry error monitoring after explicit approval: error events only, no Session Replay, financial payloads, emails or IP collection, with client/server redaction tests.
 - [ ] Add a deliberate per-user rate-limit policy.
 - [x] Add no-store API caching policy and web/API security headers locally.
-- [ ] Verify deployed security headers and record sanitized log-redaction evidence.
+- [x] Verify deployed HSTS, nosniff, frame, referrer and permissions headers.
+- [ ] Record sanitized browser/API log-redaction evidence.
 - [ ] Test PWA install/reopen, offline unsaved drafts, expired auth and accessibility.
-- [ ] Complete the 320 px, 390 px and desktop light/dark matrix.
+- [x] Confirm all six primary pages have no horizontal overflow at 320 px, 390 px and 1440 px; verify light/dark switching and mobile/desktop dark UI.
 
-Current local evidence: Home passes at 320 px; Home, Transactions, Shared,
-Assistant and Quick Add pass at 390 px with no horizontal overflow. Quick Add
-passes visual light/dark review, and Home passes visual mobile plus 1440 px dark
-review. Onboarding and auth recovery still need the full final-domain matrix.
+Current production evidence: Home, Transactions, Quick Add, Shared, Assistant
+and Settings fit at 320 px, 390 px and 1440 px without horizontal overflow.
+System/light/dark switching works; Home passed mobile and desktop dark visual
+review. Onboarding and auth recovery remain covered by their earlier focused
+responsive artifact rather than this authenticated primary-page sweep.
 See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2026-08-06-web-interface-guidelines-audit.md).
 
 ### Measured AI
@@ -192,18 +196,19 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 
 ## Release blockers before real financial data
 
-- [ ] Final-domain login, refresh, reopen and sign-out pass.
+- [x] Final-domain new/returning login, fresh app load and sign-out/re-login pass.
 - [ ] Two independent owners cannot read or write each other's households.
-- [ ] Four banks, multiple cards, a transfer, a backdated expense and a family split pass end to end.
-- [ ] 320 px, 390 px and desktop pass in light and dark modes.
+- [x] Multi-account/card onboarding, a transfer, a backdated expense and family splits pass end to end with fictional data.
+- [ ] Repeat setup with the owner's complete four-bank/multiple-card configuration.
+- [x] All six primary pages fit at 320 px, 390 px and 1440 px; explicit theme switching passes.
 - [ ] Browser/API logs contain no tokens or financial payloads.
-- [ ] Security headers are enabled and verified.
+- [x] Security headers are enabled and verified.
 - [ ] Encrypted export/restore reconstructs the ledger successfully.
 
 ## Actions needed from the user
 
-1. Complete one final-domain sign-in link in the same browser that requested it.
-2. Provide a second test email identity for isolation testing; do not share passwords or email tokens.
+1. Use a second fictional identity for isolation testing; never share passwords or email tokens.
+2. Use that fresh/empty household for the encrypted restore acceptance drill.
 3. Production Gemini variables are configured. Save the key in the ignored local
    `.env` only if local hosted evaluation is required; never commit it.
 

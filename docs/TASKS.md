@@ -10,9 +10,10 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** application-complete V1 moving through production setup. Do not enter real financial data until every P0 item below is complete.
+**Current stage:** V1 is live and the authenticated fictional-data journey is green. Do not enter real financial data until every remaining P0 security/recovery item below is complete.
 
-- [x] Public GitHub repository created under `snayan06/artha`; `main`, CI and CodeQL are active.
+- [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
+- [ ] Restore reliable GitHub Actions triggering and obtain fresh green `main` CI/CodeQL runs; do not normalize owner overrides.
 - [x] React PWA, FastAPI API, database migrations, RLS policies and automated test suites are implemented.
 - [x] Personal Vercel account created under the intended owner.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
@@ -20,9 +21,10 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Apply all migrations and pass hosted catalog/RLS schema assertions.
 - [ ] Complete anonymous-denial and two-household behavioural isolation on the hosted database.
 - [x] Create and configure the `artha-api` and `artha-web` Vercel projects.
-- [ ] Pass final-domain authentication, financial-flow, responsive-layout and recovery acceptance.
+- [x] Pass final-domain authentication, financial-flow and responsive-layout acceptance with fictional data.
+- [ ] Pass two-owner isolation and encrypted restore acceptance.
 
-**Next action:** verify magic-link authentication and two-household isolation on the final domain.
+**Next action:** prove two-owner isolation, then restore the encrypted fictional backup into a fresh/empty production household.
 
 ## Current execution queue
 
@@ -46,14 +48,15 @@ For the current ordered delivery view, blockers and user actions, see
    - [x] Configure exact CORS origins and Supabase magic-link redirects.
    - Done when: health, login, onboarding and confirmed capture work on final URLs.
 4. **Complete authentication acceptance.**
-   - [ ] Verify magic-link login, session refresh, reload persistence and sign-out.
+   - [x] Verify magic-link login, navigation/reload persistence, sign-out and returning-user sign-in.
    - [ ] Verify two different users can independently onboard and see only their own households.
    - [ ] Keep same-household member invitations disabled until the V2 authorization flow is complete.
    - Done when: the final-domain isolation scenario passes with two real test identities.
 5. **Complete recovery and production QA.**
    - [x] Implement encrypted export and tested local restore.
-   - [ ] Execute every production-pending row in the V1 QA matrix.
-   - [ ] Recheck 320 px, 390 px and desktop layouts in light and dark modes.
+   - [x] Execute the authenticated production happy path and every primary page with fictional data.
+   - [x] Recheck all six primary pages at 320 px, 390 px and 1440 px; verify light/dark switching and mobile/desktop dark UI.
+   - [ ] Restore a downloaded encrypted backup into a fresh/empty production household.
    - Done when: recovery evidence, final URLs and the signed-off QA report are recorded.
 
 ### P1 — private-pilot improvements
@@ -160,9 +163,11 @@ For the current ordered delivery view, blockers and user actions, see
 - [ ] Repeat anonymous-denial and two-household RLS isolation against the fresh project.
 - [x] Deploy the FastAPI API and React PWA, then configure exact CORS and magic-link redirect origins.
 - [x] Add the server-side Gemini key and model configuration without exposing it to the browser.
-- [ ] Test login, onboarding, four bank accounts, multiple cards, backdated capture and family splits on the final domain.
-- [ ] Verify mobile layouts at 320 px and 390 px plus desktop, including light and dark modes.
+- [x] Test login, returning login, multi-account/card onboarding, backdated capture, transfer and family splits on the final domain.
+- [ ] Repeat account setup with the owner's full four-bank/multiple-card configuration before replacing fictional QA data.
+- [x] Verify every primary page at 320 px and 390 px plus 1440 px desktop, including explicit light/dark switching.
 - [x] Implement encrypted export/restore and pass the local recovery drill.
+- [x] Download a client-side encrypted fictional backup on the final domain.
 - [ ] Repeat the encrypted recovery drill with fictional data on the final domain before entering real financial data.
 - [x] Record final URLs, ownership and environment inventory in `docs/artifacts/qa/`; keep adding acceptance evidence as tests pass.
 
