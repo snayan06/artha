@@ -286,6 +286,19 @@ describe('FastAPI adapter', () => {
     await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response did not include a valid model message')
   })
 
+  it('rejects a legacy top-level assistant payload without a result envelope', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      provider: 'gemini',
+      model: 'gemini-3.5-flash-lite',
+      message: 'Legacy top-level model copy.',
+      widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response did not include a valid result object')
+  })
+
   it('propagates assistant provider failures in demo mode without fabricating local widgets', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubEnv('VITE_DEMO_MODE', 'true')

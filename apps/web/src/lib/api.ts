@@ -415,7 +415,10 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
     method: 'POST',
     body: JSON.stringify({ message })
   })
-  const result = response.result && typeof response.result === 'object' ? response.result as JsonObject : response
+  if (!response.result || typeof response.result !== 'object' || Array.isArray(response.result)) {
+    throw new Error('Assistant response did not include a valid result object.')
+  }
+  const result = response.result as JsonObject
   const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
   const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
   const model = safeText(response.model, '', 80)
@@ -423,7 +426,7 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
   if (!assistantMessage.trim()) throw new Error('Assistant response did not include a valid model message.')
   return {
     message: assistantMessage,
-    widgets: mapAssistantWidgets(result.widgets ?? response.widgets),
+    widgets: mapAssistantWidgets(result.widgets),
     provider: model ? `${provider} · ${model}` : provider
   }
 }
