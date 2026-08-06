@@ -54,6 +54,16 @@ export class ApiError extends Error {
   }
 }
 
+export class CaptureDraftUnavailableError extends Error {
+  readonly sourceText: string
+
+  constructor(sourceText: string, options?: ErrorOptions) {
+    super('Automatic interpretation is temporarily unavailable.', options)
+    this.name = 'CaptureDraftUnavailableError'
+    this.sourceText = sourceText
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new Error('Demo mode')
   const accessToken = await accessTokenProvider()
@@ -510,17 +520,8 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
     }
   } catch (error) {
     if (error instanceof ApiError && error.status >= 400 && error.status < 500) throw error
-    const fallback = parseCaptureLocally(text, membersForFallback)
-    if (!DEMO_MODE) {
-      const accounts = await getAccounts()
-      const parsed = parseCaptureLocally(text, membersForFallback, accounts)
-      if (!parsed.sourceAccountId) throw new Error('Create an account before adding a transaction')
-      return {
-        data: parsed,
-        demo: false
-      }
-    }
-    return { data: fallback, demo: true }
+    if (DEMO_MODE) return { data: parseCaptureLocally(text, membersForFallback), demo: true }
+    throw new CaptureDraftUnavailableError(text, { cause: error })
   }
 }
 

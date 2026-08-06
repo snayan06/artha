@@ -1,13 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as api from '../lib/api'
 import { RouterProvider } from '../lib/router'
 import type { Transaction } from '../types'
 import { localDateOffset } from '../lib/date'
 import { QuickAddPage } from './QuickAddPage'
 
 describe('QuickAddPage', () => {
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
 
   it('keeps a parsed entry unsaved until explicit confirmation', async () => {
     const user = userEvent.setup()
@@ -38,6 +42,25 @@ describe('QuickAddPage', () => {
     await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
     expect(screen.getByLabelText('Transaction date')).toHaveValue(localDateOffset(0))
     expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
+  })
+
+  it('preserves the sentence and opens manual entry when AI capture is unavailable', async () => {
+    const user = userEvent.setup()
+    const sourceText = 'self transfer 25k ICICI -> HDFC'
+    const onConfirm = vi.fn()
+    vi.spyOn(api, 'parseDraft').mockRejectedValue(new api.CaptureDraftUnavailableError(sourceText))
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), sourceText)
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/automatic interpretation is temporarily unavailable/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/your text is still here/i)
+    expect(screen.getByLabelText(/your message/i)).toHaveValue(sourceText)
+    expect(screen.getByLabelText('Amount in rupees')).toHaveValue(null)
+    expect(screen.getByLabelText('Transaction date')).toBeInTheDocument()
+    expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
   })
 
   it('prevents rapid duplicate confirmation while the first write is pending', async () => {

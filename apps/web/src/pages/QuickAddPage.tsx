@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, ChevronRight, Info, RotateCcw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
-import { getAccounts, parseDraft } from '../lib/api'
+import { CaptureDraftUnavailableError, getAccounts, parseDraft } from '../lib/api'
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import { localDateOffset } from '../lib/date'
 import { useRouter } from '../lib/router'
@@ -52,7 +52,12 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
       setDraft(response.data)
       setUsedFallback(response.demo)
     } catch (caught) {
-      setError(userFacingFailure(caught, 'We could not read that. Try including an amount and what it was for.'))
+      if (caught instanceof CaptureDraftUnavailableError) {
+        startManualEntry(caught.sourceText)
+        setError(`${caught.message} Your text is still here; enter the remaining details below. Nothing was saved.`)
+      } else {
+        setError(userFacingFailure(caught, 'We could not read that. Try including an amount and what it was for.'))
+      }
     } finally {
       setParsing(false)
     }
@@ -84,9 +89,9 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     setError('')
   }
 
-  function startManualEntry() {
+  function startManualEntry(sourceText = '') {
     const firstAccount = accounts[0]
-    setDraft({ kind: 'debit', amountPaise: 0, merchant: '', category: 'Other', account: firstAccount?.name ?? 'Primary account', sourceAccountId: firstAccount?.id, occurredAt: localDateOffset(0), note: '', memberSplits: [], confidence: 'review', sourceText: '' })
+    setDraft({ kind: 'debit', amountPaise: 0, merchant: '', category: 'Other', account: firstAccount?.name ?? 'Primary account', sourceAccountId: firstAccount?.id, occurredAt: localDateOffset(0), note: '', memberSplits: [], confidence: 'review', sourceText })
     setUsedFallback(false)
     setError('')
   }
@@ -127,7 +132,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
       <Card className="p-4 sm:p-5">
         <label htmlFor="capture" className="text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</label>
         <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => setCapture(event.target.value)} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
-        <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={startManualEntry}>Enter details manually</Button></div>
+        <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={() => startManualEntry()}>Enter details manually</Button></div>
         {!draft && (
           <div className="mt-5 border-t border-line pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#8a958f] tone-subtle">Try an example</p>

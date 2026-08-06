@@ -80,6 +80,35 @@ describe('FastAPI adapter', () => {
     expect(parsed.data.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
+  it('never interprets production capture locally after an AI or API failure', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/drafts/parse')) return new Response('{}', { status: 503 })
+      if (url.endsWith('/api/v1/accounts')) {
+        return new Response(JSON.stringify([
+          { id: 1, name: 'ICICI', type: 'bank' },
+          { id: 2, name: 'HDFC', type: 'bank' }
+        ]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/api/v1/members')) {
+        return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { CaptureDraftUnavailableError, parseDraft } = await import('./api')
+    const sourceText = 'self transfer 25k ICICI -> HDFC'
+    const parsing = parseDraft(sourceText)
+
+    await expect(parsing).rejects.toEqual(expect.objectContaining({
+      name: 'CaptureDraftUnavailableError',
+      sourceText
+    }))
+    await expect(parsing).rejects.toBeInstanceOf(CaptureDraftUnavailableError)
+  })
+
   it('never substitutes fictional ledger data during a production API outage', async () => {
     vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
     vi.stubEnv('VITE_DEMO_MODE', 'false')
