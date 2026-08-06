@@ -26,7 +26,7 @@ are not added as custom analytics events.
 ## Verification
 
 ```text
-Web: 16 test files, 101 tests
+Web: 16 test files, 103 tests
 API: 122 tests
 AI datasets: 50 capture, 30 tagging, 24 assistant cases
 Hosted Gemini: 50/50 capture, 30/30 tagging, 24/24 assistant on fictional data
@@ -34,15 +34,16 @@ Quality: ESLint, TypeScript, Ruff, strict mypy and production web build
 Database: migrations, seeds, SQL contracts and encrypted-recovery round trip
 ```
 
-The exact production Supabase project resolves all four recovery RPC names. The
-application deployment remains gated on the consolidated pull request checks.
+The exact production Supabase project resolves all four recovery RPC names.
+The consolidated release and both production-QA fixes are deployed through PRs
+#16, #17 and #18.
 
 ## Remaining final-domain acceptance
 
-- Complete magic-link login persistence with two fictional identities.
+- Prove two-owner isolation with a second fictional identity.
 - Prove two-household isolation through the deployed application.
 - Run encrypted export and restore on fictional final-domain data.
-- Repeat mobile and desktop light/dark checks after the production deployment.
+- Record sanitized browser/API log-redaction and cold/warm latency evidence.
 
 These items must remain visibly pending until they are exercised against the
 final deployment; local or catalog evidence is not a substitute.

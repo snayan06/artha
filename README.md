@@ -1,19 +1,32 @@
 # Artha
 
-[![CI](https://github.com/snayan06/artha/actions/workflows/ci.yml/badge.svg)](https://github.com/snayan06/artha/actions/workflows/ci.yml)
+[![Release: private pilot](https://img.shields.io/badge/release-private_pilot-2f6f4e.svg)](https://artha-web-one.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2f6f4e.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB.svg)](https://www.python.org/)
 [![React 19](https://img.shields.io/badge/React-19-149ECA.svg)](https://react.dev/)
 
-Artha is an open-source, mobile-first money tracker for recording transactions
-in natural language, understanding spending, and correctly accounting for
-shared household expenses.
+Artha is a mobile-first private money companion for people who want clarity
+without turning every expense into bookkeeping. Write what happened in everyday
+language, review the draft, and let Artha keep accounts, cards, transfers and
+shared family expenses consistent.
 
 > [!IMPORTANT]
-> Artha V1 is deployed on the intended personal Vercel and Supabase accounts.
-> The hosted schema, API health check and PWA route fallback are green. Magic-link,
-> two-identity isolation and recovery acceptance are still pending, so use
-> fictional data until the complete deployment runbook is green.
+> **Private-pilot status:** V1 is deployed and has passed real final-domain
+> sign-in, onboarding, capture, transfer, shared-expense, assistant, encrypted
+> export and responsive tests using fictional data. Keep using fictional data
+> until the two-owner isolation and final-domain restore drills are also signed
+> off.
+
+## Product at a glance
+
+| | |
+| --- | --- |
+| **For** | An individual managing money across several bank accounts and cards, with friends or family involved in some expenses |
+| **Problem** | Logging is tedious, transfers get mistaken for spending, and shared bills distort personal totals |
+| **Promise** | Capture a transaction in seconds, see exactly what Artha understood, and save only after explicit confirmation |
+| **Current scope** | A private personal ledger with non-login participants for expense splits |
+| **Next scope** | Post-onboarding account management, audited corrections and invited family access |
+| **Live pilot** | [Web app](https://artha-web-one.vercel.app) · [API health](https://artha-api-mu.vercel.app/health) |
 
 ## Why Artha?
 
@@ -25,34 +38,61 @@ built around a five-second workflow:
 3. Confirm explicitly.
 4. See account movement, personal spending and the shared balance update.
 
-Parsing never writes directly to the ledger. Common capture remains usable
-without an AI provider through a deterministic parser. When enabled, Gemini may
-propose a structured draft grounded only in the user's existing accounts,
-categories and family participants; the user still reviews it before any write.
+The important product rule is simple: **understanding is automated; saving is
+not**. Parsing never writes directly to the ledger. Common capture works through
+a deterministic parser, while Gemini can propose a structured draft grounded
+only in the user's existing accounts, categories and household participants.
+Every write still requires review and confirmation.
 
-## V1 features
+## Core journeys
 
-- Installable React and TypeScript PWA with responsive bottom navigation.
-- Dashboard balances, six-month cash-flow chart and recent activity.
+1. **Set up once.** Add multiple bank, cash, wallet and credit-card accounts,
+   opening balances, card details and people you split expenses with.
+2. **Write naturally.** Try `self transfer 25k ICICI -> HDFC` or
+   `Paid 1840 for groceries from HDFC, split with Mira, 3 days ago`.
+3. **Review before saving.** Check the amount, date, type, account, category and
+   split. Nothing reaches the ledger until confirmation.
+4. **Understand the result.** See balances, personal spending, income, account
+   activity, shared receivables and a six-month trend.
+5. **Ask the ledger.** The read-only Gemini assistant returns approved metric,
+   chart and table components—never model-authored HTML or direct writes.
+6. **Keep control.** Export a client-side encrypted backup whose passphrase never
+   reaches the API.
+
+## What V1 includes
+
+### Fast capture and correct accounting
+
 - Natural-language INR capture with a review-before-write workflow.
 - Indian amount shorthand and account-to-account transfer capture such as
   `self transfer 25k ICICI -> HDFC`.
-- First-run setup for multiple bank, cash, wallet and credit-card accounts.
-- Configurable household members and exact per-member expense splits.
-- Light, dark and system theme support.
-- Privacy-filtered Vercel Web Analytics and Speed Insights; telemetry keeps the
-  route but removes URL query strings and fragments before sending.
 - Accounts, opening balances, income, expenses, transfers and settlements.
 - Shared-expense accounting that separates cash movement from personal share.
 - Transaction search plus type and per-account activity filters, including both
   sides of internal transfers.
+
+### Everyday product experience
+
+- Installable React and TypeScript PWA with responsive bottom navigation.
+- Dashboard balances, six-month cash-flow chart and recent activity.
+- First-run setup for multiple bank, cash, wallet and credit-card accounts.
+- Configurable household participants and exact per-person expense splits.
+- Read-only Gemini assistant with safe inline metrics, charts and tables.
+- Light, dark and system theme support across mobile and desktop.
+
+### Privacy, reliability and portability
+
 - Recoverable magic-link states for expired, reused, wrong-browser and stale sessions.
-- FastAPI, Pydantic and SQLAlchemy API with integer-paise money values.
 - Replay-safe writes using idempotency keys.
 - Supabase Postgres schema with constraints, RLS, audit events and atomic RPCs.
 - Client-side encrypted export and preview-before-restore recovery; the
   passphrase never leaves the browser.
+- Privacy-filtered Vercel Web Analytics and Speed Insights; telemetry keeps the
+  route but removes URL query strings and fragments before sending.
 - Local SQLite demo that requires no cloud account or paid AI service.
+
+The backend uses FastAPI, Pydantic and SQLAlchemy, and stores money as integer
+paise rather than floating-point values.
 
 ## Architecture
 
@@ -164,6 +204,17 @@ This runs web linting, TypeScript checks, Vitest, the production PWA build,
 Ruff, strict mypy, pytest, every SQL syntax contract, and both keyless validators
 for the 50-case capture dataset and hosted-model runner.
 
+Current release evidence:
+
+| Gate | Result |
+| --- | --- |
+| Web | 16 test files, 103 tests passed |
+| API | 122 tests passed |
+| AI contracts | 50 capture, 30 auto-tag and 24 assistant cases valid |
+| Hosted Gemini on fictional data | 50/50 capture, 30/30 auto-tag, 24/24 assistant |
+| Production UI | All six primary pages fit at 320 px, 390 px and 1440 px; light/dark controls and mobile/desktop dark UI verified |
+| Production flows | Magic-link new/returning login, session persistence, onboarding, expense, income, transfer, split, filters, assistant and encrypted export passed |
+
 ## API surface
 
 | Method | Endpoint | Purpose |
@@ -185,22 +236,29 @@ for the 50-case capture dataset and hosted-model runner.
 | `GET` | `/api/v1/assistant/status` | Report configured assistant provider without exposing secrets |
 | `POST` | `/api/v1/assistant/chat` | Return validated read-only cards, charts or tables |
 | `POST` | `/api/v1/assistant/tag-suggestion` | Suggest an allow-listed category without saving it |
+| `GET` | `/api/v1/recovery/export` | Export the authenticated household bundle for client-side encryption |
+| `POST` | `/api/v1/recovery/preview` | Validate and summarize a decrypted bundle without writing it |
+| `POST` | `/api/v1/recovery/restore` | Atomically restore a validated bundle into a fresh/empty household |
 
 ## Deployment status
 
 The private-pilot topology is live: two Vercel Hobby projects (`apps/web` and
-`apps/api`) plus the fresh personal `artha-production` Supabase Free project.
-The previous Cloudflare Pages + Render path remains an optional container
-fallback.
+`apps/api`) plus the personal `artha-production` Supabase Free project. The
+previous Cloudflare Pages + Render path remains an optional container fallback.
 
 - PWA: <https://artha-web-one.vercel.app>
 - API health: <https://artha-api-mu.vercel.app/health>
 
-Before production can be called green:
+The deployed fictional-data acceptance pass now covers new and returning
+magic-link users, persisted sessions, multi-account onboarding, financial
+flows, Gemini capture/assistant behavior, encrypted export, responsive layouts
+and security headers.
 
-- verify magic-link login, refresh and sign-out on the final domain;
-- repeat two-identity household isolation on the personal production database;
-- verify final-domain authentication, export and restore behavior.
+Before entering real financial data:
+
+- prove two independent owners cannot read or write each other's households;
+- restore the encrypted fictional backup into a fresh/empty production household;
+- record sanitized authenticated cold/warm latency and log-redaction evidence.
 
 See [the deployment runbook](docs/DEPLOYMENT.md) for the complete acceptance gate.
 The current ordered status and named blockers are in the
@@ -208,10 +266,10 @@ The current ordered status and named blockers are in the
 
 ## Roadmap
 
-- Final-domain encrypted recovery and two-household isolation drills.
+- Complete final-domain encrypted restore and two-household isolation drills.
+- Post-onboarding account/card/participant management and audited corrections.
 - Member invitations and collaborative household access.
 - Optional WhatsApp or Telegram draft capture.
-- Read-only analytics agent with validated inline metric, chart and table UI.
 - Investments, liabilities and net-worth tracking.
 
 The implementation checklist is maintained in [docs/TASKS.md](docs/TASKS.md).
