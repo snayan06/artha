@@ -150,6 +150,7 @@ Detailed schema and privacy rules: [`artifacts/architecture/private-ai-learning-
 
 ### Production quality
 
+- [x] Add Vercel Web Analytics and Speed Insights with query/fragment redaction tests.
 - [ ] Record cold/warm authenticated latency after the Mumbai deployment.
 - [ ] Add privacy-first Sentry error monitoring after explicit approval: error events only, no Session Replay, financial payloads, emails or IP collection, with client/server redaction tests.
 - [ ] Add a deliberate per-user rate-limit policy.

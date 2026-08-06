@@ -78,7 +78,7 @@ and recovery acceptance still require interactive testing.
 ## Verification checkpoint
 
 ```text
-Local web after recovery: 15 files, 98 tests passed
+Local web after recovery and telemetry: 16 files, 101 tests passed
 Local API after recovery and Gemini: 122 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
@@ -90,6 +90,7 @@ Manual UI: 320 px, 390 px and desktop checks passed in light/dark
 Production: PR #13 merged; CodeQL and both Vercel checks green; GitHub Web/API/SQL jobs queued during an Actions outage
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
+Telemetry: Vercel Web Analytics and Speed Insights are mounted with tested query/fragment redaction
 ```
 
 Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliability-batch.md).

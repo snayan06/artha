@@ -40,6 +40,8 @@ categories and family participants; the user still reviews it before any write.
 - First-run setup for multiple bank, cash, wallet and credit-card accounts.
 - Configurable household members and exact per-member expense splits.
 - Light, dark and system theme support.
+- Privacy-filtered Vercel Web Analytics and Speed Insights; telemetry keeps the
+  route but removes URL query strings and fragments before sending.
 - Accounts, opening balances, income, expenses, transfers and settlements.
 - Shared-expense accounting that separates cash movement from personal share.
 - Transaction search plus type and per-account activity filters, including both
