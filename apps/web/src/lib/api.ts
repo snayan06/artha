@@ -158,14 +158,14 @@ function parseAssistantWidget(raw: unknown): AssistantWidget | null {
       !hasExactKeys(raw, ['type', 'title', 'value_paise', 'caption', 'tone'], ['type', 'title', 'value_paise'])
       || !isBoundedText(raw.title, 80)
       || !isSafePaise(raw.value_paise)
-      || (raw.caption !== undefined && raw.caption !== null && !isBoundedText(raw.caption, 160))
+      || (raw.caption !== undefined && raw.caption !== null && (typeof raw.caption !== 'string' || raw.caption.length > 160))
       || (raw.tone !== undefined && raw.tone !== 'neutral' && raw.tone !== 'positive' && raw.tone !== 'warning')
     ) return null
     return {
       type: 'metric',
       title: raw.title,
       value: formatAssistantPaise(raw.value_paise),
-      detail: typeof raw.caption === 'string' ? raw.caption : undefined
+      detail: typeof raw.caption === 'string' && raw.caption.length > 0 ? raw.caption : undefined
     }
   }
 

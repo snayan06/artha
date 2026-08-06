@@ -285,6 +285,22 @@ describe('FastAPI adapter', () => {
     expect(JSON.stringify(reply)).not.toContain('onerror')
   })
 
+  it('accepts an empty optional metric caption and omits the UI detail', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(assistantEnvelope({
+      type: 'metric', title: 'Balance', value_paise: 12345, caption: ''
+    })), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { chatAssistant } = await import('./api')
+
+    const reply = await chatAssistant('Show my balance')
+
+    expect(reply.widgets).toEqual([expect.objectContaining({
+      type: 'metric',
+      title: 'Balance',
+      detail: undefined
+    })])
+  })
+
   it('rejects a successful response without a model-written assistant message', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
