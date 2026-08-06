@@ -138,14 +138,17 @@
     <rect x="36" y="404" width="1124" height="112" rx="21" class="rough2"/>
   </g>
   <text x="62" y="431" class="label">Ask Artha is read-only</text>
-  <rect x="65" y="451" width="238" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
-  <text x="184" y="478" text-anchor="middle" class="body">DB values → canonical bundles</text>
-  <path d="M305 473 C326 468 340 477 360 473" class="arrow"/>
-  <rect x="368" y="451" width="320" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
-  <text x="528" y="478" text-anchor="middle" class="body">Gemini selects intent + copies exact bundle</text>
-  <path d="M690 473 C711 477 725 468 746 473" class="arrow"/>
-  <rect x="754" y="451" width="220" height="43" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
-  <text x="864" y="478" text-anchor="middle" class="body">React safely renders</text>
+  <rect x="60" y="444" width="250" height="60" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
+  <text x="185" y="467" text-anchor="middle" class="body">DB values build</text>
+  <text x="185" y="487" text-anchor="middle" class="body">canonical bundles</text>
+  <path d="M313 474 C324 470 334 478 345 474" class="arrow"/>
+  <rect x="352" y="444" width="315" height="60" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
+  <text x="509" y="467" text-anchor="middle" class="body">Gemini selects intent</text>
+  <text x="509" y="487" text-anchor="middle" class="body">and copies the exact bundle</text>
+  <path d="M670 474 C681 478 693 470 710 474" class="arrow"/>
+  <rect x="717" y="444" width="235" height="60" rx="13" fill="var(--paper)" stroke="var(--blue)" stroke-width="2"/>
+  <text x="834" y="467" text-anchor="middle" class="body">React safely</text>
+  <text x="834" y="487" text-anchor="middle" class="body">renders</text>
   <text x="1001" y="465" class="tiny" fill="var(--blue)">NO WRITES</text>
   <text x="1001" y="486" class="small">no model HTML</text>
 

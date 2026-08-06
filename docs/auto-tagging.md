@@ -7,15 +7,17 @@ without confirmation.
 
 Supabase production Quick Add sends the authenticated capture context directly
 to Gemini, including the household's existing category allow-list. It does not
-currently load or apply `merchant_rules` before interpretation.
+currently load or apply `merchant_rules` before interpretation. Gemini's
+allow-listed category selection is surfaced inside the unsaved Quick Add review
+draft. If interpretation is unavailable or invalid, category selection remains
+manual.
 
-The production tag-suggestion endpoint is also Gemini-only today:
-
-1. Send the minimum merchant/description context and existing category IDs.
-2. Validate that Gemini selected an exact allow-listed category.
-3. Present the suggestion in the unsaved review flow.
-4. If Gemini is missing, unavailable or invalid, leave category selection to
-   the user. Never create a fallback category.
+The standalone `POST /api/v1/assistant/tag-suggestion` endpoint is a bounded
+Gemini API contract: it accepts minimum merchant/description context, permits
+only an exact existing category and returns no suggestion when the model is
+missing, unavailable or invalid. The V1 web application does not call this
+endpoint, so its result must not be described as part of the web review flow.
+Neither path creates a fallback category.
 
 Only explicit transaction confirmation can save the reviewed draft.
 
