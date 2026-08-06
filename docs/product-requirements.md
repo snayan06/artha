@@ -62,8 +62,11 @@ Money trackers fail because recording every payment feels like work. They also c
 - Account setup: cash, bank, UPI-linked bank, credit card, and wallet.
 - Opening balance for each account.
 - Natural-language debit/credit capture.
-- Parsed review: amount, type, merchant, category, account, date, notes, and split.
-- Manual edit and confirm.
+- Parsed review: displayed transaction type, amount, description, category,
+  account(s), date, and equal-split member selection.
+- Manual correction of amount, description, category, account(s), date, and
+  equal-split member selection before confirm. Transaction type is displayed
+  but is not an editable control in V1.
 - Quick Add category selection through Gemini capture output, constrained to
   existing household categories and surfaced in the unsaved draft, with manual
   selection on failure. Merchant-rule-first behavior is currently local/demo
@@ -126,8 +129,8 @@ Money trackers fail because recording every payment feels like work. They also c
 4. A valid result becomes a compact unsaved draft. If interpretation is
    unavailable or invalid, Artha preserves the exact text and opens the manual
    form without guessing.
-5. The user reviews and edits the amount, type, accounts, date, category and
-   split.
+5. The user reviews the displayed transaction type and edits the amount,
+   description, category, account(s), date and equal-split member selection.
 6. User taps **Confirm**. Only then do the ledger, dashboard and shared balance
    update together.
 
@@ -257,7 +260,8 @@ drill-down. Those remain explicit future capabilities.
 - `categories`: household categories and parent category.
 - `transaction_splits`: responsible member and exact integer-paise share; the V1
   interface derives equal shares across selected participants.
-- `settlements`: from member, to member, amount, linked transaction.
+- `settlements`: backend foundation for member, counterparty, amount and linked
+  transaction; the user-facing recording workflow is planned.
 - `transfer_links`: connects the two sides of account transfers.
 - `merchant_rules`: remembered merchant/category/account defaults.
 - `audit_events`: who changed what and when.

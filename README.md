@@ -40,8 +40,9 @@ Or simply:
 > `self transfer 25k ICICI -> HDFC`
 
 Artha turns that into an **unsaved draft** containing the amount, transaction
-type, accounts, date, category and sharing details. Review it, correct anything,
-then confirm. Only confirmation changes the ledger.
+type, accounts, date, category and sharing details. Review the displayed type;
+correct the amount, description, category, accounts, date or equal-split member
+selection; then confirm. Only confirmation changes the ledger.
 
 That gives you one private view across bank accounts, cards, internal transfers,
 personal spending and expenses shared with family or friends—without making
@@ -55,8 +56,9 @@ capture itself feel like accounting.
    opening balances, card details and people you split expenses with.
 2. **Write naturally.** Try `self transfer 25k ICICI -> HDFC` or
    `Paid 1840 for groceries from HDFC, split with Krima, 3 days ago`.
-3. **Review before saving.** Check the amount, date, type, account, category and
-   split. Nothing reaches the ledger until confirmation.
+3. **Review before saving.** Check the displayed transaction type, then correct
+   the amount, description, category, account, date or equal-split member
+   selection. Nothing reaches the ledger until confirmation.
 4. **Understand the result.** See balances, personal spending, income, account
    activity, shared receivables and a six-month trend.
 5. **Ask the ledger.** Gemini selects one supported intent, then must return that
@@ -76,7 +78,8 @@ the assistant shows an honest error when its model is unavailable.
 - Natural-language INR capture with a review-before-write workflow.
 - Indian amount shorthand and account-to-account transfer capture such as
   `self transfer 25k ICICI -> HDFC`.
-- Accounts, opening balances, income, expenses, transfers and settlements.
+- Accounts, opening balances, income, expenses and transfers. The settlement
+  accounting foundation exists in the backend; its recording UI is planned.
 - Shared-expense accounting that separates cash movement from personal share.
 - Transaction search plus type and per-account activity filters, including both
   sides of internal transfers.
@@ -131,8 +134,9 @@ assistant answer.
 | CI | GitHub Actions |
 
 Money is stored as integer paise. Balances are derived from opening balances and
-ledger movements. Transfers and settlements are not counted as spending or
-income, and confirmed writes are idempotent.
+ledger movements. Transfers are not counted as spending or income, and
+confirmed writes are idempotent. The backend settlement foundation applies the
+same accounting rule; its user-facing workflow is planned.
 
 ## Repository layout
 
