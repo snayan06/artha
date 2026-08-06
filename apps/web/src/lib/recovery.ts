@@ -167,6 +167,12 @@ function authenticatedHeader(container: RecoveryContainer): Uint8Array {
   }))
 }
 
+function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const owned = new Uint8Array(bytes.byteLength)
+  owned.set(bytes)
+  return owned.buffer
+}
+
 async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -176,7 +182,12 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     ['deriveKey']
   )
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: RECOVERY_PBKDF2_ITERATIONS },
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: ownedArrayBuffer(salt),
+      iterations: RECOVERY_PBKDF2_ITERATIONS
+    },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -227,7 +238,7 @@ export async function encryptRecoveryBundle(bundle: Record<string, unknown>, pas
   const plaintext = serializeBundle(bundle)
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES))
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', plaintext))
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', ownedArrayBuffer(plaintext)))
   const container: RecoveryContainer = {
     format: RECOVERY_FORMAT,
     version: RECOVERY_VERSION,
@@ -248,9 +259,14 @@ export async function encryptRecoveryBundle(bundle: Record<string, unknown>, pas
   }
   const key = await deriveKey(passphrase, salt)
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: authenticatedHeader(container), tagLength: GCM_TAG_BITS },
+    {
+      name: 'AES-GCM',
+      iv: ownedArrayBuffer(iv),
+      additionalData: ownedArrayBuffer(authenticatedHeader(container)),
+      tagLength: GCM_TAG_BITS
+    },
     key,
-    plaintext
+    ownedArrayBuffer(plaintext)
   )
   container.ciphertext = encodeBase64(new Uint8Array(encrypted))
   return JSON.stringify(container)
@@ -263,9 +279,14 @@ export async function decryptRecoveryBundle(text: string, passphrase: string): P
   let plaintextBuffer: ArrayBuffer
   try {
     plaintextBuffer = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv, additionalData: authenticatedHeader(container), tagLength: GCM_TAG_BITS },
+      {
+        name: 'AES-GCM',
+        iv: ownedArrayBuffer(iv),
+        additionalData: ownedArrayBuffer(authenticatedHeader(container)),
+        tagLength: GCM_TAG_BITS
+      },
       key,
-      ciphertext
+      ownedArrayBuffer(ciphertext)
     )
   } catch {
     fail('DECRYPTION_FAILED', 'Recovery file could not be decrypted with this passphrase.')
@@ -274,7 +295,9 @@ export async function decryptRecoveryBundle(text: string, passphrase: string): P
   if (plaintext.length > MAX_RECOVERY_BUNDLE_BYTES) {
     fail('PAYLOAD_TOO_LARGE', 'Decrypted recovery bundle exceeds the supported size.')
   }
-  const actualDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', plaintext))
+  const actualDigest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', ownedArrayBuffer(plaintext))
+  )
   if (!digestsEqual(actualDigest, digest)) {
     fail('DIGEST_MISMATCH', 'Recovery bundle failed its integrity check.')
   }
