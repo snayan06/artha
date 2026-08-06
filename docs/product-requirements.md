@@ -69,9 +69,8 @@ Money trackers fail because recording every payment feels like work. They also c
   selection on failure. Merchant-rule-first behavior is currently local/demo
   only; production integration is planned.
 - Dashboard: available balance, month income, month spend, and pending shared balance.
-- Transaction list, search, filters, edit, and soft delete.
+- Transaction list, search, and transaction-type/account filters.
 - Equal expense splits across selected participants.
-- Settlement recording.
 - Read-only conversational assistant with approved narratives and safe inline
   metrics, charts and transaction tables; all financial values are calculated
   by server/database code.
@@ -86,6 +85,11 @@ Money trackers fail because recording every payment feels like work. They also c
 - Offline draft queue; offline entries must never become confirmed transactions
   until synchronized and reviewed.
 - Post-onboarding account, card and participant management.
+- Transaction correction and soft-delete controls. The authenticated API and
+  ledger recalculation foundation are implemented; the user-facing workflow is
+  planned.
+- Settlement recording and actions. The settlement schema, parser and
+  accounting foundation are implemented; the user-facing workflow is planned.
 - Voice capture: “Paid 850 for dinner from ICICI, shared with two family members.”
 - Favorite one-tap entries such as rent, maid, and groceries.
 - Recurring rules with review reminders.
@@ -170,7 +174,8 @@ Draft:
 4. **Transactions:** searchable ledger with transaction-type and account filters.
 5. **Ask:** fixed-intent read-only assistant preview with canonical metrics,
    charts, tables and clarification states.
-6. **Family:** per-member net owed/owing, expense details, and settlement actions.
+6. **Family:** per-member net owed/owing and the shared expenses that make up
+   the balance. Settlement actions are planned.
 7. **Settings:** shipped theme and encrypted recovery controls. Post-onboarding
    account/category/rule/member management and permanent deletion are planned.
 
@@ -189,7 +194,9 @@ For a ₹1,840 transaction paid fully by the user and shared with one member equ
 - member personal expense: ₹920
 - member payable / the user receivable: ₹920
 
-A later settlement changes cash and clears the receivable; it does not count as new income or spending.
+A later settlement changes cash and clears the receivable; it does not count as
+new income or spending. That accounting foundation is implemented, while the
+user-facing settlement workflow is planned.
 
 ### Credit card
 
@@ -197,7 +204,10 @@ A card purchase increases card liability. Paying the card is an account transfer
 
 ### Corrections
 
-Edits preserve an audit record. Deletes are soft deletes. Recalculations happen transactionally so balances, splits, and settlements cannot diverge.
+The authenticated API supports transaction edits and soft deletes, with
+transactional recalculation so balances, splits, and settlements cannot
+diverge. These are backend foundations; user-facing correction and deletion
+controls are planned.
 
 ## 9. Ask Artha current preview
 
@@ -390,12 +400,19 @@ learning, rate limiting or custom splits have shipped.
 - Natural debit, credit, transfer, and shared entries parse into drafts.
 - No transaction is saved without confirmation.
 - Full account movement and personal share are both correct.
-- Editing/deleting a shared expense recalculates balances atomically.
-- Settlement does not inflate income or expense.
 - Assistant narratives and canonical bundles match the selected intent and
   bounded server context exactly.
 - Equal V1 splits are represented through exact integer-paise member shares.
 - Client-side encrypted export/restore preserves the ledger contract.
+
+### Backend foundations implemented; user-facing workflows planned
+
+- Editing or soft-deleting a shared expense through the authenticated API
+  recalculates balances atomically; transaction correction and deletion
+  controls are not yet exposed in the web interface.
+- Settlement parsing, storage and accounting keep settlements outside income
+  and expense; settlement recording and actions are not yet exposed in the web
+  interface.
 
 ### Planned acceptance gates
 
@@ -405,6 +422,8 @@ learning, rate limiting or custom splits have shipped.
 - Validate CSV reconstruction only after CSV export/import ships.
 - Validate offline draft synchronization only after the offline queue ships.
 - Validate percentage/custom split correction only after that UI ships.
+- Validate transaction correction and soft deletion after those controls ship.
+- Validate settlement recording and balance clearing after that workflow ships.
 - Continue operating within documented free-plan quotas; a custom domain and
   messaging integrations remain optional and potentially paid.
 
