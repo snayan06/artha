@@ -200,6 +200,47 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
 
 
 @pytest.mark.parametrize(
+    "widget",
+    [
+        {
+            "type": "chart",
+            "title": "Categories",
+            "chart_type": "bar",
+            "points": [{"label": "Invented", "value_paise": 120_000}],
+        },
+        {"type": "metric", "title": "Invented", "value_paise": 999_999},
+    ],
+)
+@pytest.mark.asyncio
+async def test_hosted_assistant_eval_rejects_ungrounded_widgets_before_scoring(
+    widget: dict[str, object],
+) -> None:
+    suite = load_assistant_suite(
+        ROOT / "evals" / "assistant-context-v1.json",
+        ROOT / "evals" / "assistant-questions-v1.jsonl",
+    )
+    completion = {
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        "intent": "summary",
+        "widgets": [widget],
+    }
+
+    class Interactions:
+        async def create(self, **_body: object) -> SimpleNamespace:
+            return SimpleNamespace(output_text=json.dumps(completion))
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(provider=LlmProvider.GEMINI, gemini_api_key="test-key"),
+        gemini_client=SimpleNamespace(
+            aio=SimpleNamespace(interactions=Interactions(), models=SimpleNamespace())
+        ),
+    )
+
+    with pytest.raises(ValueError, match="grounded"):
+        await assistant.complete_with_selected_model("Show balance", suite.context)
+
+
+@pytest.mark.parametrize(
     "message",
     ["Your available balance is 15000.", "Your balance is ९९ crore.", "INR one hundred."],
 )

@@ -51,7 +51,7 @@ VALID_INTENTS = {
     "clarification",
     "unsupported",
 }
-VALID_WIDGET_TYPES = {"metric", "chart", "table", "insight", "clarification"}
+VALID_WIDGET_TYPES = {"metric", "chart", "table", "clarification"}
 
 
 @dataclass(frozen=True, slots=True)

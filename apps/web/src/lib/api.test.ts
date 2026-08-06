@@ -425,6 +425,7 @@ describe('FastAPI adapter', () => {
     ['oversized table rows', { type: 'table', title: 'Activity', rows: Array.from({ length: 13 }, (_, index) => ({ label: `R${index}`, amount_paise: index })) }],
     ['invalid table date', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, date: '7 Aug' }] }],
     ['invalid table kind', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, kind: 'forecast' }] }],
+    ['ungrounded insight widget', { type: 'insight', title: 'Note', body: 'An arbitrary second narrative.' }],
     ['blank insight body', { type: 'insight', title: 'Note', body: '   ' }],
     ['overlong insight body', { type: 'insight', title: 'Note', body: 'x'.repeat(401) }],
     ['overlong clarification question', { type: 'clarification', question: 'x'.repeat(241), choices: [] }],

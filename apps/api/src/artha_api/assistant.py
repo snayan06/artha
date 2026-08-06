@@ -131,13 +131,6 @@ class TableWidget(StrictModel):
     rows: list[TableRow] = Field(min_length=1, max_length=12)
 
 
-class InsightWidget(StrictModel):
-    type: Literal["insight"]
-    title: str = Field(min_length=1, max_length=80)
-    body: str = Field(min_length=1, max_length=400)
-    severity: Literal["info", "positive", "attention"] = "info"
-
-
 class ClarificationWidget(StrictModel):
     type: Literal["clarification"]
     question: str = Field(min_length=1, max_length=240)
@@ -152,7 +145,7 @@ class ClarificationWidget(StrictModel):
 
 
 AssistantWidget = Annotated[
-    MetricWidget | ChartWidget | TableWidget | InsightWidget | ClarificationWidget,
+    MetricWidget | ChartWidget | TableWidget | ClarificationWidget,
     Field(discriminator="type"),
 ]
 
@@ -246,6 +239,56 @@ class AssistantFinancialContext(StrictModel):
     top_categories: list[ContextCategory] = Field(max_length=5)
     monthly: list[ContextMonth] = Field(max_length=6)
     recent_transactions: list[ContextTransaction] = Field(max_length=8)
+
+
+def _ground_completion(
+    completion: AssistantCompletion,
+    context: AssistantFinancialContext,
+) -> AssistantCompletion:
+    metric_values = {
+        context.total_balance_paise,
+        context.current_month_spend_paise,
+        context.current_month_income_paise,
+        *(member.balance_paise for member in context.member_balances),
+        *(category.amount_paise for category in context.top_categories),
+        *(month.income_paise for month in context.monthly),
+        *(month.spend_paise for month in context.monthly),
+        *(transaction.personal_share_paise for transaction in context.recent_transactions),
+    }
+    chart_pairs = {
+        *((category.category, category.amount_paise) for category in context.top_categories),
+        *((month.month, month.income_paise) for month in context.monthly),
+        *((month.month, month.spend_paise) for month in context.monthly),
+    }
+    table_rows = {
+        *(
+            (member.member_name, member.balance_paise, None, None)
+            for member in context.member_balances
+        ),
+        *(
+            (
+                transaction.category,
+                transaction.personal_share_paise,
+                transaction.occurred_on,
+                transaction.kind,
+            )
+            for transaction in context.recent_transactions
+        ),
+    }
+
+    for widget in completion.widgets:
+        if isinstance(widget, MetricWidget) and widget.value_paise not in metric_values:
+            raise ValueError("assistant metric is not grounded in server context")
+        if isinstance(widget, ChartWidget) and any(
+            (point.label, point.value_paise) not in chart_pairs for point in widget.points
+        ):
+            raise ValueError("assistant chart is not grounded in server context")
+        if isinstance(widget, TableWidget) and any(
+            (row.label, row.amount_paise, row.date, row.kind) not in table_rows
+            for row in widget.rows
+        ):
+            raise ValueError("assistant table is not grounded in server context")
+    return completion
 
 
 class AssistantStatus(StrictModel):
@@ -924,7 +967,8 @@ class LocalFinancialAssistant:
             input_text=_prompt(message, context),
             schema=None,
         )
-        return AssistantCompletion.model_validate_json(content)
+        completion = AssistantCompletion.model_validate_json(content)
+        return _ground_completion(completion, context)
 
     async def _ollama_completion(
         self, message: str, context: AssistantFinancialContext
@@ -943,7 +987,8 @@ class LocalFinancialAssistant:
             response = await client.post("/api/chat", json=payload)
             response.raise_for_status()
             body = response.json()
-        return AssistantCompletion.model_validate_json(body["message"]["content"])
+        completion = AssistantCompletion.model_validate_json(body["message"]["content"])
+        return _ground_completion(completion, context)
 
     @staticmethod
     def _ground_tag_suggestion(

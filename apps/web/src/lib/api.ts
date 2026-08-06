@@ -228,16 +228,6 @@ function parseAssistantWidget(raw: unknown): AssistantWidget | null {
     return { type: 'table', title: raw.title, columns: ['Item', 'Amount', 'Date'], rows }
   }
 
-  if (raw.type === 'insight') {
-    if (
-      !hasExactKeys(raw, ['type', 'title', 'body', 'severity'], ['type', 'title', 'body'])
-      || !isBoundedText(raw.title, 80)
-      || !isBoundedText(raw.body, 400)
-      || (raw.severity !== undefined && raw.severity !== 'info' && raw.severity !== 'positive' && raw.severity !== 'attention')
-    ) return null
-    return { type: 'insight', title: raw.title, body: raw.body }
-  }
-
   if (raw.type === 'clarification') {
     if (
       !hasExactKeys(raw, ['type', 'question', 'choices'], ['type', 'question'])

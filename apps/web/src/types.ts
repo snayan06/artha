@@ -96,7 +96,6 @@ export type AssistantWidget =
   | { type: 'metric'; title: string; value: string; detail?: string }
   | { type: 'bar_chart' | 'line_chart'; title: string; data: Array<{ label: string; value: number }> }
   | { type: 'table'; title: string; columns: string[]; rows: string[][] }
-  | { type: 'insight'; title: string; body: string }
   | { type: 'clarification'; question: string; options: string[] }
 
 export interface AssistantReply {

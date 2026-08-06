@@ -173,6 +173,23 @@ def test_assistant_completion_schema_advertises_only_approved_messages() -> None
     }
 
 
+def test_assistant_completion_schema_rejects_the_ungrounded_insight_channel() -> None:
+    with pytest.raises(ValidationError):
+        AssistantCompletion.model_validate(
+            {
+                "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+                "intent": "summary",
+                "widgets": [
+                    {
+                        "type": "insight",
+                        "title": "Model narrative",
+                        "body": "An arbitrary second narrative channel.",
+                    }
+                ],
+            }
+        )
+
+
 @pytest.mark.parametrize(
     "message",
     [
@@ -302,6 +319,121 @@ async def test_gemini_uses_private_stateless_structured_output(
     for intent, message in ASSISTANT_INTENT_MESSAGES.items():
         assert f'intent={intent.value}: message="{message.casefold()}"' in normalized_prompt
     assert "tools" not in body
+
+
+@pytest.mark.parametrize(
+    "widget",
+    [
+        {"type": "metric", "title": "Invented", "value_paise": 999_999},
+        {
+            "type": "chart",
+            "title": "Categories",
+            "chart_type": "bar",
+            "points": [{"label": "Invented", "value_paise": 120_000}],
+        },
+        {
+            "type": "chart",
+            "title": "Categories",
+            "chart_type": "bar",
+            "points": [{"label": "Food", "value_paise": 999_999}],
+        },
+        {
+            "type": "table",
+            "title": "Activity",
+            "rows": [
+                {
+                    "label": "Invented",
+                    "amount_paise": 42_000,
+                    "date": "2026-08-04",
+                    "kind": "expense",
+                }
+            ],
+        },
+        {
+            "type": "table",
+            "title": "Activity",
+            "rows": [
+                {
+                    "label": "Food",
+                    "amount_paise": 999_999,
+                    "date": "2026-08-04",
+                    "kind": "expense",
+                }
+            ],
+        },
+    ],
+)
+@pytest.mark.asyncio
+async def test_chat_rejects_ungrounded_model_widgets(
+    widget: dict[str, object],
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = {
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        "intent": "summary",
+        "widgets": [widget],
+    }
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(
+            provider=LlmProvider.GEMINI,
+            gemini_api_key="gemini-test-key",
+        ),
+        gemini_client=FakeGeminiClient(json.dumps(completion)),
+    )
+
+    with pytest.raises(AssistantUnavailableError, match="AI assistant is unavailable"):
+        await assistant.chat("Show my ledger", financial_context)
+
+
+@pytest.mark.parametrize(
+    "widget",
+    [
+        {"type": "metric", "title": "Balance", "value_paise": 1_500_000},
+        {
+            "type": "chart",
+            "title": "Grounded chart",
+            "chart_type": "bar",
+            "points": [
+                {"label": "Food", "value_paise": 120_000},
+                {"label": "Aug", "value_paise": 800_000},
+            ],
+        },
+        {
+            "type": "table",
+            "title": "Grounded table",
+            "rows": [
+                {"label": "Avery", "amount_paise": 40_000},
+                {
+                    "label": "Food",
+                    "amount_paise": 42_000,
+                    "date": "2026-08-04",
+                    "kind": "expense",
+                },
+            ],
+        },
+    ],
+)
+@pytest.mark.asyncio
+async def test_chat_accepts_server_grounded_model_widgets(
+    widget: dict[str, object],
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = {
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        "intent": "summary",
+        "widgets": [widget],
+    }
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(
+            provider=LlmProvider.GEMINI,
+            gemini_api_key="gemini-test-key",
+        ),
+        gemini_client=FakeGeminiClient(json.dumps(completion)),
+    )
+
+    response = await assistant.chat("Show my ledger", financial_context)
+
+    assert response.result.widgets[0].model_dump(mode="json", exclude_defaults=True) == widget
 
 
 @pytest.mark.asyncio
