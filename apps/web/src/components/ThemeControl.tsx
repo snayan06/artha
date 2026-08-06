@@ -23,5 +23,5 @@ export function ThemeControl() {
   }
 
   const Icon = preference === 'dark' ? Moon : preference === 'light' ? Sun : Monitor
-  return <button onClick={cycle} className="grid h-11 w-11 place-items-center rounded-full border border-line bg-white text-[#66736d] tone-muted transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Theme: ${labels[preference]}. Change theme`} title={`Theme: ${labels[preference]}`}><Icon className="h-5 w-5" /></button>
+  return <button onClick={cycle} className="grid h-11 w-11 place-items-center rounded-full border border-line bg-white text-[#66736d] tone-muted transition hover:border-moss-300 hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label={`Theme: ${labels[preference]}. Change theme`} title={`Theme: ${labels[preference]}`}><Icon className="h-5 w-5" aria-hidden="true" /></button>
 }

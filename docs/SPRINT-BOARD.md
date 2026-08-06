@@ -143,16 +143,18 @@ and [`artifacts/architecture/v2-accounts-family-management.md`](artifacts/archit
 ### Production quality
 
 - [ ] Record cold/warm authenticated latency after the Mumbai deployment.
+- [ ] Add privacy-first Sentry error monitoring after explicit approval: error events only, no Session Replay, financial payloads, emails or IP collection, with client/server redaction tests.
 - [ ] Add a deliberate per-user rate-limit policy.
 - [x] Add no-store API caching policy and web/API security headers locally.
 - [ ] Verify deployed security headers and record sanitized log-redaction evidence.
 - [ ] Test PWA install/reopen, offline unsaved drafts, expired auth and accessibility.
 - [ ] Complete the 320 px, 390 px and desktop light/dark matrix.
 
-Current local evidence: Home and Transactions pass at 320 px, 390 px and
-desktop in light/dark with no horizontal overflow or browser-console errors.
-Onboarding, Quick add, Shared, Assistant and auth recovery still need the full
-final-domain matrix.
+Current local evidence: Home passes at 320 px; Home, Transactions, Shared,
+Assistant and Quick Add pass at 390 px with no horizontal overflow. Quick Add
+passes visual light/dark review, and Home passes visual mobile plus 1440 px dark
+review. Onboarding and auth recovery still need the full final-domain matrix.
+See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2026-08-06-web-interface-guidelines-audit.md).
 
 ### Measured AI
 

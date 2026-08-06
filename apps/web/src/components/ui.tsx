@@ -24,7 +24,7 @@ export function Button({ className, variant = 'primary', loading, icon, children
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : icon}
+      {loading ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : icon}
       {children}
     </button>
   )

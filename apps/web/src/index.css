@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,13 +8,19 @@
   background: #f5f7f2;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  color-scheme: light;
+  --chart-axis: #7c8781;
+  --chart-grid: #dfe6e0;
+  --chart-income: #c5ddd1;
+  --chart-series: #315b4d;
+  --chart-tooltip: #ffffff;
 }
 
 * { box-sizing: border-box; }
 html { background: #f5f7f2; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+body { margin: 0; min-width: 320px; min-height: 100vh; min-height: 100svh; overflow-x: hidden; }
 button, input, select, textarea { font: inherit; }
-button, a { -webkit-tap-highlight-color: transparent; }
+button, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 html.dark,
 html.dark body {
@@ -51,10 +55,18 @@ html.dark textarea::placeholder { color: #87928c; }
 html.dark .assistant-input { background-color: transparent; }
 html.dark .shadow-card { box-shadow: 0 16px 42px rgba(0, 0, 0, .32); }
 html.dark .recharts-cartesian-axis-tick-value { fill: #a7b0aa; }
+html.dark {
+  --chart-axis: #a7b0aa;
+  --chart-grid: #3b4740;
+  --chart-income: #8dbda7;
+  --chart-series: #55a082;
+  --chart-tooltip: #1a1f1c;
+}
 
 @layer utilities {
   .font-display { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; }
   .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .safe-page { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
 }

@@ -44,6 +44,7 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [Security headers and offline state](qa/2026-08-05-security-network.md)
 - [Sprint 1 reliability batch](qa/2026-08-05-reliability-batch.md)
 - [Production release acceptance](qa/2026-08-06-production-release-acceptance.md)
+- [Web Interface Guidelines audit](qa/2026-08-06-web-interface-guidelines-audit.md)
 - [V1 QA scenario matrix](qa/v1-scenario-matrix.md)
 - [V1 public-release verification](qa/v1-public-release.md)
 - [Production staging verification](qa/production-staging-verification.md)

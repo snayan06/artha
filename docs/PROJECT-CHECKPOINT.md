@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 6 August 2026, 19:52 IST
+Updated: 6 August 2026, 22:38 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,7 +20,7 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: Sprint 1 reliability release deployed; authenticated acceptance remains.**
+**Status: Production ledger RPC recovered; authenticated acceptance remains.**
 
 Do not enter real financial data yet. Database, CI and public deployment checks
 are green, but final-domain login persistence, two-owner isolation and recovery
@@ -31,8 +31,8 @@ acceptance still require interactive testing.
 | Production `main` | Merge `82045a8`; PR [#11](https://github.com/snayan06/artha/pull/11) is merged |
 | GitHub checks | Fresh main Web, API, SQL and CodeQL checks passed |
 | Vercel | Web and API production deployments completed successfully |
-| Supabase migration | All six migrations match locally and remotely, including `20260805010000` |
-| Public checks | API health and web `/transactions` plus `/assistant` routing return `200` with security headers |
+| Supabase RPC catalog | The deployed project resolves `get_account_balances` and `list_ledger_activity`; exact-project migration-history access remains an owner-only operational requirement |
+| Public checks | API health and web return `200`; anonymous catalog probes resolve both required ledger RPCs without exposing ledger data |
 | Remaining gate | Authenticated login/reopen/sign-out, two-owner isolation and financial-flow smoke |
 
 ## Resume checklist
@@ -40,6 +40,8 @@ acceptance still require interactive testing.
 - [x] Apply and verify `20260805010000_logical_ledger_activity.sql` remotely.
 - [x] Merge PR #11 and pass fresh main CI, CodeQL and Vercel deployments.
 - [x] Verify public API health, web routing and baseline security headers.
+- [x] Verify the deployed `list_ledger_activity` and `get_account_balances`
+  endpoints resolve through PostgREST instead of returning `PGRST202`.
 - [ ] Complete authenticated login, reopen, sign-out, transfer and account-filter
   smoke tests using fictional data.
 - [ ] Complete two-owner hosted isolation and the remaining responsive matrix.
@@ -72,6 +74,8 @@ Capture evaluation: 50 fictional cases valid; hosted baseline was 16/16 evaluate
 Manual UI: 320 px, 390 px and desktop checks passed in light/dark
 Browser console: no warnings or errors during the checked flows
 Production: PR #11 merged; fresh main CI, CodeQL and both Vercel deployments green
+Recovery: deployed Supabase project resolves `get_account_balances` and
+`list_ledger_activity`; API health remains 200
 ```
 
 Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliability-batch.md).
@@ -133,5 +137,6 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 6 Aug 2026 | Recovered the production ledger RPC catalog, verified both required functions through the deployed REST endpoint and added exact-project release guards |
 | 6 Aug 2026 | Logical-ledger migration applied; PR #11 merged; main CI, CodeQL, Vercel and public health/routing checks green; Sprint 2 contract and Qwen baseline recorded |
 | 5 Aug 2026 | Release candidate implemented, manually checked, published as PR #11 and fully green; production held for Supabase migration authorization |

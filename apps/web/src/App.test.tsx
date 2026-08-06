@@ -5,6 +5,14 @@ import { demoDashboard, demoTransactions } from './data/demo'
 import { RouterProvider } from './lib/router'
 
 const api = vi.hoisted(() => ({
+  ApiError: class ApiError extends Error {
+    readonly status: number
+
+    constructor(status: number, message: string) {
+      super(message)
+      this.status = status
+    }
+  },
   bootstrapDemo: vi.fn(),
   getMembers: vi.fn(),
   setupOnboarding: vi.fn(),
@@ -15,7 +23,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock('./lib/api', () => api)
 
-import App from './App'
+import App, { LedgerLoadError, ledgerLoadIssue } from './App'
 
 describe('first-run gate', () => {
   beforeEach(() => {
@@ -27,7 +35,7 @@ describe('first-run gate', () => {
   afterEach(() => {
     cleanup()
     localStorage.clear()
-    Object.values(api).forEach((mock) => mock.mockClear())
+    vi.clearAllMocks()
   })
 
   it('does not bootstrap until the user explicitly chooses the fictional demo', async () => {
@@ -40,5 +48,34 @@ describe('first-run gate', () => {
     await waitFor(() => expect(api.bootstrapDemo).toHaveBeenCalledTimes(1))
     expect(localStorage.getItem('artha.setup.complete')).toBe('true')
     expect(await screen.findByRole('heading', { name: 'Your money, made clear.' })).toBeInTheDocument()
+  })
+})
+
+describe('ledger recovery states', () => {
+  afterEach(() => cleanup())
+
+  it('explains a missing production RPC without implying that data was lost', () => {
+    const issue = ledgerLoadIssue(new api.ApiError(404, 'missing function'), 'ledger')
+
+    expect(issue).toMatchObject({
+      title: 'Artha is finishing an update',
+      retryLabel: 'Try again'
+    })
+    expect(issue.message).toContain('Your data is safe')
+  })
+
+  it('renders actionable mobile-safe recovery controls and retries once', async () => {
+    const user = userEvent.setup()
+    const retry = vi.fn().mockResolvedValue(undefined)
+    const signOut = vi.fn().mockResolvedValue(undefined)
+    const issue = ledgerLoadIssue(new api.ApiError(503, 'unavailable'), 'ledger')
+
+    render(<LedgerLoadError issue={issue} onRetry={retry} onSignOut={signOut} />)
+
+    expect(screen.getByRole('heading', { name: 'Artha is taking longer than expected' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Your data is safe')
+    await user.click(screen.getByRole('button', { name: 'Retry connection' }))
+    expect(retry).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 })

@@ -21,7 +21,7 @@ export function configureApiAccessTokenProvider(provider: AccessTokenProvider): 
 
 type JsonObject = Record<string, unknown>
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message)
   }

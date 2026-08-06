@@ -1,7 +1,7 @@
 import { Bot, Home, List, LogOut, Plus, UsersRound, WifiOff } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useOnlineStatus } from '../lib/network'
-import { type AppPath, useRouter } from '../lib/router'
+import { AppLink, type AppPath, useRouter } from '../lib/router'
 import { ThemeControl } from './ThemeControl'
 
 const navigation = [
@@ -12,19 +12,21 @@ const navigation = [
 ]
 
 export function Shell({ children, userEmail, onSignOut }: { children: ReactNode; userEmail?: string; onSignOut?: () => Promise<void> }) {
-  const { path, navigate } = useRouter()
+  const { path } = useRouter()
   const isOnline = useOnlineStatus()
   const isQuickAdd = path === '/add'
+  const overviewLabel = new Intl.DateTimeFormat('en-IN', { month: 'long' }).format(new Date())
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
+      <a href="#main-content" className="sr-only fixed left-4 top-4 z-50 rounded-xl bg-white px-4 py-3 font-semibold text-ink shadow-card focus:not-sr-only focus-visible:ring-2 focus-visible:ring-moss-400">Skip to Main Content</a>
       <header className="sticky top-0 z-30 border-b border-line/80 bg-canvas/90 backdrop-blur-xl dark:border-night-border dark:bg-night-canvas/95">
         <div className="mx-auto flex h-[72px] max-w-6xl items-center justify-between px-5 sm:px-8">
-          <button onClick={() => navigate('/')} className="flex min-h-11 items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Go home">
+          <AppLink to="/" className="flex min-h-11 items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Go to Home">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-moss-900 font-display text-lg font-bold text-white dark:bg-[#27604e]">H</span>
             <div className="text-left"><p className="font-display text-lg font-bold leading-none tracking-[-0.03em]">Artha</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#839089] tone-subtle">Private ledger</p></div>
-          </button>
-          <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">August overview</span><ThemeControl />{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Sign out"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span></button>}</div>
+          </AppLink>
+          <div className="flex items-center gap-2"><span className="hidden rounded-full bg-moss-100 px-3 py-1.5 text-xs font-semibold text-moss-800 sm:block">{overviewLabel} overview</span><ThemeControl />{onSignOut && <button onClick={() => void onSignOut()} title={userEmail ? `Signed in as ${userEmail}` : undefined} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-white px-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:border-moss-300 hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400" aria-label="Sign out"><LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Sign out</span></button>}</div>
         </div>
       </header>
 
@@ -37,14 +39,14 @@ export function Shell({ children, userEmail, onSignOut }: { children: ReactNode;
         </div>
       )}
 
-      <main className={`mx-auto max-w-6xl px-4 pb-32 pt-5 sm:px-8 sm:pt-8 ${isQuickAdd ? 'max-w-3xl' : ''}`}>{children}</main>
+      <main id="main-content" className={`mx-auto max-w-6xl scroll-mt-24 px-4 pb-32 pt-5 sm:px-8 sm:pt-8 ${isQuickAdd ? 'max-w-3xl' : ''}`}>{children}</main>
 
       {!isQuickAdd && (
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 pt-2 backdrop-blur-xl dark:border-night-border dark:bg-night-surface/95 sm:left-1/2 sm:bottom-5 sm:w-[430px] sm:-translate-x-1/2 sm:rounded-[24px] sm:border sm:shadow-float" aria-label="Main navigation">
           <div className="relative grid grid-cols-5 items-end">
-            {navigation.slice(0, 2).map((item) => <NavItem key={item.to} {...item} active={path === item.to} onClick={() => navigate(item.to)} />)}
-            <div className="flex justify-center"><button onClick={() => navigate('/add')} className="-mt-7 grid h-14 w-14 place-items-center rounded-[20px] bg-moss-900 text-white shadow-float transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 focus-visible:ring-offset-2 dark:bg-[#27604e]" aria-label="Quick add transaction"><Plus className="h-6 w-6" strokeWidth={2.5} /></button></div>
-            {navigation.slice(2).map((item) => <NavItem key={item.to} {...item} active={path === item.to} onClick={() => navigate(item.to)} />)}
+            {navigation.slice(0, 2).map((item) => <NavItem key={item.to} {...item} active={path === item.to} />)}
+            <div className="flex justify-center"><AppLink to="/add" className="-mt-7 grid h-14 w-14 place-items-center rounded-[20px] bg-moss-900 text-white shadow-float transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 focus-visible:ring-offset-2 dark:bg-[#27604e]" aria-label="Quick Add Transaction"><Plus className="h-6 w-6" strokeWidth={2.5} aria-hidden="true" /></AppLink></div>
+            {navigation.slice(2).map((item) => <NavItem key={item.to} {...item} active={path === item.to} />)}
           </div>
         </nav>
       )}
@@ -52,6 +54,6 @@ export function Shell({ children, userEmail, onSignOut }: { children: ReactNode;
   )
 }
 
-function NavItem({ label, icon: Icon, active, onClick }: (typeof navigation)[number] & { active: boolean; onClick: () => void }) {
-  return <button onClick={onClick} className={`flex min-h-[54px] w-full flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition ${active ? 'text-moss-800' : 'text-[#8a958f] tone-subtle hover:text-moss-700'}`} aria-current={active ? 'page' : undefined}><Icon className={`h-5 w-5 ${active ? 'fill-moss-100' : ''}`} /><span>{label}</span></button>
+function NavItem({ label, icon: Icon, active, to }: (typeof navigation)[number] & { active: boolean }) {
+  return <AppLink to={to} className={`flex min-h-[54px] w-full flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 ${active ? 'text-moss-800' : 'text-[#8a958f] tone-subtle hover:text-moss-700'}`} aria-current={active ? 'page' : undefined}><Icon className={`h-5 w-5 ${active ? 'fill-moss-100' : ''}`} aria-hidden="true" /><span>{label}</span></AppLink>
 }
