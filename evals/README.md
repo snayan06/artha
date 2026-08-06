@@ -31,7 +31,17 @@ ARTHA_LLM_PROVIDER=groq make eval-capture-hosted
 store and must never be pasted into documentation, committed, or passed as a
 command-line argument. The runner calls the same `LocalFinancialAssistant`
 capture adapter used by the API, runs sequentially with one-second pacing, and
-retries one unavailable/invalid response. Options can be inspected with:
+retries one unavailable/invalid response. Rate limits honor the provider's
+`Retry-After` header (with a bounded wait), and every completed case is written
+atomically to a sanitized checkpoint. If a run is interrupted or quota-limited,
+resume it without re-calling already evaluated cases:
+
+```bash
+cd apps/api
+uv run python -m artha_api.capture_evals --mode run --resume
+```
+
+Options can be inspected with:
 
 ```bash
 cd apps/api
@@ -39,9 +49,12 @@ uv run python -m artha_api.capture_evals --help
 ```
 
 The generated JSON contains overall, outcome, field and tag slices plus only the
-constrained structured values for failed cases. The Markdown report deliberately
-omits utterances and model-generated free text. The command exits non-zero when
-the strict case pass rate is below `--minimum-pass-rate` (100% by default).
+constrained structured values for failed cases. Provider failures are classified
+separately (for example, `rate_limited` or `timeout`) and excluded from model
+accuracy; evaluation coverage remains a separate 100% gate. Reports and
+checkpoints deliberately omit utterances, provider response bodies and
+model-generated free text. The command exits non-zero when either the strict case
+pass rate or coverage gate is missed.
 
 The Vitest suite imports this same dataset and gates the common and
 safety-critical behavior required from the no-provider browser fallback. The

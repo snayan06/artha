@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 5 August 2026
+Updated: 6 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -23,13 +23,14 @@ Sprint 1 dependency.
 | --- | --- | --- |
 | Public repository and CI | Done | GitHub, CI and CodeQL are active |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
-| Persistent production login | Recovery done locally | Expired, reused, wrong-browser and stale-session states are implemented; final-domain acceptance remains |
-| Server-owned onboarding/profile | Done locally | Profile, household and members now hydrate from the server; final-domain acceptance remains |
+| Persistent production login | Deployed; acceptance pending | Expired, reused, wrong-browser and stale-session states are live; final-domain user acceptance remains |
+| Server-owned onboarding/profile | Deployed; acceptance pending | Profile, household and members hydrate from the server; final-domain cross-device acceptance remains |
 | ₹25k self-transfer flow | Deployed | Parser, review UI, atomic backend and history projection are live; authenticated smoke remains |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
-| Structured Qwen capture | Runner done locally | Strict schema, allow-list grounding and the 50-case hosted evaluator pass locally; provider key and benchmark remain |
+| Structured Qwen capture | Hosted baseline run | Qwen key/model work; 16 valid responses passed and 34 cases were unavailable, so availability diagnostics and a paced resume are next |
 | Parser evaluation dataset | Done | 50 fictional cases plus an automated contract checker are in the repository |
-| Family email invitations | Next | Permission model is defined; schema, RLS, email acceptance and limited UI remain |
+| Accounts & family | Next implementation track | Product contract and secure architecture are complete; owner maintenance ships before invitations |
+| Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
 | Production acceptance | Blocked | Requires two test identities plus login/link interaction from the user |
@@ -87,37 +88,47 @@ Sprint 1 dependency.
 - [x] Validate dataset IDs, allow-listed entities, outcomes and integer-paise values in CI.
 - [x] Gate 22 common/safety-critical deterministic drafts plus negative, ambiguous and unknown-member input.
 - [x] Add a hosted-model evaluation runner with field/outcome/tag slices and sanitized reports.
-- [ ] Score all 50 cases against hosted Qwen and review the error slices.
-- [ ] Configure the server-only Groq key after the user creates one.
-- [ ] Run the benchmark and publish accuracy/error slices before enabling Qwen.
+- [x] Configure a local server-only Groq key and verify `qwen/qwen3.6-27b` availability.
+- [x] Run the first hosted baseline: 16 valid responses passed and 34 cases were unavailable.
+- [ ] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
+- [ ] Respect `Retry-After`, back off safely, checkpoint progress and resume the unfinished cases.
+- [ ] Publish final field/error slices only after all 50 cases receive a valid scored outcome.
 
-## Sprint 2 — collaborative household access
+## Sprint 2 — Accounts & family
 
 **Entry gate:** Sprint 1 login/session, two-household isolation and transfer
 smoke tests pass on the final domain.
 
-**Scope note:** optional for the current personal pilot. V1 already supports
-non-login friends/family participants for splits.
+Detailed acceptance criteria and security decisions live in
+[`artifacts/architecture/sprint-2-accounts-family-contract.md`](artifacts/architecture/sprint-2-accounts-family-contract.md)
+and [`artifacts/architecture/v2-accounts-family-management.md`](artifacts/architecture/v2-accounts-family-management.md).
 
-### Invitation and permission model
+### Sprint 2A — owner maintenance
 
-- [x] Separate non-login participants from authenticated invited users in the product model.
-- [x] Define the first invited role as limited `shared_viewer`.
-- [ ] Add invitation, acceptance, expiry, resend and revocation tables/functions.
-- [ ] Add audited owner-only invitation APIs.
-- [ ] Add RLS proving a shared viewer cannot read account balances or unrelated transactions.
-- [ ] Link an accepted identity to exactly one participant record.
-- [ ] Build owner invitation management UI with email and status.
-- [ ] Build the invited user's limited shared-expense and settlement UI.
-- [ ] Add two-owner/two-viewer isolation and revocation tests.
+| ID | Status | Task | Depends on | Acceptance gate |
+| --- | --- | --- | --- | --- |
+| S2-01 | Next | Owner-only **Accounts & family** settings snapshot and responsive route | Sprint 1 production acceptance | Returning owner sees active/archived server data; non-owner gets `403` |
+| S2-02 | Planned | Add, rename, archive and restore banks, cash, wallets and cards | S2-01 | Immutable type/currency, duplicate-name and non-zero/archive rules pass |
+| S2-03 | Planned | Update card limit, statement day and due day | S2-02 | Card-only validation and over-limit warning pass |
+| S2-04 | Planned | Audited balance correction using append-only adjustment movements | S2-02 | Balance changes exactly; income/spend/splits remain unchanged |
+| S2-05 | Planned | Add, rename, deactivate and restore non-login participants | S2-01 | Historical splits survive; unsettled people cannot be deactivated |
 
-### Post-onboarding management
+### Sprint 2B — family access
 
-- [ ] Add **Accounts & family** settings.
-- [ ] Add/rename/archive banks, cash, wallets and cards.
-- [ ] Update card limits, statement days and due days.
-- [ ] Add/rename/deactivate non-login participants.
-- [ ] Record balance corrections as audited adjustments, never history rewrites.
+| ID | Status | Task | Depends on | Acceptance gate |
+| --- | --- | --- | --- | --- |
+| S2-06 | Planned | Harden base-table RLS/RPCs to owner-only before adding viewers | S2-01 | Direct viewer reads of accounts, ledger, roster and audit are denied |
+| S2-07 | Planned | Invitation create/resend/expire/accept/revoke lifecycle | S2-05, S2-06 | Token hash, email match, single-use acceptance and immediate revocation pass |
+| S2-08 | Planned | **Shared with me** minimal read model and mobile UI | S2-07 | Viewer sees only their shared expenses/settlements, never private balances |
+| S2-09 | Planned | Two-owner/two-viewer production isolation and revocation matrix | S2-08 | Cross-household and unrelated-row probes return no data |
+
+### Sprint 2C — private capture learning loop
+
+| ID | Status | Task | Depends on | Acceptance gate |
+| --- | --- | --- | --- | --- |
+| S2-10 | Planned | Store private capture feedback: original text, parser/model/version, proposed JSON and user-confirmed JSON | Privacy/schema review | Enabled by default with clear onboarding disclosure; never written before review |
+| S2-11 | Planned | Add Settings toggle plus export and delete-all controls | S2-10 | Household can disable, export and permanently remove learning history |
+| S2-12 | Planned | Promote reviewed, sanitized examples into versioned eval cases | S2-10 | No automatic external training or public dataset use without separate consent |
 
 ## Sprint 3 — recovery, production quality and measured AI
 
