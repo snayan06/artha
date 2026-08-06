@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../lib/api'
 import { RouterProvider } from '../lib/router'
-import type { Transaction } from '../types'
+import type { LedgerAccount, Transaction } from '../types'
 import { localDateOffset } from '../lib/date'
 import { QuickAddPage } from './QuickAddPage'
 
@@ -67,6 +67,7 @@ describe('QuickAddPage', () => {
     expect(screen.getByLabelText('Transaction date')).toBeInTheDocument()
     expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
     expect(onConfirm).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Review the details' })).toHaveFocus())
 
     await user.type(screen.getByLabelText('Amount in rupees'), '250')
     await user.type(screen.getByLabelText('Description'), 'Manual transfer')
@@ -74,6 +75,46 @@ describe('QuickAddPage', () => {
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
     expect(onConfirm.mock.calls[0]?.[0].sourceText).toBe(sourceText)
+  })
+
+  it('waits for a real account before confirming a recovered manual draft', async () => {
+    const user = userEvent.setup()
+    const sourceText = '  Paid 250 for coffee  '
+    let resolveAccounts!: (accounts: LedgerAccount[]) => void
+    const accountsPromise = new Promise<LedgerAccount[]>((resolve) => {
+      resolveAccounts = resolve
+    })
+    vi.spyOn(api, 'getAccounts').mockReturnValue(accountsPromise)
+    vi.spyOn(api, 'parseDraft').mockImplementation(async (text) => {
+      throw new api.CaptureDraftUnavailableError(text)
+    })
+    const onConfirm = vi.fn().mockResolvedValue({
+      id: 'account-grounded-recovery', kind: 'debit', amountPaise: 25_000, personalSharePaise: 25_000,
+      merchant: 'Coffee', category: 'Other', account: 'ICICI', occurredAt: localDateOffset(0),
+      memberSplits: [], status: 'confirmed'
+    } satisfies Transaction)
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), sourceText)
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await screen.findByRole('alert')
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Coffee')
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+
+    expect(confirmButton).toBeDisabled()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    resolveAccounts([{ id: 'account-1', name: 'ICICI', kind: 'bank' }])
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Paid from account' })).toHaveDisplayValue('ICICI'))
+    expect(confirmButton).toBeEnabled()
+    await user.click(confirmButton)
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    expect(onConfirm.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      sourceAccountId: 'account-1',
+      sourceText
+    }))
   })
 
   it('prevents rapid duplicate confirmation while the first write is pending', async () => {
