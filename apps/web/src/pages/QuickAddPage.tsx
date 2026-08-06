@@ -48,7 +48,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     setParsing(true)
     setError('')
     try {
-      const response = await parseDraft(text.trim(), members)
+      const response = await parseDraft(text, members)
       setDraft(response.data)
       setUsedFallback(response.demo)
     } catch (caught) {

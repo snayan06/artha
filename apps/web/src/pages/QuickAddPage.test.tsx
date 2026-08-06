@@ -46,9 +46,15 @@ describe('QuickAddPage', () => {
 
   it('preserves the sentence and opens manual entry when AI capture is unavailable', async () => {
     const user = userEvent.setup()
-    const sourceText = 'self transfer 25k ICICI -> HDFC'
-    const onConfirm = vi.fn()
-    vi.spyOn(api, 'parseDraft').mockRejectedValue(new api.CaptureDraftUnavailableError(sourceText))
+    const sourceText = '  self transfer 25k ICICI -> HDFC  '
+    const onConfirm = vi.fn().mockResolvedValue({
+      id: 'manual-recovery', kind: 'debit', amountPaise: 25_000, personalSharePaise: 25_000,
+      merchant: 'Manual transfer', category: 'Other', account: 'HDFC UPI', occurredAt: localDateOffset(0),
+      memberSplits: [], status: 'confirmed'
+    } satisfies Transaction)
+    vi.spyOn(api, 'parseDraft').mockImplementation(async (text) => {
+      throw new api.CaptureDraftUnavailableError(text)
+    })
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), sourceText)
@@ -61,6 +67,13 @@ describe('QuickAddPage', () => {
     expect(screen.getByLabelText('Transaction date')).toBeInTheDocument()
     expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
     expect(onConfirm).not.toHaveBeenCalled()
+
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Manual transfer')
+    await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    expect(onConfirm.mock.calls[0]?.[0].sourceText).toBe(sourceText)
   })
 
   it('prevents rapid duplicate confirmation while the first write is pending', async () => {
