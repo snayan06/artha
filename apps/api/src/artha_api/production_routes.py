@@ -14,6 +14,7 @@ from .assistant import (
     AssistantChatResponse,
     AssistantFinancialContext,
     AssistantStatus,
+    AssistantUnavailableError,
     CaptureAccount,
     CaptureCategory,
     CaptureClarification,
@@ -802,7 +803,13 @@ async def assistant_chat(
             for row in list(summary["recent_transactions"])[:8]
         ],
     )
-    return await LocalFinancialAssistant().chat(payload.message, context)
+    try:
+        return await LocalFinancialAssistant().chat(payload.message, context)
+    except AssistantUnavailableError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "AI is temporarily unavailable; the ledger was not changed.",
+        ) from error
 
 
 @router.post(
@@ -814,4 +821,13 @@ async def assistant_tag_suggestion(
     payload: TagSuggestionRequest,
     _auth: AuthDependency,
 ) -> TagSuggestionResponse:
-    return await LocalFinancialAssistant().suggest_tag(payload)
+    try:
+        return await LocalFinancialAssistant().suggest_tag(payload)
+    except AssistantUnavailableError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            (
+                "AI category suggestion is temporarily unavailable; "
+                "the ledger was not changed."
+            ),
+        ) from error

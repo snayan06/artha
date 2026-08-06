@@ -7,15 +7,20 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from artha_api.assistant import (
+    AssistantChatRequest,
     CaptureClarification,
     CaptureInterpretationResponse,
     LlmProvider,
     LocalFinancialAssistant,
+    TagCategory,
+    TagSuggestionRequest,
 )
 from artha_api.auth import AuthContext
 from artha_api.production_routes import (
     ProductionDraft,
     ProductionSplit,
+    assistant_chat,
+    assistant_tag_suggestion,
     confirm_transaction,
     list_transactions,
     member_balances,
@@ -33,6 +38,53 @@ DESTINATION_ACCOUNT_ID = "00000000-0000-0000-0000-000000000107"
 CATEGORY_ID = "00000000-0000-0000-0000-000000000104"
 USER_ID = "00000000-0000-0000-0000-000000000105"
 TRANSACTION_ID = "00000000-0000-0000-0000-000000000106"
+
+
+async def test_production_assistant_routes_return_503_when_provider_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "disabled")
+    auth = AuthContext(user_id=USER_ID)
+
+    async def empty_dashboard(_client: object, _auth: AuthContext) -> dict[str, object]:
+        return {
+            "total_balance_paise": 0,
+            "spend_paise": 0,
+            "income_paise": 0,
+            "member_balances": [],
+            "spend_by_category": [],
+            "monthly": [],
+            "recent_transactions": [],
+        }
+
+    monkeypatch.setattr("artha_api.production_routes.dashboard", empty_dashboard)
+
+    with pytest.raises(HTTPException) as chat_error:
+        await assistant_chat(
+            AssistantChatRequest(message="Show my spending"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            auth,
+        )
+    with pytest.raises(HTTPException) as tag_error:
+        await assistant_tag_suggestion(
+            TagSuggestionRequest(
+                description="Food purchase",
+                amount_paise=12_000,
+                direction="expense",
+                allowed_categories=[TagCategory(id="food", name="Food")],
+            ),
+            auth,
+        )
+
+    assert chat_error.value.status_code == 503
+    assert chat_error.value.detail == (
+        "AI is temporarily unavailable; the ledger was not changed."
+    )
+    assert tag_error.value.status_code == 503
+    assert tag_error.value.detail == (
+        "AI category suggestion is temporarily unavailable; "
+        "the ledger was not changed."
+    )
 
 
 class FakeProductionClient:

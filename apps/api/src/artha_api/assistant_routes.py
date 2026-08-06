@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .assistant import (
@@ -10,6 +10,7 @@ from .assistant import (
     AssistantChatResponse,
     AssistantFinancialContext,
     AssistantStatus,
+    AssistantUnavailableError,
     ContextCategory,
     ContextMemberBalance,
     ContextMonth,
@@ -95,7 +96,13 @@ async def assistant_chat(
     assistant: AssistantDependency,
 ) -> AssistantChatResponse:
     context = await compact_financial_context(session, auth)
-    return await assistant.chat(payload.message, context)
+    try:
+        return await assistant.chat(payload.message, context)
+    except AssistantUnavailableError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "AI is temporarily unavailable; the ledger was not changed.",
+        ) from error
 
 
 @router.post("/tag-suggestion", response_model=TagSuggestionResponse)
@@ -107,4 +114,13 @@ async def assistant_tag_suggestion(
     # Authentication gates access, but the model receives no identity and this
     # endpoint intentionally has no DB session or persistence capability.
     del auth
-    return await assistant.suggest_tag(payload)
+    try:
+        return await assistant.suggest_tag(payload)
+    except AssistantUnavailableError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            (
+                "AI category suggestion is temporarily unavailable; "
+                "the ledger was not changed."
+            ),
+        ) from error

@@ -10,6 +10,7 @@ import pytest
 from artha_api.assistant import (
     AssistantFinancialContext,
     AssistantSettings,
+    AssistantUnavailableError,
     CaptureAccount,
     CaptureCategory,
     CaptureContext,
@@ -109,14 +110,12 @@ def financial_context() -> AssistantFinancialContext:
 
 
 @pytest.mark.asyncio
-async def test_disabled_assistant_uses_deterministic_fallback(
+async def test_disabled_assistant_is_unavailable(
     financial_context: AssistantFinancialContext,
 ) -> None:
     assistant = LocalFinancialAssistant(AssistantSettings(provider=LlmProvider.DISABLED))
 
     status = await assistant.status()
-    response = await assistant.chat("How much did I spend?", financial_context)
-
     assert status.model_dump() == {
         "configured": False,
         "provider": "disabled",
@@ -126,9 +125,10 @@ async def test_disabled_assistant_uses_deterministic_fallback(
         "ollama_fallback_enabled": False,
         "detail": "disabled",
     }
-    assert response.mode == "deterministic_fallback"
-    assert response.result.intent == "spending"
-    assert response.result.widgets[0].type == "metric"
+    with pytest.raises(
+        AssistantUnavailableError, match="AI assistant is unavailable"
+    ):
+        await assistant.chat("How much did I spend?", financial_context)
 
 
 @pytest.mark.asyncio
@@ -487,7 +487,7 @@ async def test_groq_failure_can_use_opt_in_ollama_fallback(
 
 
 @pytest.mark.asyncio
-async def test_invalid_model_payload_falls_back_deterministically(
+async def test_invalid_model_payload_makes_assistant_unavailable(
     financial_context: AssistantFinancialContext,
 ) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
@@ -519,10 +519,10 @@ async def test_invalid_model_payload_falls_back_deterministically(
         AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
-    response = await assistant.chat("Show spending", financial_context)
-
-    assert response.mode == "deterministic_fallback"
-    assert response.result.intent == "spending"
+    with pytest.raises(
+        AssistantUnavailableError, match="AI assistant is unavailable"
+    ):
+        await assistant.chat("Show spending", financial_context)
 
 
 @pytest.mark.asyncio
@@ -633,7 +633,7 @@ async def test_gemini_tag_suggestion_is_grounded_in_allowed_categories() -> None
 
 
 @pytest.mark.asyncio
-async def test_invented_tag_is_rejected_and_gracefully_falls_back() -> None:
+async def test_invented_tag_makes_category_suggestion_unavailable() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/chat"
         suggestion = {
@@ -651,22 +651,21 @@ async def test_invented_tag_is_rejected_and_gracefully_falls_back() -> None:
         AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
-    response = await assistant.suggest_tag(
-        TagSuggestionRequest(
-            description="Unknown merchant",
-            amount_paise=5000,
-            direction="expense",
-            allowed_categories=[TagCategory(id="food", name="Food")],
+    with pytest.raises(
+        AssistantUnavailableError, match="AI category suggestion is unavailable"
+    ):
+        await assistant.suggest_tag(
+            TagSuggestionRequest(
+                description="Unknown merchant",
+                amount_paise=5000,
+                direction="expense",
+                allowed_categories=[TagCategory(id="food", name="Food")],
+            )
         )
-    )
-
-    assert response.mode == "deterministic_fallback"
-    assert response.result.category_id is None
-    assert response.result.confidence == 0
 
 
 @pytest.mark.asyncio
-async def test_assistant_endpoints_are_read_only_when_provider_is_disabled(
+async def test_disabled_assistant_endpoints_return_503_without_changing_ledger(
     client: httpx.AsyncClient,
     bootstrapped: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
@@ -692,8 +691,15 @@ async def test_assistant_endpoints_are_read_only_when_provider_is_disabled(
 
     assert status_response.status_code == 200
     assert status_response.json()["detail"] == "disabled"
-    assert chat_response.status_code == 200
-    assert chat_response.json()["mode"] == "deterministic_fallback"
-    assert tag_response.status_code == 200
-    assert tag_response.json()["result"]["category_id"] == "food"
+    assert chat_response.status_code == 503
+    assert chat_response.json() == {
+        "detail": "AI is temporarily unavailable; the ledger was not changed."
+    }
+    assert tag_response.status_code == 503
+    assert tag_response.json() == {
+        "detail": (
+            "AI category suggestion is temporarily unavailable; "
+            "the ledger was not changed."
+        )
+    }
     assert before == after

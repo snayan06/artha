@@ -84,6 +84,10 @@ class CaptureInterpretationError(Exception):
         super().__init__(kind.value)
 
 
+class AssistantUnavailableError(RuntimeError):
+    """No configured model produced a valid, grounded response."""
+
+
 class AssistantIntent(StrEnum):
     SUMMARY = "summary"
     SPENDING = "spending"
@@ -218,7 +222,7 @@ class AssistantStatus(StrictModel):
 class AssistantChatResponse(StrictModel):
     provider: LlmProvider
     model: str | None
-    mode: Literal["model", "deterministic_fallback"]
+    mode: Literal["model"]
     result: AssistantCompletion
 
 
@@ -266,7 +270,7 @@ class TagSuggestion(StrictModel):
 class TagSuggestionResponse(StrictModel):
     provider: LlmProvider
     model: str | None
-    mode: Literal["model", "deterministic_fallback"]
+    mode: Literal["model"]
     result: TagSuggestion
 
 
@@ -910,12 +914,7 @@ class LocalFinancialAssistant:
                 result=result,
             )
 
-        return AssistantChatResponse(
-            provider=settings.provider,
-            model=None,
-            mode="deterministic_fallback",
-            result=deterministic_completion(message, context),
-        )
+        raise AssistantUnavailableError("AI assistant is unavailable")
 
     async def suggest_tag(self, payload: TagSuggestionRequest) -> TagSuggestionResponse:
         settings = self.settings
@@ -957,12 +956,7 @@ class LocalFinancialAssistant:
                 result=result,
             )
 
-        return TagSuggestionResponse(
-            provider=settings.provider,
-            model=None,
-            mode="deterministic_fallback",
-            result=deterministic_tag_suggestion(payload),
-        )
+        raise AssistantUnavailableError("AI category suggestion is unavailable")
 
     async def interpret_capture(
         self, message: str, context: CaptureContext
