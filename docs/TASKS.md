@@ -10,7 +10,7 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** V1 is live and the authenticated fictional-data journey is green. Do not enter real financial data until every remaining P0 security/recovery item below is complete.
+**Current stage:** V1 is live and the authenticated fictional-data journey is green. The AI-primary candidate is locally verified but not deployed. Do not enter real financial data until every remaining P0 security/recovery item below is complete.
 
 - [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
 - [ ] Restore reliable GitHub Actions triggering and obtain fresh green `main` CI/CodeQL runs; do not normalize owner overrides.
@@ -68,6 +68,11 @@ For the current ordered delivery view, blockers and user actions, see
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
 - [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the pilot model.
 - [x] Select Gemini 3.5 Flash-Lite for fictional pilot traffic and configure it server-side only.
+- [x] Remove deterministic production language parsing and fail into exact-text manual review without saving.
+- [x] Restrict assistant responses to approved intents and exact server-owned, database-grounded widget bundles.
+- [x] Pass the AI-primary candidate local gate: 150 web, 204 API and 104 AI contract cases.
+- [ ] Re-run the hosted fictional Gemini gates for the AI-primary candidate.
+- [ ] Deploy the AI-primary candidate and repeat authenticated capture/assistant success and unavailable-state acceptance.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
 
 ### P2 — expansion after the private pilot
@@ -115,7 +120,7 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Check learned merchant rules before requesting an LLM suggestion.
 - [x] Constrain LLM tagging output to existing household categories with confidence.
 - [x] Fall back to manual review when parsing is incomplete.
-- [x] Keep the flow functional without an AI provider.
+- [x] Keep dashboard and manual review available when production AI is unavailable; never substitute a production language-parser guess.
 
 ## Milestone 3 — mobile PWA
 

@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 7 August 2026, 01:08 IST
+Updated: 7 August 2026, 19:41 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,7 +20,7 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: V1 is live and the authenticated fictional-data production journey is green.**
+**Status: V1 is live; the AI-primary release candidate is locally verified but is not deployed yet.**
 
 Do not enter real financial data yet. New and returning login, onboarding,
 financial flows, Gemini capture/assistant behavior, encrypted export and the
@@ -29,6 +29,7 @@ final-domain restore into a fresh household remain the release guard.
 
 | Surface | Current state |
 | --- | --- |
+| AI-primary candidate | Feature branch is locally green with model-only production capture/assistant behavior, exact-text manual recovery, updated product story and the repository-owned architecture diagram; publication and final-domain acceptance remain |
 | Production `main` | Merge `0376b60`; release PRs [#16](https://github.com/snayan06/artha/pull/16), [#17](https://github.com/snayan06/artha/pull/17) and [#18](https://github.com/snayan06/artha/pull/18) are merged |
 | GitHub checks | Both Vercel checks passed on every release PR. GitHub did not create the required Web/API/SQL runs, so the owner merge override was used only after the identical full local gate passed |
 | Vercel | Web and API production aliases serve the current release successfully from Mumbai |
@@ -85,15 +86,17 @@ final-domain restore into a fresh household remain the release guard.
 ## Verification checkpoint
 
 ```text
-Local web after production QA fixes: 16 files, 103 tests passed
-Local API after recovery and Gemini: 122 tests passed
+AI-primary candidate web: 16 files, 150 tests passed
+AI-primary candidate API: 204 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
-SQL: 7 migrations, seed and 2 SQL contract tests parsed
-Recovery SQL: 8 migrations and 4 SQL contract tests parsed; blank-local-database migration and direct SQL contracts passed
+SQL: 8 migrations, seed and 4 SQL contract tests parsed
 AI contracts: 50 capture, 30 auto-tag and 24 assistant cases valid
-Hosted Gemini evidence: capture 50/50, auto-tag 30/30, assistant 24/24 on fictional data
-Manual UI: all 6 primary pages fit at 320 px, 390 px and 1440 px; theme switching plus mobile/desktop dark visual review passed
+Fresh hosted Gemini gate: not run in this worktree because ARTHA_GEMINI_API_KEY is unavailable; prior fictional production evidence remains 50/50, 30/30 and 24/24
+Manual candidate UI: grounded 25k ICICI -> HDFC unsaved transfer; zero-amount and incomplete-transfer confirmation guards; assistant success with approved server-owned widgets; assistant 503 retained the exact question and showed the honest error
+Responsive candidate UI: Quick Add and Assistant had no horizontal page overflow at 320 px, 390 px or 1440 px in light/dark checks; browser console had no warnings or errors
+Capture 503 recovery: focused automated tests pass; an authenticated production-like manual run remains for final-domain acceptance
+Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
 Production: PRs #16-#18 merged; all web/API Vercel preview and production deployments are ready
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
@@ -164,6 +167,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 7 Aug 2026 | AI-primary feature candidate passed the fresh full local gate (150 web, 204 API and 104 AI contracts) plus fictional rendered QA for grounded capture, guards, assistant success/failure and 320/390/1440 light/dark overflow; hosted Gemini and authenticated capture-503 recovery were not rerun locally, and the candidate is not deployed |
 | 7 Aug 2026 | Merged and deployed PRs #16-#18; completed real magic-link new/returning login, server-owned onboarding, fictional expense/income/transfer/card/split flows, transaction filters, Gemini capture/assistant, encrypted export and 320/390/1440 responsive acceptance; fixed live chart/member refresh and mobile chart overflow found during QA |
 | 7 Aug 2026 | Consolidated Gemini and dependency PRs onto encrypted recovery; full local gate passed with 98 web and 122 API tests plus 104 AI dataset contracts; applied and catalog-probed the exact production recovery migration; production Gemini variables configured pending deployment |
 | 7 Aug 2026 | Implemented encrypted export/restore, Settings recovery UI, recovery RPCs and two-household/round-trip SQL contracts; full local gate passed with 98 web and 112 API tests; production migration and consolidated Gemini release remain |
