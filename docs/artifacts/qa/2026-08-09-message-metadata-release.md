@@ -1,8 +1,8 @@
 # Message UX and structured metadata release evidence
 
 Date: 9 August 2026
-Branch: `codex/message-ux`
-Status: PR #23 open; merge held for companion feature and final-domain acceptance
+Production commit: `e32b5b60b5575be9019d9253381ed4400be7a097`
+Status: PRs #23/#24 merged and deployed; signed-in user acceptance remains
 
 ## Product scope
 
@@ -25,10 +25,10 @@ Status: PR #23 open; merge held for companion feature and final-domain acceptanc
 
 ## Automated evidence
 
-Fresh `make check` before the documentation pass:
+Fresh `make check` for the combined release:
 
-- Web: 19 files, 184 tests passed.
-- API: 256 tests passed.
+- Web: 20 files, 206 tests passed.
+- API: 275 tests passed.
 - ESLint, TypeScript, Ruff and strict mypy passed.
 - Production PWA build passed.
 - Eight migrations, seed and four SQL contract files parsed.
@@ -92,22 +92,24 @@ Completed locally before publication:
   at 390 px.
 - The final clean-browser sweep reported no app-owned console warnings or
   errors. Keyboard behavior, metadata review, safe tag selection and live-region
-  semantics are covered by the 184 web checks.
+  semantics are covered by the 206 web checks.
 
-The production Gemini metadata result still requires final-domain authenticated
-acceptance after this branch is merged and deployed.
+The production Gemini metadata result still requires signed-in final-domain
+user acceptance.
 
-## Remote release gates
+## Remote release evidence
 
-Pending:
+- PRs #23 and #24 are merged as `e32b5b6`.
+- Main CI `31278245585` and CodeQL `31278245587` passed.
+- Exact-SHA web and API Vercel deployments are Ready.
+- Public web, API health, protected intent endpoint and production mobile login
+  smoke checks passed.
+- Isolated fictional browser QA passed routed capture, routed Ask Artha and the
+  mixed-intent choice at mobile and desktop widths.
 
-1. Reconcile the companion feature into the open PR #23 release line.
-2. Resolve the hosted metadata/missing-account misses and rerun their affected
-   cases before the full hosted gate.
-3. Review the combined diff; pass CI and CodeQL.
-4. Merge the combined candidate to `main`.
-5. Verify both Vercel deployments correspond to the merge SHA.
-6. Run authenticated final-domain demo-account and personal-account smoke tests.
+Pending: signed-in final-domain user acceptance, combined hosted capture rerun
+and the named real-data release guards in the
+[production release report](2026-08-09-unified-entry-production-release.md).
 
 ## Next sprint plan
 
