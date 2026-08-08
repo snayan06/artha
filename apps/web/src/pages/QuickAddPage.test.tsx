@@ -90,6 +90,60 @@ describe('QuickAddPage', () => {
     expect(parseSpy).not.toHaveBeenCalled()
   })
 
+  it('explains a missing payment account and offers grounded choices', async () => {
+    const user = userEvent.setup()
+    const parseSpy = vi.spyOn(api, 'parseDraft')
+      .mockResolvedValueOnce({
+        demo: false,
+        data: {
+          outcome: 'clarification',
+          sourceText: 'Paid 540 at Zomato',
+          understood: { amountPaise: 54_000, kind: 'expense', merchant: 'Zomato' },
+          missingField: 'source_account_id',
+          question: 'How did you pay for Zomato?',
+          explanation: 'Choose one so Artha updates the correct balance. Nothing has been saved.',
+          choices: [
+            { id: 'demo-hdfc-upi', label: 'HDFC UPI', answer: 'paid from HDFC UPI' },
+            { id: 'demo-icici-bank', label: 'ICICI Bank', answer: 'paid from ICICI Bank' }
+          ],
+          warnings: [],
+          parserSource: 'gemini:test-model'
+        }
+      } as never)
+      .mockResolvedValueOnce({
+        demo: false,
+        data: {
+          kind: 'debit', amountPaise: 54_000, merchant: 'Zomato', category: 'Food & Dining',
+          account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(0),
+          note: '', memberSplits: [], confidence: 'high',
+          sourceText: 'Paid 540 at Zomato; paid from HDFC UPI'
+        }
+      })
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), 'Paid 540 at Zomato')
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Zomato')
+    expect(status).toHaveTextContent('₹540')
+    expect(status).toHaveTextContent('How did you pay for Zomato?')
+    expect(status).toHaveTextContent(/correct balance.*nothing has been saved/i)
+    expect(screen.getByRole('button', { name: 'HDFC UPI' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ICICI Bank' })).toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'HDFC UPI' }))
+
+    await waitFor(() => expect(parseSpy).toHaveBeenLastCalledWith(
+      'Paid 540 at Zomato; paid from HDFC UPI',
+      []
+    ))
+    expect(screen.getByLabelText(/your message/i)).toHaveValue('Paid 540 at Zomato; paid from HDFC UPI')
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
   it('offers a form-first entry with an explicit date picker', async () => {
     const user = userEvent.setup()
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)

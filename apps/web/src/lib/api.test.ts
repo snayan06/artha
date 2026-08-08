@@ -91,9 +91,10 @@ describe('FastAPI adapter', () => {
         source_account_id: 42, occurred_at: '2026-08-04T12:00:00Z'
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
-    const { confirmDraft, parseDraft } = await import('./api')
+    const { confirmDraft, isCaptureClarification, parseDraft } = await import('./api')
 
     const parsed = await parseDraft('Paid 1840 for groceries from HDFC UPI, split equally with Sam')
+    if (isCaptureClarification(parsed.data)) throw new Error('expected a review draft')
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual(expect.objectContaining({ timezone: expect.any(String) }))
     expect(parsed.data.sourceAccountId).toBe(42)
     const confirmed = await confirmDraft(parsed.data)
@@ -128,13 +129,60 @@ describe('FastAPI adapter', () => {
     await expect(parseDraft('split equally without an amount')).rejects.toThrow('API request failed (422)')
   })
 
+  it('maps a grounded capture clarification without treating it as an error', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/drafts/parse')) {
+        return new Response(JSON.stringify({
+          outcome: 'clarification',
+          source_text: 'Paid 540 at Zomato',
+          understood: { amount_paise: 54_000, kind: 'expense', merchant: 'Zomato' },
+          missing_field: 'source_account_id',
+          question: 'How did you pay for Zomato?',
+          explanation: 'Choose one so Artha updates the correct balance. Nothing has been saved.',
+          choices: [
+            { id: 'hdfc', label: 'HDFC UPI', answer: 'paid from HDFC UPI' },
+            { id: 'sbi', label: 'SBI Cashback Card', answer: 'paid from SBI Cashback Card' }
+          ],
+          warnings: [],
+          parser_source: 'gemini:test-model'
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/api/v1/accounts') || url.endsWith('/api/v1/members')) {
+        return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { parseDraft } = await import('./api')
+
+    const parsed = await parseDraft('Paid 540 at Zomato')
+
+    expect(parsed).toMatchObject({
+      demo: false,
+      data: {
+        outcome: 'clarification',
+        sourceText: 'Paid 540 at Zomato',
+        understood: { amountPaise: 54_000, kind: 'expense', merchant: 'Zomato' },
+        missingField: 'source_account_id',
+        choices: [
+          { id: 'hdfc', label: 'HDFC UPI', answer: 'paid from HDFC UPI' },
+          { id: 'sbi', label: 'SBI Cashback Card', answer: 'paid from SBI Cashback Card' }
+        ]
+      }
+    })
+  })
+
   it('uses the local parser only for a transient API outage in demo mode', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubEnv('VITE_DEMO_MODE', 'true')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 503 })))
-    const { parseDraft } = await import('./api')
+    const { isCaptureClarification, parseDraft } = await import('./api')
 
     const parsed = await parseDraft('Paid 250 for coffee yesterday from HDFC UPI')
+    if (isCaptureClarification(parsed.data)) throw new Error('expected a review draft')
     expect(parsed.demo).toBe(true)
     expect(parsed.data.amountPaise).toBe(25_000)
     expect(parsed.data.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)

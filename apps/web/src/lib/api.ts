@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureContext, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -308,6 +308,79 @@ function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string
     warnings: warningList,
     sourceText: text
   }
+}
+
+const CAPTURE_MISSING_FIELDS = new Set([
+  'amount_paise', 'kind', 'description', 'source_account_id',
+  'destination_account_id', 'category_id', 'member_ids', 'occurred_on'
+])
+
+function mapCaptureClarification(raw: JsonObject): CaptureClarification | null {
+  if (
+    !hasExactKeys(
+      raw,
+      ['outcome', 'source_text', 'understood', 'missing_field', 'question', 'explanation', 'choices', 'warnings', 'parser_source'],
+      ['outcome', 'source_text', 'understood', 'missing_field', 'question', 'explanation', 'choices', 'warnings', 'parser_source']
+    )
+    || raw.outcome !== 'clarification'
+    || !isBoundedText(raw.source_text, 500)
+    || typeof raw.missing_field !== 'string'
+    || !CAPTURE_MISSING_FIELDS.has(raw.missing_field)
+    || !isBoundedText(raw.question, 240)
+    || !isBoundedText(raw.explanation, 240)
+    || !isBoundedText(raw.parser_source, 120)
+    || !isJsonObject(raw.understood)
+    || !Array.isArray(raw.choices)
+    || raw.choices.length > 20
+    || !Array.isArray(raw.warnings)
+    || raw.warnings.length > 5
+  ) return null
+
+  const understood = raw.understood
+  if (
+    !hasExactKeys(understood, ['amount_paise', 'kind', 'merchant', 'category', 'occurred_on'], [])
+    || (understood.amount_paise !== undefined && (!isSafePaise(understood.amount_paise) || understood.amount_paise <= 0))
+    || (understood.kind !== undefined && understood.kind !== 'expense' && understood.kind !== 'income' && understood.kind !== 'transfer')
+    || (understood.merchant !== undefined && !isBoundedText(understood.merchant, 160))
+    || (understood.category !== undefined && !isBoundedText(understood.category, 80))
+    || (understood.occurred_on !== undefined && (typeof understood.occurred_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(understood.occurred_on)))
+  ) return null
+
+  const choices = raw.choices.flatMap((value) => {
+    if (
+      !isJsonObject(value)
+      || !hasExactKeys(value, ['id', 'label', 'answer'], ['id', 'label', 'answer'])
+      || !isBoundedText(value.id, 80)
+      || !isBoundedText(value.label, 100)
+      || !isBoundedText(value.answer, 160)
+    ) return []
+    return [{ id: value.id, label: value.label, answer: value.answer }]
+  })
+  if (choices.length !== raw.choices.length) return null
+  const warnings = raw.warnings.flatMap((value) => isBoundedText(value, 160) ? [value] : [])
+  if (warnings.length !== raw.warnings.length) return null
+
+  return {
+    outcome: 'clarification',
+    sourceText: raw.source_text,
+    understood: {
+      amountPaise: understood.amount_paise as number | undefined,
+      kind: understood.kind as 'expense' | 'income' | 'transfer' | undefined,
+      merchant: understood.merchant as string | undefined,
+      category: understood.category as string | undefined,
+      occurredOn: understood.occurred_on as string | undefined
+    },
+    missingField: raw.missing_field as CaptureClarification['missingField'],
+    question: raw.question,
+    explanation: raw.explanation,
+    choices,
+    warnings,
+    parserSource: raw.parser_source
+  }
+}
+
+export function isCaptureClarification(result: CaptureResult): result is CaptureClarification {
+  return 'outcome' in result && result.outcome === 'clarification'
 }
 
 function toApiDraft(draft: TransactionDraft): JsonObject {
@@ -647,7 +720,7 @@ export async function getTransactions(): Promise<{ data: Transaction[]; demo: bo
   }
 }
 
-export async function parseDraft(text: string, membersForFallback: HouseholdMember[] = []): Promise<{ data: TransactionDraft; demo: boolean }> {
+export async function parseDraft(text: string, membersForFallback: HouseholdMember[] = []): Promise<{ data: CaptureResult; demo: boolean }> {
   try {
     const [response, accounts, members] = await Promise.all([
       request<JsonObject>('/api/v1/drafts/parse', {
@@ -657,6 +730,11 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
       request<unknown>('/api/v1/accounts'),
       request<unknown>('/api/v1/members')
     ])
+    if (response.outcome === 'clarification') {
+      const clarification = mapCaptureClarification(response)
+      if (!clarification) throw new Error('Capture clarification was invalid')
+      return { data: clarification, demo: false }
+    }
     const rawDraft = (response.draft ?? response) as JsonObject
     const memberNames = memberNameMap(members)
     const draft = mapDraft(rawDraft, text, memberNames, response.confidence, response.warnings)

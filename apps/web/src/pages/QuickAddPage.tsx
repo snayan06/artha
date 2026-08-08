@@ -1,17 +1,19 @@
 import { ArrowLeft, Check, ChevronRight, Info, RotateCcw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
-import { CaptureDraftUnavailableError, getCaptureContext, parseDraft } from '../lib/api'
+import { CaptureClarificationCard } from '../components/CaptureClarificationCard'
+import { CaptureDraftUnavailableError, getCaptureContext, isCaptureClarification, parseDraft } from '../lib/api'
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import { localDateOffset } from '../lib/date'
 import { useRouter } from '../lib/router'
-import type { CaptureCategory, CaptureContext, HouseholdMember, LedgerAccount, Transaction, TransactionDraft, TransactionKind } from '../types'
+import type { CaptureCategory, CaptureChoice, CaptureClarification, CaptureContext, HouseholdMember, LedgerAccount, Transaction, TransactionDraft, TransactionKind } from '../types'
 
 export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: TransactionDraft, idempotencyKey?: string) => Promise<Transaction>; members: HouseholdMember[] }) {
   const { state, navigate, back } = useRouter()
   const initialCapture = (state as { capture?: string } | null)?.capture ?? ''
   const [capture, setCapture] = useState(initialCapture)
   const [draft, setDraft] = useState<TransactionDraft | null>(null)
+  const [clarification, setClarification] = useState<CaptureClarification | null>(null)
   const [parsing, setParsing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<Transaction | null>(null)
@@ -58,6 +60,13 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     try {
       const response = await parseDraft(text, members)
       if (generation !== parseGeneration.current) return
+      if (isCaptureClarification(response.data)) {
+        setDraft(null)
+        setClarification(response.data)
+        setUsedFallback(false)
+        return
+      }
+      setClarification(null)
       setDraft(groundDraft(response.data, contextRef.current))
       setUsedFallback(response.demo)
     } catch (caught) {
@@ -96,6 +105,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     invalidatePendingParse()
     setCapture('')
     setDraft(null)
+    setClarification(null)
     setSuccess(null)
     confirmationAttempt.current = null
     setError('')
@@ -107,6 +117,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     const firstAccount = loadedContext?.accounts[0]
     const firstCategory = categoriesForKind(loadedContext, 'debit')[0]
     setDraft({ kind: 'debit', amountPaise: 0, merchant: '', category: firstCategory?.name ?? '', account: firstAccount?.name ?? '', sourceAccountId: firstAccount?.id, occurredAt: localDateOffset(0), note: '', memberSplits: [], confidence: 'review', sourceText })
+    setClarification(null)
     setUsedFallback(false)
     setError('')
   }
@@ -176,6 +187,14 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     setDraft(nextDraft)
   }
 
+  function chooseClarification(choice: CaptureChoice) {
+    if (!clarification || parsing) return
+    const continuedText = `${clarification.sourceText}; ${choice.answer}`
+    setCapture(continuedText)
+    setClarification(null)
+    void makeDraft(continuedText)
+  }
+
   if (success) {
     return (
       <div className="mx-auto max-w-xl pt-8 sm:pt-16">
@@ -217,7 +236,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
         <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => { invalidatePendingParse(); setCapture(event.target.value) }} onKeyDown={(event) => { if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return; event.preventDefault(); if (!capture.trim() || parsing) return; void makeDraft() }} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
         <p className="mt-2 text-xs text-[#7b8781] tone-muted">Enter to continue · Shift+Enter for a new line.</p>
         <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={() => startManualEntry()}>Enter details manually</Button></div>
-        {!draft && (
+        {!draft && !clarification && (
           <div className="mt-5 border-t border-line pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#8a958f] tone-subtle">Try an example</p>
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -231,6 +250,15 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
       {contextStatus === 'error' && <div role="alert" aria-live="assertive" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><p>{contextError}</p><Button variant="secondary" className="mt-3" onClick={() => void loadContext()}>Try again</Button></div>}
 
       {error && <div role="alert" aria-live="polite" className="mt-4 break-words rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
+
+      {clarification && (
+        <CaptureClarificationCard
+          clarification={clarification}
+          busy={parsing}
+          onChoose={chooseClarification}
+          onManual={() => startManualEntry(clarification.sourceText)}
+        />
+      )}
 
       {draft && (
         <section className="mt-5" aria-labelledby="review-heading">

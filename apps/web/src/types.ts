@@ -94,6 +94,32 @@ export interface TransactionDraft {
   sourceText: string
 }
 
+export interface CaptureChoice {
+  id: string
+  label: string
+  answer: string
+}
+
+export interface CaptureClarification {
+  outcome: 'clarification'
+  sourceText: string
+  understood: {
+    amountPaise?: Paise
+    kind?: 'expense' | 'income' | 'transfer'
+    merchant?: string
+    category?: string
+    occurredOn?: string
+  }
+  missingField: 'amount_paise' | 'kind' | 'description' | 'source_account_id' | 'destination_account_id' | 'category_id' | 'member_ids' | 'occurred_on'
+  question: string
+  explanation: string
+  choices: CaptureChoice[]
+  warnings: string[]
+  parserSource: string
+}
+
+export type CaptureResult = TransactionDraft | CaptureClarification
+
 export interface MonthlyPoint {
   month: string
   incomePaise: Paise
