@@ -21,6 +21,12 @@ from pydantic import (
     model_validator,
 )
 
+from .intent_router import (
+    ROUTER_SYSTEM_PROMPT,
+    IntentRouteResponse,
+    IntentRouteResult,
+)
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -853,6 +859,27 @@ class LocalFinancialAssistant:
             return await self._ollama_completion(message, context)
         raise ValueError("model provider is disabled")
 
+    async def route_intent(self, message: str) -> IntentRouteResponse:
+        settings = self.settings
+        if settings.provider is not LlmProvider.GEMINI or not settings.gemini_api_key:
+            raise AssistantUnavailableError("AI routing is unavailable")
+        try:
+            result = await self._gemini_route_intent(message)
+        except (
+            httpx.HTTPError,
+            genai_errors.APIError,
+            KeyError,
+            TypeError,
+            ValueError,
+            ValidationError,
+        ) as error:
+            raise AssistantUnavailableError("AI routing is unavailable") from error
+        return IntentRouteResponse(
+            provider="gemini",
+            model=settings.gemini_model,
+            result=result,
+        )
+
     async def suggest_tag_with_selected_model(
         self, payload: TagSuggestionRequest
     ) -> TagSuggestion:
@@ -1105,6 +1132,15 @@ class LocalFinancialAssistant:
         )
         completion = AssistantCompletion.model_validate_json(content)
         return _ground_completion(completion, context)
+
+    async def _gemini_route_intent(self, message: str) -> IntentRouteResult:
+        content = await self._gemini_interaction(
+            system_instruction=ROUTER_SYSTEM_PROMPT,
+            input_text=json.dumps(message, ensure_ascii=False),
+            schema=IntentRouteResult.model_json_schema(),
+            max_output_tokens=128,
+        )
+        return IntentRouteResult.model_validate_json(content)
 
     async def _ollama_completion(
         self, message: str, context: AssistantFinancialContext
