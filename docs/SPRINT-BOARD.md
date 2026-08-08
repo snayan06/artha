@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 7 August 2026
+Updated: 8 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -36,6 +36,32 @@ Sprint 1 dependency.
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
 | Production acceptance | In progress | Authenticated happy path and responsive sweep passed; two-owner isolation and encrypted restore remain |
+
+## Senior product audit — net-new additions
+
+The full journey review is in
+[`artifacts/product/2026-08-08-senior-product-usability-audit.md`](artifacts/product/2026-08-08-senior-product-usability-audit.md).
+Existing isolation, recovery, Accounts & family, correction, settlement,
+invitation and assistant-evidence tasks remain unchanged; this table contains
+only additions that were missing from the board.
+
+| ID | Status | Placement | Net-new task | Acceptance gate |
+| --- | --- | --- | --- | --- |
+| PA-01 | Next | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
+| PA-02 | Planned | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
+| PA-03 | Planned | First Sprint 2 slice; real-data gate | Post-confirm **View transaction** recovery entry point | Reuses audited edit/soft-delete; balances recalculate atomically; retries are idempotent |
+| PA-04 | Planned | Fictional-pilot hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Fictional-only restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
+| PA-05 | Planned | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
+| PA-06 | Planned | Before candidate publication | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
+| PA-07 | Planned | Sprint 2 product quality | Resumable onboarding, field errors and first-transaction guidance | Refresh preserves safe setup fields; each error identifies its field; empty states offer a next action |
+| PA-08 | Planned | Sprint 2 shared-money slice | Member-paid expense capture in the web | Owner account does not move; owner's payable and member balance update; settlement later clears without income/spend |
+| PA-09 | Planned | Sprint 2 measurement | Privacy-safe activation/capture/reliability events | No text, amounts, balances, emails, account/member names or assistant questions are emitted |
+| PA-10 | Later | After daily capture is proven | Optional missing-transaction reminder and weekly review | User-controlled cadence; no financial content in notifications; dismissal/snooze supported |
+
+PA-01 through PA-06 do not block deployment for continued fictional testing
+when engineering gates are green. They do block representing the product as
+ready for real family-finance data, together with the existing isolation,
+restore and log-redaction gates.
 
 ## Sprint 1 — trust and capture foundation
 
