@@ -15,7 +15,24 @@ export interface AccountSetupInput {
 export interface LedgerAccount {
   id?: EntityId
   name: string
-  kind: SetupAccountKind
+  kind: SetupAccountKind | 'other'
+}
+
+export interface CaptureAccount extends LedgerAccount {
+  id: EntityId
+}
+
+export type CaptureCategoryKind = 'expense' | 'income' | 'both'
+
+export interface CaptureCategory {
+  id: EntityId
+  name: string
+  kind: CaptureCategoryKind
+}
+
+export interface CaptureContext {
+  accounts: CaptureAccount[]
+  categories: CaptureCategory[]
 }
 
 export interface UserProfile {

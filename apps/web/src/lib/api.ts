@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantWidget, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantWidget, CaptureAccount, CaptureCategory, CaptureContext, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -469,6 +469,69 @@ export async function getAccounts(): Promise<LedgerAccount[]> {
       { id: 'demo-icici-bank', name: 'ICICI Bank', kind: 'bank' },
       { id: 'demo-hdfc-card', name: 'HDFC Card', kind: 'credit_card' }
     ]
+  }
+}
+
+function mapCaptureContext(raw: unknown): CaptureContext {
+  if (!isJsonObject(raw) || !Array.isArray(raw.accounts) || !Array.isArray(raw.categories)) {
+    throw new Error('Capture context response was invalid.')
+  }
+  const accounts: CaptureAccount[] = []
+  for (const item of raw.accounts) {
+    if (!isJsonObject(item) || !hasExactKeys(item, ['id', 'name', 'kind'], ['id', 'name', 'kind'])) {
+      throw new Error('Capture context response was invalid.')
+    }
+    const id = entityId(item.id)
+    const kind = item.kind
+    if (
+      id === undefined
+      || !isBoundedText(item.name, 100)
+      || (kind !== 'bank' && kind !== 'cash' && kind !== 'wallet' && kind !== 'credit_card' && kind !== 'other')
+    ) {
+      throw new Error('Capture context response was invalid.')
+    }
+    accounts.push({ id, name: item.name, kind })
+  }
+  const categories: CaptureCategory[] = []
+  for (const item of raw.categories) {
+    if (!isJsonObject(item) || !hasExactKeys(item, ['id', 'name', 'kind'], ['id', 'name', 'kind'])) {
+      throw new Error('Capture context response was invalid.')
+    }
+    const id = entityId(item.id)
+    const kind = item.kind
+    if (
+      id === undefined
+      || !isBoundedText(item.name, 80)
+      || (kind !== 'expense' && kind !== 'income' && kind !== 'both')
+    ) {
+      throw new Error('Capture context response was invalid.')
+    }
+    categories.push({ id, name: item.name, kind })
+  }
+  return { accounts, categories }
+}
+
+export async function getCaptureContext(): Promise<CaptureContext> {
+  try {
+    return mapCaptureContext(await request<unknown>('/api/v1/capture-context'))
+  } catch (error) {
+    if (!DEMO_MODE) throw error
+    return {
+      accounts: [
+        { id: 'demo-hdfc-upi', name: 'HDFC UPI', kind: 'bank' },
+        { id: 'demo-icici-bank', name: 'ICICI Bank', kind: 'bank' },
+        { id: 'demo-hdfc-card', name: 'HDFC Card', kind: 'credit_card' }
+      ],
+      categories: [
+        { id: 'demo-groceries', name: 'Groceries', kind: 'expense' },
+        { id: 'demo-food-dining', name: 'Food & Dining', kind: 'expense' },
+        { id: 'demo-housing', name: 'Housing', kind: 'expense' },
+        { id: 'demo-transport', name: 'Transport', kind: 'expense' },
+        { id: 'demo-shopping', name: 'Shopping', kind: 'expense' },
+        { id: 'demo-salary', name: 'Salary', kind: 'income' },
+        { id: 'demo-other', name: 'Other', kind: 'both' }
+      ]
+    }
   }
 }
 
