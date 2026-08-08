@@ -2,9 +2,9 @@
 
 **Date:** 9 August 2026
 
-**Status:** Approved implementation scope
+**Status:** Implemented release slice; normalized tag analytics remain planned
 
-**Release boundary:** Quick Add, Ask Artha, reviewed transaction metadata, category/tag suggestions, grounded analytics, recovery, and release evidence. A future multi-step agent runtime is explicitly excluded.
+**Release boundary:** Quick Add and Ask Artha messaging, reviewed transaction metadata, bounded category/tag suggestions, existing recovery compatibility, and release evidence. Normalized tag management, metadata analytics, and a future multi-step agent runtime are explicitly deferred.
 
 ## Outcome
 
@@ -28,11 +28,11 @@ The review step should also make Artha's interpretation inspectable. It separate
 
 ## Considered approaches
 
-### 1. Versioned transaction JSON only
+### 1. Versioned transaction JSON only — selected for this release
 
-Keep every field, tag, and evidence record in `transactions.metadata`. This is the smallest migration and recovery already preserves the JSON, but household tag reuse, aliases, uniqueness, removal, and indexed many-to-many analysis become awkward.
+Keep every reviewed field, tag, and evidence record in `transactions.metadata`. This uses the existing atomic confirmation and encrypted recovery boundaries without adding a database migration during the messaging release. FastAPI still validates the full bounded contract before confirmation. The trade-off is that household tag reuse, aliases, and indexed many-to-many analysis remain a follow-up.
 
-### 2. Relational tags plus bounded transaction metadata JSON — selected
+### 2. Relational tags plus bounded transaction metadata JSON — planned follow-up
 
 Keep category, merchant, and account in their existing normalized columns. Add dedicated optional `subcategory` and `platform` transaction columns, plus a versioned, bounded JSON contract for per-field evidence and low-cardinality reviewed attributes such as meal occasion and order channel. Add normalized household tags, aliases, and transaction-tag links with provenance/confidence/review columns.
 
@@ -91,11 +91,11 @@ Loading copy describes the work (“Reading your message…”, “Reviewing you
 | Dimension | Cardinality | Storage | Example |
 |---|---:|---|---|
 | Category | exactly one for expense/income | existing `category_id` | Food & Dining |
-| Subcategory | zero or one | `transactions.subcategory` | Fast Food |
+| Subcategory | zero or one | versioned `transactions.metadata` | Fast Food |
 | Merchant/counterparty | one reviewed description | existing `transactions.merchant` | Burger King |
-| Platform | zero or one | `transactions.platform` | Zomato |
+| Platform | zero or one | versioned `transactions.metadata` | Zomato |
 | Reviewed attributes | zero-to-many bounded keys | versioned `transactions.metadata` contract | meal occasion = Dinner; order channel = Delivery |
-| Tags | zero-to-many | `household_tags` + `transaction_tags` | Date Night, Work Meal |
+| Tags | zero-to-many | versioned `transactions.metadata` | Date Night, Work Meal |
 
 The example `Paid 680 for dinner at Burger King via Zomato from HDFC, split with Hermi yesterday` therefore reviews as:
 
@@ -132,9 +132,9 @@ The review UI shows “Suggested category” with the selected household categor
 
 Personal rules always win. A catalog or model result cannot create a category. Changing the category marks it `user_corrected`. No category selection creates a rule or rewrites prior transactions.
 
-### Tags and aliases
+### Tags in the current slice
 
-`household_tags` stores one normalized active name per household. `household_tag_aliases` maps normalized aliases to a tag, and `transaction_tags` records the reviewed many-to-many selection with source, confidence, and review status. Composite household foreign keys prevent cross-household references. Foreign-key and lookup columns are indexed, RLS uses the existing cached membership helper, and grants remain least-privilege.
+The current release accepts only a small server-owned set of explicit tag phrases and stores the selected reviewed tags in the confirmed transaction's versioned metadata. Household-created tags, aliases, lifecycle management, and indexed relational links remain a separate database release with their own RLS and recovery acceptance.
 
 Safe built-in tag suggestions are limited to explicit, high-signal phrases such as “date night”, “work meal”, “on vacation”, or “treat”. Existing household names and aliases can match explicit phrases. Suggestions appear separately from Category and can be accepted, corrected, removed, or ignored. Confirmation remains enabled with zero tags.
 
@@ -148,34 +148,25 @@ The server rejects tags equivalent to the category, subcategory, merchant, platf
 4. React renders distinct Category, Transaction details, Context, and Optional tags sections. Editing a field changes its evidence to `user_corrected` and `reviewed`.
 5. Explicit confirmation sends core fields, bounded metadata, and reviewed tag selections. It never sends `sourceText`.
 6. FastAPI revalidates category direction, account/member/tag ownership, metadata size/keys, reserved-tag rules, and confirmed review status.
-7. The extended `confirm_transaction` RPC writes the transaction and tag links atomically and returns the same normalized dimensions for immediate UI state.
+7. The existing `confirm_transaction` RPC writes the core transaction and reviewed versioned metadata atomically.
 
 Transfers keep category `Transfer`, have no tags or food metadata, and continue through the dedicated transfer RPC. Income can use the common evidence contract but cannot carry expense-only catalog hints.
 
-## Database and RLS design
+## Database and RLS design for this release
 
-The migration adds:
+No database migration is required for this release. The existing transaction row already has an RLS-protected JSON object and the existing confirmation RPC already accepts it atomically. FastAPI restricts the stored version-1 object to reviewed platform, subcategory, evidence, attributes, and selected tags; raw capture text is never included.
 
-- optional bounded `transactions.subcategory` and `transactions.platform` columns;
-- a database validator/check for the versioned transaction metadata object;
-- partial indexes for posted expense analysis by household/category/merchant/platform;
-- `household_tags`, `household_tag_aliases`, and `transaction_tags` with UUID primary keys, household-scoped composite foreign keys, uniqueness constraints, timestamps, and provenance/confidence/review checks;
-- indexes for every foreign key and the household-normalized lookup paths;
-- RLS and explicit authenticated grants matching the existing household membership model;
-- an updated atomic confirmation RPC and logical activity projection;
-- recovery export/restore support for tag definitions, aliases, links, structured fields, and evidence.
+The planned normalized-tag follow-up will add dedicated tables, indexes, RLS, aliases, and analytics only after its migration and recovery design is accepted. No service-role path is introduced by either design.
 
-Existing transaction RLS protects its metadata JSON. New tables receive their own policies; no service-role path is introduced.
+## Analytics and Ask Artha follow-up
 
-## Analytics and Ask Artha
+The reviewed metadata is intentionally stored now so a later release can add current-month, personal-share aggregates for merchant, platform, and the Food & Dining category's merchant/platform split. Only posted expense rows will count; transfers and card payments will remain excluded.
 
-The dashboard read model adds current-month, personal-share aggregates for merchant, platform, and the Food & Dining category's merchant/platform split. Only posted expense rows count; transfers and card payments remain excluded.
-
-Ask Artha receives bounded server-derived aggregate labels and integer-paise values, never raw prompts, notes, account identifiers, or raw transaction rows. Canonical, server-owned widget bundles add a Food & Dining breakdown intent and enrich the general spending bundle with top merchant/platform views when data exists. Gemini still selects a bundle; it never calculates or edits values. FastAPI continues to require exact semantic equality before React renders the widgets.
+Ask Artha remains on its existing read-only, fixed-intent canonical bundles in this release. The metadata analytics follow-up may add bounded server-derived aggregate labels and integer-paise values, but Gemini will still select a bundle rather than calculate or edit values.
 
 ## Recovery and privacy
 
-Recovery schema version advances to version 2. Export includes structured transaction fields, bounded evidence metadata, household tags, aliases, and transaction-tag links. Restore validates closed references and recreates all tag relationships atomically in an empty household. Version 1 bundles remain accepted through an explicit compatibility adapter that supplies empty structured metadata and tag collections; version 2 restore never drops fields it does not understand.
+The existing version-1 recovery bundle already exports and restores the transaction metadata JSON without modification, so reviewed structured facts survive encrypted backup and restore without a schema-version change. A future relational-tag release must advance recovery only when it introduces collections that version 1 cannot represent.
 
 Raw prompt retention remains a separate privacy decision. This release stores reviewed structured facts only after confirmation and does not introduce capture-history storage, external training, or telemetry containing messages, merchant names, tags, or financial values.
 
@@ -195,13 +186,13 @@ Raw prompt retention remains a separate privacy decision. This release stores re
 - Draft/clarification union, partial grounding, one missing field, safe choices, evidence source restrictions, and invented-fact rejection.
 - Household rule > safe catalog > model precedence with direction-valid categories only.
 - Safe merchant/platform and tag catalogs, alias normalization, redundant-tag rejection, and exact confirmed metadata shape.
-- Food & Dining merchant/platform analytics and canonical assistant bundle equality.
+- Existing assistant canonical bundle equality remains unchanged; metadata analytics are a planned follow-up.
 - Fictional eval cases for platform versus merchant, explicit attributes, weak evidence, clarification, tag suggestions, and prohibited inferred facts.
 
-### SQL and recovery
+### Persistence and recovery
 
-- Schema, constraints, indexes, grants, RLS isolation, atomic confirmation, idempotent replay, and no cross-household tag linkage.
-- Recovery v2 round-trip preserves dimensions, evidence, tag aliases, and transaction-tag links.
+- FastAPI metadata validation, atomic confirmation, idempotent replay, and existing transaction RLS.
+- Recovery version 1 preserves the reviewed transaction metadata JSON.
 - No raw capture text appears in transaction metadata, exports, logs, screenshots, or fixtures.
 
 ### Rendered QA and release
@@ -209,7 +200,7 @@ Raw prompt retention remains a separate privacy decision. This release stores re
 - Quick Add and Ask Artha at 320 px, 390 px, and 1440 px in light and dark themes.
 - Keyboard-only operation, focus visibility, polite/assertive live regions, 44 px touch targets, no horizontal overflow, and readable long merchant/tag values.
 - Full `make check`, diff review, GitHub CI, CodeQL, and both Vercel deployments before merge.
-- After merge, final-domain fictional QA covers continuation, Burger King via Zomato review, tag optionality, explicit confirmation, transaction history, and merchant/platform Ask Artha results.
+- After merge, final-domain demo-account QA covers continuation, Burger King via Zomato review, tag optionality, explicit confirmation, transaction history, and Ask Artha progress/error behavior.
 
 ## Explicit non-goals
 

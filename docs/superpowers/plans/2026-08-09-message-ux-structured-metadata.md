@@ -8,6 +8,23 @@
 
 **Tech Stack:** React 19, TypeScript, Vite, Tailwind CSS, FastAPI, Pydantic v2, Gemini structured output, Supabase Postgres/RLS, Vitest/Testing Library, Pytest, pgTAP-style SQL contracts.
 
+## Implementation status update — 9 August 2026
+
+- Complete: composer keyboard safety, grounded one-question continuation,
+  structured merchant/platform/category/context/tag review, honest Quick Add and
+  Ask Artha progress messages, server revalidation, atomic persistence in
+  versioned transaction metadata, and a 60-case capture evaluation dataset.
+- Persistence decision: use the existing RLS-protected transaction metadata and
+  version-1 recovery boundary for this release; no database migration is needed.
+- Deferred to the next data sprint: relational household tags/aliases, recovery
+  version 2, metadata indexes/aggregates, and new Ask Artha analytics bundles.
+- Still required here: current documentation, responsive rendered QA, complete
+  local gate, PR review/CI, merge, deployment, and final-domain acceptance.
+
+This status update supersedes Tasks 5–7 below where they describe the larger
+relational-tag and metadata-analytics scope; those sections are retained as the
+follow-up implementation blueprint.
+
 ---
 
 ## File structure
