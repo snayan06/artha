@@ -21,9 +21,10 @@ Sprint 1 dependency.
 
 | Area | Status | What this means |
 | --- | --- | --- |
+| Unified intent entry | Integrated release candidate | One composer routes transactions to review and questions directly to Ask Artha; ambiguous/mixed input requires a choice and all 49 keyless cases pass. Combined PR review, CI, deployment and live QA remain |
 | AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
 | V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
-| Message UX and metadata | Local release candidate | Safe composer behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are implemented; PR/CI/deployment/final-domain QA remain |
+| Message UX and metadata | Integrated release candidate | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are implemented; CI/deployment/final-domain QA remain |
 | Public repository and CI | Done for current release | Main CI `31271421128` and CodeQL `31271421107` passed for `c4ae0dc` |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
@@ -108,6 +109,13 @@ on privacy approval, isolation, restore and log-redaction evidence.
 - [ ] Add sanitized authenticated cold/warm latency evidence.
 
 ### Structured LLM parsing and evaluation
+
+- [x] Implement a bounded four-intent router for the shared entry composer; it
+  receives text only and cannot read or write the ledger.
+- [x] Add 49 fictional router cases with near-neighbours, ambiguity, Hinglish,
+  unsupported actions and prompt injection; false capture is a safety failure.
+- [ ] Publish the combined unified-entry release, pass CI/deployment, then accept both routed
+  paths on mobile and desktop against the final domain.
 
 - [x] Define a strict provider-neutral capture schema for kind, paise, accounts, category, members and date.
 - [x] Ground every model-selected ID against server-provided allow-lists.

@@ -1,5 +1,6 @@
 export type Paise = number
 export type EntityId = string | number
+export type UnifiedIntent = 'capture_transaction' | 'ask_ledger' | 'clarify' | 'unsupported'
 
 export type SetupAccountKind = 'bank' | 'cash' | 'wallet' | 'credit_card'
 

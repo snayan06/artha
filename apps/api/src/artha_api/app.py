@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .assistant_routes import router as assistant_router
 from .database import build_engine, create_schema, default_database_url
+from .intent_routes import router as intent_router
 from .production_routes import router as production_router
 from .routes import router
 from .security import SecurityHeadersMiddleware
@@ -73,6 +74,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(SecurityHeadersMiddleware, production=is_production)
+    app.include_router(intent_router)
     if is_production:
         app.include_router(production_router)
     else:

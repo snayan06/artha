@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -21,8 +21,10 @@ type AssistantIntent = keyof typeof APPROVED_ASSISTANT_MESSAGES
 const ASSISTANT_PROVIDERS = new Set(['gemini', 'ollama'])
 const RETRYABLE_POST_PATHS = new Set([
   '/api/v1/drafts/parse',
-  '/api/v1/assistant/chat'
+  '/api/v1/assistant/chat',
+  '/api/v1/intents/route'
 ])
+const UNIFIED_INTENTS = new Set<UnifiedIntent>(['capture_transaction', 'ask_ledger', 'clarify', 'unsupported'])
 
 type AccessTokenProvider = () => Promise<string | null>
 let accessTokenProvider: AccessTokenProvider = async () => null
@@ -145,6 +147,10 @@ function formatAssistantPaise(value: number): string {
 
 function isJsonObject(value: unknown): value is JsonObject {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isUnifiedIntent(value: unknown): value is UnifiedIntent {
+  return typeof value === 'string' && UNIFIED_INTENTS.has(value as UnifiedIntent)
 }
 
 function isAssistantIntent(value: string): value is AssistantIntent {
@@ -807,6 +813,26 @@ export async function getAssistantStatus(): Promise<AssistantRuntimeStatus> {
     personalDataEnabled: raw.personal_data_enabled === true,
     isDemo: raw.is_demo === true
   }
+}
+
+export async function routeIntent(message: string): Promise<{ intent: UnifiedIntent }> {
+  const response = await request<unknown>('/api/v1/intents/route', {
+    method: 'POST',
+    body: JSON.stringify({ message })
+  })
+  if (
+    !isJsonObject(response)
+    || !hasExactKeys(response, ['provider', 'model', 'mode', 'result'], ['provider', 'model', 'mode', 'result'])
+    || response.provider !== 'gemini'
+    || !isBoundedText(response.model, 80)
+    || response.mode !== 'model'
+    || !isJsonObject(response.result)
+    || !hasExactKeys(response.result, ['intent'], ['intent'])
+    || !isUnifiedIntent(response.result.intent)
+  ) {
+    throw new Error('Intent route response was invalid.')
+  }
+  return { intent: response.result.intent }
 }
 
 export async function getDashboard(): Promise<{ data: Dashboard; demo: boolean }> {

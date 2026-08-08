@@ -53,14 +53,17 @@ capture itself feel like accounting.
 
 1. **Set up once.** Add multiple bank, cash, wallet and credit-card accounts,
    opening balances, card details and people you split expenses with.
-2. **Write naturally.** Try `self transfer 25k ICICI -> HDFC` or
-   `Paid 1840 for groceries from HDFC, split with Krima, 3 days ago`.
+2. **Write or ask naturally.** The same entry accepts `self transfer 25k ICICI
+   -> HDFC` and questions such as `Compare my food spending over the last three
+   months`.
 3. **Review before saving.** Check the displayed transaction type, then correct
    the amount, merchant, platform, category, context, optional tags, account,
    date or equal-split member selection. Nothing reaches the ledger until confirmation.
 4. **Understand the result.** See balances, personal spending, income, account
    activity, shared receivables and a six-month trend.
-5. **Ask the ledger.** Gemini selects one supported intent, then must return that
+5. **Ask the ledger.** A small Gemini router moves ledger questions directly to
+   Ask Artha and submits them once. The assistant then selects one supported
+   intent and must return that
    intent's exact approved narrative and server-owned widget bundle—never model-
    authored HTML, model-calculated balances or direct writes.
 6. **Keep control.** Export a client-side encrypted backup whose passphrase never
@@ -96,6 +99,8 @@ the assistant shows an honest error when its model is unavailable.
 - Read-only Gemini assistant with safe inline metrics, charts and tables.
 - Honest progress messages while capture and Ask Artha prepare reviewable results;
   private model chain-of-thought is never displayed.
+- One intent-aware Home/Quick Add entry that routes transaction sentences to an
+  unsaved review draft and ledger questions directly to Ask Artha.
 - Light, dark and system theme support across mobile and desktop.
 
 ### Privacy, reliability and portability
@@ -127,6 +132,11 @@ Gemini interprets authenticated household context, but strict application code
 owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
 authentication, RLS, idempotency and ledger invariants. A draft is not a
 transaction; only the reviewed confirmation can write.
+
+Before either workflow, an authenticated, text-only router returns exactly one
+of `capture_transaction`, `ask_ledger`, `clarify` or `unsupported`. It receives
+no ledger snapshot, has no tools and cannot write. Ambiguity or provider failure
+keeps the original text and lets the user choose the destination.
 
 The assistant follows the same separation. FastAPI builds a bounded snapshot
 from database-backed dashboard data and the canonical widget bundle for every
@@ -232,16 +242,16 @@ make check
 ```
 
 This runs web linting, TypeScript checks, Vitest, the production PWA build,
-Ruff, strict mypy, pytest, every SQL syntax contract, and both keyless validators
-for the 60-case capture dataset and hosted-model runner.
+Ruff, strict mypy, pytest, every SQL syntax contract, and keyless validators for
+60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases, plus the hosted-model runners.
 
 Current local release-candidate evidence:
 
 | Gate | Result |
 | --- | --- |
-| Web | 19 test files, 184 tests passed |
-| API | 256 tests passed |
-| AI contracts | 60 capture, 30 auto-tag and 24 assistant cases valid |
+| Web | 20 test files, 206 tests passed |
+| API | 274 tests passed |
+| AI contracts | 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases valid |
 | Hosted Gemini on sample data | Baseline capture run: 50/60 exact cases, 94.3% structured fields, 100% provider availability; affected metadata cases were hardened with canonical labels and explicit-source guardrails, pending the combined full rerun |
 | Production UI | All six primary pages fit at 320 px, 390 px and 1440 px; light/dark controls and mobile/desktop dark UI verified |
 | Production flows | Magic-link new/returning login, session persistence, onboarding, expense, income, transfer, split, filters, assistant and encrypted export passed |
@@ -259,6 +269,7 @@ Current local release-candidate evidence:
 | `GET/POST` | `/api/v1/merchant-rules` | Manage prospective household rules used by Quick Add |
 | `POST` | `/api/v1/merchant-rules/learn` | Store a prospective rule for future suggestions |
 | `POST` | `/api/v1/drafts/parse` | Parse an unsaved transaction draft |
+| `POST` | `/api/v1/intents/route` | Route text to capture, Ask Artha, clarification or unsupported without ledger access or writes |
 | `POST` | `/api/v1/transactions/confirm` | Confirm a reviewed draft idempotently |
 | `GET` | `/api/v1/transactions` | List confirmed transactions |
 | `PATCH/DELETE` | `/api/v1/transactions/{id}` | Correct or soft-delete a transaction |

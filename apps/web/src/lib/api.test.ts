@@ -22,6 +22,46 @@ describe('FastAPI adapter', () => {
     vi.resetModules()
   })
 
+  it('accepts the exact unified-intent route contract', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      provider: 'gemini',
+      model: 'gemini-3.5-flash-lite',
+      mode: 'model',
+      result: { intent: 'ask_ledger' }
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { routeIntent } = await import('./api')
+
+    await expect(routeIntent('Show my last three months')).resolves.toEqual({ intent: 'ask_ledger' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.artha.test/api/v1/intents/route',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ message: 'Show my last three months' })
+      })
+    )
+  })
+
+  it.each([
+    { provider: 'ollama', model: 'qwen', mode: 'model', result: { intent: 'ask_ledger' } },
+    { provider: 'gemini', model: '', mode: 'model', result: { intent: 'ask_ledger' } },
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'fallback', result: { intent: 'ask_ledger' } },
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model', result: { intent: 'delete_ledger' } },
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model', result: { intent: 'ask_ledger', reason: 'model prose' } }
+  ])('rejects an unsafe unified-intent response %#', async (payload) => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { routeIntent } = await import('./api')
+
+    await expect(routeIntent('Show my spending')).rejects.toThrow('Intent route response was invalid.')
+  })
+
   it('maps the authenticated capture context contract', async () => {
     vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
     vi.stubEnv('VITE_DEMO_MODE', 'false')

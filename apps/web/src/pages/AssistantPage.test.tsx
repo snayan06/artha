@@ -10,6 +10,7 @@ describe('AssistantPage generated UI', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+    window.history.replaceState(null, '', '/assistant')
   })
 
   it('shows an accurate read-only AI disclosure before a question is sent', () => {
@@ -20,6 +21,29 @@ describe('AssistantPage generated UI', () => {
     expect(notice).toHaveTextContent(/read-only and cannot change your ledger/i)
     expect(notice).not.toHaveTextContent(/fictional|pilot/i)
     expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
+  })
+
+  it('submits a routed ledger question once and shows it during the handoff', async () => {
+    vi.mocked(chatAssistant).mockReturnValue(new Promise(() => undefined))
+    window.history.replaceState({ initialQuestion: 'stale' }, '', '/assistant')
+
+    render(<AssistantPage initialHandoff={{ initialQuestion: 'Show my last three months', handoffId: 'handoff-1' }} />)
+
+    expect(await screen.findByText('Show my last three months', { selector: 'section p' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Reading your latest ledger summary')
+    expect(chatAssistant).toHaveBeenCalledTimes(1)
+    expect(chatAssistant).toHaveBeenCalledWith('Show my last three months')
+    expect(window.history.state).toBeNull()
+  })
+
+  it('restores the exact routed question when the assistant is unavailable', async () => {
+    vi.mocked(chatAssistant).mockRejectedValue(new Error('API request failed (503)'))
+
+    render(<AssistantPage initialHandoff={{ initialQuestion: '  Compare food spending  ', handoffId: 'handoff-2' }} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Artha could not reach the assistant')
+    expect(screen.getByLabelText('Ask Artha')).toHaveValue('  Compare food spending  ')
+    expect(chatAssistant).toHaveBeenCalledWith('Compare food spending')
   })
 
   it('renders generated chart data as an accessible table', async () => {

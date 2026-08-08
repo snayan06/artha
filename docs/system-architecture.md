@@ -16,6 +16,11 @@ Gemini is unavailable or cannot return a valid interpretation, Artha preserves
 the user's exact text and opens the manual form. Production does not substitute
 a language parser or manufacture a likely draft.
 
+The Home and Quick Add composer first calls a bounded intent router. The router
+receives only the submitted text and returns one of `capture_transaction`,
+`ask_ledger`, `clarify` or `unsupported`. It does not receive household or
+ledger context, call tools, calculate money or write data.
+
 ## Chosen stack
 
 | Layer | Choice | Responsibility |
@@ -42,6 +47,7 @@ React PWA / Vercel
    ▼
 FastAPI / Vercel ───── server-side only ─────► Gemini
    │
+   ├── intent router ──────────► capture | Ask Artha | clarify | unsupported
    ├── capture orchestration ─► validated unsaved draft ─► review ─► confirm
    ├── ledger and read models ─► atomic database functions
    └── assistant contract ─────► approved narrative and widget selection
@@ -56,6 +62,12 @@ so RLS remains effective. Gemini credentials and calls stay server-side. A
 service-role key is not used in normal user request paths.
 
 ## Quick Add trust flow
+
+Before this flow, `POST /api/v1/intents/route` classifies only the entry's
+destination. A transaction continues below. A ledger question moves directly
+to `/assistant`, where the exact question is submitted once and route state is
+consumed. Routing failure never guesses: the original text remains editable and
+the user chooses transaction or ledger question.
 
 1. The authenticated user sends natural text to
    `POST /api/v1/drafts/parse`.
@@ -130,6 +142,8 @@ preparing validated widgets; it never exposes private model chain-of-thought.
 
 Important V1 routes include:
 
+- `POST /api/v1/intents/route`: classify text into one bounded workflow without
+  loading ledger context or writing data.
 - `POST /api/v1/drafts/parse`: interpret natural language into an unsaved draft,
   or return manual-recovery context without guessing.
 - `POST /api/v1/transactions/confirm`: atomically save a reviewed draft.

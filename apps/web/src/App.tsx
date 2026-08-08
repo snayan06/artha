@@ -149,7 +149,7 @@ export default function App() {
 }
 
 function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEmail?: string; onSignOut?: () => Promise<void> }) {
-  const { path } = useRouter()
+  const { path, state } = useRouter()
   const localDemo = isDemoMode()
   const setupKey = userKey ? `${SETUP_KEY}.${userKey}` : SETUP_KEY
   const profileKey = userKey ? `${PROFILE_KEY}.${userKey}` : PROFILE_KEY
@@ -244,7 +244,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   if (path === '/transactions') page = <TransactionsPage transactions={transactions} demoMode={demoMode} />
   if (path === '/shared') page = <SharedPage transactions={transactions} sharedBalancePaise={dashboard.sharedBalancePaise} memberBalances={dashboard.memberBalances} demoMode={demoMode} profile={profile} />
   if (path === '/add') page = <QuickAddPage onConfirm={addTransaction} members={profile.members} />
-  if (path === '/assistant') page = <AssistantPage />
+  if (path === '/assistant') page = <AssistantPage initialHandoff={state as { initialQuestion?: string; handoffId?: string } | null} />
   if (path === '/settings') page = <SettingsPage />
 
   return <Shell userEmail={userEmail} onSignOut={onSignOut}>{page}</Shell>

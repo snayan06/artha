@@ -3,9 +3,10 @@ import { useState } from 'react'
 import type { Dashboard, UserProfile } from '../types'
 import { formatMoney } from '../lib/money'
 import { AppLink, useRouter } from '../lib/router'
-import { Card, Badge, Button } from '../components/ui'
+import { Card, Badge } from '../components/ui'
 import { SpendChart } from '../components/SpendChart'
 import { TransactionRow } from '../components/TransactionRow'
+import { UnifiedEntryComposer } from '../components/UnifiedEntryComposer'
 
 export function HomePage({ dashboard, demoMode, profile }: { dashboard: Dashboard; demoMode: boolean; profile: UserProfile }) {
   const [showBalance, setShowBalance] = useState(true)
@@ -14,11 +15,6 @@ export function HomePage({ dashboard, demoMode, profile }: { dashboard: Dashboar
   const sharedLabel = dashboard.sharedBalancePaise > 0 ? 'Family owes you' : dashboard.sharedBalancePaise < 0 ? 'You owe family' : 'You are settled up'
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-
-  function startCapture(event: React.FormEvent) {
-    event.preventDefault()
-    if (capture.trim()) navigate('/add', { capture: capture.trim() })
-  }
 
   return (
     <div className="space-y-5 sm:space-y-7">
@@ -69,15 +65,17 @@ export function HomePage({ dashboard, demoMode, profile }: { dashboard: Dashboar
       </div>
 
       <Card className="p-4 sm:p-5">
-        <form onSubmit={startCapture}>
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-moss-600" aria-hidden="true" /> What happened?</div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <label className="sr-only" htmlFor="home-capture">Describe a transaction</label>
-            <input id="home-capture" name="transaction-capture" autoComplete="off" value={capture} onChange={(event) => setCapture(event.target.value)} placeholder={`${profile.members[0] ? `Paid 850 for dinner with ${profile.members[0].name}` : 'Paid 850 for dinner yesterday'}…`} className="min-h-12 min-w-0 flex-1 rounded-2xl border border-line bg-[#fafbf9] px-4 text-[15px] outline-none transition placeholder:text-[#9ca69f] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
-            <Button type="submit" disabled={!capture.trim()} className="sm:px-6">Make draft <ArrowRight className="h-4 w-4" aria-hidden="true" /></Button>
-          </div>
-          <p className="mt-2.5 text-[11px] text-[#8b958f] tone-subtle">Nothing is saved until you review and confirm.</p>
-        </form>
+        <div className="mb-1 flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-moss-600" aria-hidden="true" /> What would you like to do?</div>
+        <p className="mb-3 text-xs text-[#718078] tone-muted">Add a transaction or ask Artha about your money.</p>
+        <UnifiedEntryComposer
+          id="home-capture"
+          value={capture}
+          onChange={setCapture}
+          onCapture={(message) => navigate('/add', { capture: message })}
+          onAskLedger={(initialQuestion) => navigate('/assistant', { initialQuestion, handoffId: crypto.randomUUID() })}
+          placeholder={profile.members[0] ? `Paid 850 for dinner with ${profile.members[0].name} · or ask about this month` : 'Paid 850 for dinner · or ask about this month'}
+        />
+        <p role="note" aria-label="AI-assisted routing" className="mt-2.5 text-[11px] text-[#8b958f] tone-subtle">✨ AI helps choose between transaction review and Ask Artha. It never saves a transaction automatically.</p>
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-[.92fr_1.08fr]">

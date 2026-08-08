@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 9 August 2026, 01:10 IST
+Updated: 9 August 2026, 02:16 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -34,9 +34,9 @@ release guards.
 
 | Surface | Current state |
 | --- | --- |
-| Message/metadata release candidate | Local branch `codex/message-ux`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages and 60-case capture evaluation are implemented; remote release gates remain |
+| Combined message, metadata and unified-entry release candidate | Local branch `codex/message-ux`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, strict text-only intent routing, shared composer and one-time Ask Artha handoff are implemented; remote release gates remain |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
-| V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context, complete manual Expense/Income/Transfer recovery and the fictional-pilot AI data-use notice are deployed and final-domain accepted |
+| V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
 | Production `main` | Merge `c4ae0dc`; release PRs [#16](https://github.com/snayan06/artha/pull/16), [#17](https://github.com/snayan06/artha/pull/17), [#18](https://github.com/snayan06/artha/pull/18), [#20](https://github.com/snayan06/artha/pull/20) and [#21](https://github.com/snayan06/artha/pull/21) are merged |
 | GitHub checks | Main CI run [31271421128](https://github.com/snayan06/artha/actions/runs/31271421128) passed Web/API/SQL; CodeQL run [31271421107](https://github.com/snayan06/artha/actions/runs/31271421107) passed JavaScript/TypeScript and Python analysis for `c4ae0dc` |
 | Vercel | Web deployment `5811366329` and API deployment `5811363817` completed successfully for `c4ae0dc`; the final web and health URLs return `200` |
@@ -108,17 +108,17 @@ release guards.
 ## Verification checkpoint
 
 ```text
-Current release candidate web: 19 files, 184 tests passed
-Current release candidate API: 256 tests passed
+Current release candidate web: 20 files, 206 tests passed
+Current release candidate API: 274 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 8 migrations, seed and 4 SQL contract tests parsed
-AI contracts: 60 capture, 30 auto-tag and 24 assistant cases valid
+AI contracts: 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases valid
 Fresh hosted Gemini gate: not run for this hardening follow-up; prior fictional production evidence remains 50/50, 30/30 and 24/24
 Hardening recovery: focused automated Expense/Income/Transfer, category allow-list, context-retry and provider-unavailable tests pass; final-domain manual Expense/Income/Transfer recovery passed; real provider unavailability remains
 Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
 Production baseline: capture-hardening PR #21 merged as c4ae0dc; main CI 31271421128, CodeQL 31271421107 and both web/API Vercel deployments are green
-Candidate publication: not pushed, reviewed, merged or deployed yet
+Candidate publication: PR #24 is integrated into PR #23 locally; combined push, CI, review, merge and deployment remain
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
 Telemetry: Vercel Web Analytics and Speed Insights are mounted with tested query/fragment redaction

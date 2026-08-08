@@ -1,5 +1,5 @@
 import { Bot, ChartNoAxesCombined, LockKeyhole, Send, Sparkles } from 'lucide-react'
-import { useEffect, useLayoutEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Button, Card } from '../components/ui'
 import { chatAssistant } from '../lib/api'
@@ -18,12 +18,20 @@ const progressMessages = [
   'Preparing verified numbers and charts…'
 ]
 
-export function AssistantPage() {
+export interface AssistantHandoff {
+  initialQuestion?: string
+  handoffId?: string
+}
+
+export function AssistantPage({ initialHandoff = null }: { initialHandoff?: AssistantHandoff | null }) {
   const [message, setMessage] = useState('')
   const [history, setHistory] = useState<Exchange[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [progressIndex, setProgressIndex] = useState(0)
+  const [pendingQuestion, setPendingQuestion] = useState('')
+  const activeRequest = useRef(false)
+  const handledHandoff = useRef<string | null>(null)
 
   useEffect(() => {
     if (!loading) {
@@ -40,12 +48,12 @@ export function AssistantPage() {
     if (error) window.scrollTo({ top: 0, behavior: 'auto' })
   }, [error])
 
-  async function send(event?: FormEvent) {
-    event?.preventDefault()
-    const rawQuestion = message
+  const sendQuestion = useCallback(async (rawQuestion: string) => {
     const question = rawQuestion.trim()
-    if (!question || loading) return
+    if (!question || activeRequest.current) return
+    activeRequest.current = true
     setLoading(true)
+    setPendingQuestion(question)
     setMessage('')
     setError('')
     try {
@@ -55,8 +63,25 @@ export function AssistantPage() {
       setError('Artha could not reach the assistant. Your ledger was not changed; please try again.')
       setMessage(rawQuestion)
     } finally {
+      activeRequest.current = false
       setLoading(false)
+      setPendingQuestion('')
     }
+  }, [])
+
+  useEffect(() => {
+    const rawQuestion = initialHandoff?.initialQuestion
+    if (!rawQuestion?.trim()) return
+    const handoffKey = initialHandoff?.handoffId ?? rawQuestion
+    if (handledHandoff.current === handoffKey) return
+    handledHandoff.current = handoffKey
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${window.location.hash}`)
+    void sendQuestion(rawQuestion)
+  }, [initialHandoff, sendQuestion])
+
+  function send(event?: FormEvent) {
+    event?.preventDefault()
+    void sendQuestion(message)
   }
 
   return (
@@ -75,9 +100,9 @@ export function AssistantPage() {
         </div>
         <div className="min-h-[280px] space-y-6 p-4 sm:p-6" aria-live="polite">
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-          {history.length === 0 && <EmptyState onPick={setMessage} />}
+          {history.length === 0 && !pendingQuestion && <EmptyState onPick={setMessage} />}
           {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} />)}
-          {loading && <div role="status" aria-live="polite" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> {progressMessages[progressIndex]}</div>}
+          {pendingQuestion && <section className="space-y-3"><p className="ml-auto w-fit max-w-[88%] break-words rounded-[20px] rounded-br-md bg-moss-900 px-4 py-3 text-sm leading-6 text-white dark:bg-[#27604e]">{pendingQuestion}</p><div role="status" aria-live="polite" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> {progressMessages[progressIndex]}</div></section>}
         </div>
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
           <label htmlFor="assistant-message" className="sr-only">Ask Artha</label>
