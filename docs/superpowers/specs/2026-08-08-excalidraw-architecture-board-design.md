@@ -17,41 +17,37 @@ This is preferred over:
 - Mermaid, which is maintainable but looks like generated documentation rather than collaborative thinking;
 - a bitmap screenshot, which would not be editable and would lose sharpness when zoomed.
 
-## Board structure
+## Board composition
 
-The board uses three loose horizontal zones rather than a dense grid.
+The board must look like an architecture discussion captured by a developer,
+not a designed infographic. There is no enclosing panel, formal grid, or set of
+equal-sized stages.
 
-### 1. Capture to ledger truth
+The main flow runs loosely across the upper half:
 
-The main left-to-right story is:
+`write naturally` → `Gemini + household context` → `unsaved draft` → `you review + confirm` → `ledger truth`
 
-`Write naturally` → `Gemini interprets with household context` → `Review the draft` → `Confirm` → `Ledger updated`
+The nodes vary in size and alignment. The review checkpoint is circled twice
+with a handwritten note: **AI understands. You decide.**
 
-The review and confirmation checkpoint is visually emphasized. A handwritten note says: **AI understands. You decide.**
+Supporting thoughts are scattered around the main flow like working notes:
 
-### 2. Safe recovery and assistant
-
-Two smaller branches sit below the main flow:
-
-- If AI is unavailable or unsure: keep the original sentence, open the manual form, and save nothing.
-- Ask Artha: database facts become a safe answer card; the assistant is read-only and cannot write to the ledger.
-
-### 3. Production boundary
-
-A compact footer strip shows:
-
-`React PWA / Vercel` → `FastAPI / Vercel` → `Supabase Postgres + RLS`
-
-FastAPI also calls Gemini. A crossed-out direct arrow and short note make it clear that Gemini never connects directly to the ledger.
+- a yellow sticky beneath Gemini: `unsure? keep the exact text → manual form`; 
+- a small red note beside the write boundary: `NO CONFIRM = NO WRITE`;
+- a blue side trail for Ask Artha: `DB facts → Gemini chooses intent → safe React card`, ending in `read only`;
+- a developer stack sketch near the bottom: `React PWA` → `FastAPI` → `Supabase + RLS`, with Gemini connected only to FastAPI;
+- a crossed-out attempted Gemini-to-ledger arrow labelled `never direct`;
+- tiny margin notes such as `integer paise`, `allow-listed IDs`, `RLS`, and `idempotent` positioned beside the component that owns each rule.
 
 ## Visual direction
 
-- warm off-white Excalidraw canvas;
+- warm off-white infinite-canvas crop with visible breathing room around the notes;
 - Excalidraw's handwritten typography;
 - rough, imperfect strokes and curved arrows;
-- pale green, blue, yellow, and coral sticky-note fills;
+- pale green, blue, yellow, and coral sticky notes with deliberately uneven sizing and placement;
 - dark ink instead of a dark background;
-- generous whitespace and no decorative container around the entire board;
+- no swim lanes, section panels, formal three-zone layout, or decorative container around the board;
+- a few underlines, circles, question marks and crossed-out arrows so it feels actively reasoned through;
 - short phrases only, with deeper implementation detail left in the architecture docs.
 
 ## Deliverables
@@ -65,7 +61,7 @@ FastAPI also calls Gemini. A crossed-out direct arrow and short note make it cle
 
 - the `.excalidraw` file opens as valid editable Excalidraw JSON;
 - the SVG is a real export of the editable board, not a separately drawn approximation;
-- the whole story is readable at normal README width;
+- the whole story is readable at normal README width without looking like a polished product card;
 - the primary flow remains understandable at 390 px without horizontal overflow;
 - the board remains legible on both light and dark GitHub themes because it carries its own light canvas;
 - no labels are clipped and arrows do not cover text;
