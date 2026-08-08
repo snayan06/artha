@@ -3,7 +3,7 @@ import type { AccountSetupInput, AssistantReply, AssistantWidget, Dashboard, Hou
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
-const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 const TIMEOUT_MS = 10_000
 const RETRY_DELAY_MS = 250
 const TRANSIENT_STATUSES = new Set([502, 503, 504])

@@ -94,6 +94,20 @@ describe('FastAPI adapter', () => {
     expect(parsed.data.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
+  it('fails closed when demo mode is not explicitly enabled', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', '')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 503 })))
+    const { CaptureDraftUnavailableError, parseDraft } = await import('./api')
+    const sourceText = 'self transfer 25k ICICI -> HDFC'
+
+    await expect(parseDraft(sourceText)).rejects.toEqual(expect.objectContaining({
+      name: 'CaptureDraftUnavailableError',
+      sourceText
+    }))
+    await expect(parseDraft(sourceText)).rejects.toBeInstanceOf(CaptureDraftUnavailableError)
+  })
+
   it('never interprets production capture locally after an AI or API failure', async () => {
     vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
     vi.stubEnv('VITE_DEMO_MODE', 'false')

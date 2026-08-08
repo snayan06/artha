@@ -100,10 +100,47 @@ def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
 def test_explicit_ollama_selection_remains_supported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "development")
     monkeypatch.setenv("ARTHA_LLM_PROVIDER", "ollama")
     monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
 
     assert AssistantSettings.from_env().provider is LlmProvider.OLLAMA
+
+
+@pytest.mark.parametrize("provider", ["disabled", "ollama"])
+def test_production_requires_gemini_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    provider: str,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", provider)
+
+    with pytest.raises(ValueError, match="production requires the Gemini provider"):
+        AssistantSettings.from_env()
+
+
+def test_production_forbids_ollama_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "gemini-test-key")
+    monkeypatch.setenv("ARTHA_OLLAMA_FALLBACK", "true")
+
+    with pytest.raises(ValueError, match="production forbids Ollama fallback"):
+        AssistantSettings.from_env()
+
+
+def test_production_requires_gemini_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("ARTHA_OLLAMA_FALLBACK", "false")
+
+    with pytest.raises(ValueError, match="production requires a Gemini API key"):
+        AssistantSettings.from_env()
 
 
 @pytest.fixture

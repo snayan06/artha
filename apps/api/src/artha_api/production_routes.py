@@ -698,8 +698,9 @@ async def parse_draft(
     interpreted = await LocalFinancialAssistant().interpret_capture(payload.text, context)
     if interpreted is None:
         raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "hosted capture interpretation is unavailable; use the validated client parser",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Automatic interpretation is temporarily unavailable; "
+            "review the details manually.",
         )
     result = interpreted.result
     if isinstance(result, CaptureClarification):

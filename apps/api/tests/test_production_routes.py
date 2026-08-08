@@ -472,6 +472,32 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
     assert error.value.detail == "Which account should this use?"
 
 
+async def test_parse_draft_returns_sanitized_503_when_ai_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unavailable(
+        _self: LocalFinancialAssistant,
+        _message: str,
+        _context: object,
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(LocalFinancialAssistant, "interpret_capture", unavailable)
+
+    with pytest.raises(HTTPException) as error:
+        await parse_draft(
+            ParseRequest(text="self transfer 25k ICICI -> HDFC", timezone="Asia/Kolkata"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 503
+    assert error.value.detail == (
+        "Automatic interpretation is temporarily unavailable; "
+        "review the details manually."
+    )
+
+
 def test_production_draft_rejects_inexact_split_total() -> None:
     with pytest.raises(ValidationError, match="must add up"):
         ProductionDraft(

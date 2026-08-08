@@ -581,6 +581,7 @@ class AssistantSettings:
     @classmethod
     def from_env(cls) -> AssistantSettings:
         gemini_api_key = getenv("ARTHA_GEMINI_API_KEY") or None
+        environment = getenv("ARTHA_ENV", "development").strip().casefold()
         raw_provider = getenv("ARTHA_LLM_PROVIDER")
         if raw_provider is None:
             provider = (
@@ -595,6 +596,14 @@ class AssistantSettings:
                     f"unsupported LLM provider: {normalized_provider}"
                 ) from error
         fallback = getenv("ARTHA_OLLAMA_FALLBACK", "false").strip().casefold()
+        fallback_enabled = fallback in {"1", "true", "yes", "on"}
+        if environment == "production":
+            if provider is not LlmProvider.GEMINI:
+                raise ValueError("production requires the Gemini provider")
+            if not gemini_api_key:
+                raise ValueError("production requires a Gemini API key")
+            if fallback_enabled:
+                raise ValueError("production forbids Ollama fallback")
         return cls(
             provider=provider,
             gemini_api_key=gemini_api_key,
@@ -603,7 +612,7 @@ class AssistantSettings:
                 "ARTHA_OLLAMA_BASE_URL", "http://127.0.0.1:11434"
             ).rstrip("/"),
             ollama_model=getenv("ARTHA_OLLAMA_MODEL", "qwen3:4b-instruct").strip(),
-            ollama_fallback_enabled=fallback in {"1", "true", "yes", "on"},
+            ollama_fallback_enabled=fallback_enabled,
         )
 
 
