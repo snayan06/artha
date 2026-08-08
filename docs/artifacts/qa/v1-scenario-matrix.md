@@ -1,7 +1,8 @@
 # Artha V1 QA scenario matrix
 
 Updated: 8 August 2026
-Scope: local V1 source, fictional demo data, and production acceptance backlog
+Scope: local V1 source, fictional demo data, final-domain fictional acceptance,
+and the remaining real-data release backlog
 
 ## How to read this matrix
 
@@ -46,7 +47,7 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | CAP-13 | API validation error | Error is shown and no draft is fabricated or saved | Automated |
 | CAP-14 | Merchant rule matches in the local/demo repository | The stored household rule is used without changing the production web capture contract | Automated; production learning is planned |
 | CAP-15 | Learned merchant rule | It affects future drafts only and does not rewrite history | Automated |
-| CAP-16 | Manual recovery type correction | Expense, Income and Transfer use direction-valid server-owned categories/accounts and remain unsaved until confirmation | Automated; final-domain acceptance pending |
+| CAP-16 | Manual recovery type correction | Expense, Income and Transfer use direction-valid server-owned categories/accounts and remain unsaved until confirmation | Automated; production verified on `c4ae0dc` |
 | CAP-17 | Account-context load fails | Exact text and any safe draft fields survive retry; confirmation stays disabled with an accessible reason | Automated; final-domain acceptance pending |
 
 ## Confirmation and ledger invariants
@@ -108,9 +109,9 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | UX-01 | Text capture and form-first capture | Both reach the same review-before-write flow | Automated/manual local |
 | UX-02 | Zero or negative manual amount | Confirm stays disabled | Automated |
 | UX-03 | 320 px viewport | Cards, form, and bottom navigation fit without horizontal overflow | Manual local |
-| UX-04 | 390 px viewport | Primary mobile layout fits without horizontal overflow | Manual local |
+| UX-04 | 390 px viewport | Primary mobile layout fits without horizontal overflow | Manual local; production verified on all six primary routes |
 | UX-05 | Desktop viewport | Content width, charts, and navigation remain readable | Manual local |
-| UX-06 | Light, dark, and system themes | Controls remain visible and preference persists | Automated/manual local |
+| UX-06 | Light, dark, and system themes | Controls remain visible and preference persists | Automated/manual local; production dark/system verified |
 | UX-07 | Capture API unavailable | Exact text is retained, manual review explains the error, and no silent save occurs | Automated; authenticated final-domain acceptance pending |
 | UX-08 | PWA production build | Manifest, service worker, and precache are generated | Automated build |
 | OPS-01 | Web/API restart from renamed folder | Root `.env` is loaded and both documented URLs become healthy | Automated configuration plus local smoke |

@@ -135,8 +135,9 @@ is a failed release even when `supabase migration list --linked` is synchronized
 
 ## Acceptance before calling production green
 
-Current status: **AI-primary is deployed; capture hardening is locally green
-but unpublished; real-data acceptance remains pending**.
+Current status: **AI-primary and capture hardening are deployed at `c4ae0dc`;
+final-domain fictional acceptance passed; real-data acceptance remains
+pending**.
 Do not enter real financial data until every unchecked item passes.
 
 - [x] Magic-link login works on the final PWA domain.
@@ -151,8 +152,9 @@ Do not enter real financial data until every unchecked item passes.
 - [ ] Repeat four-bank/multiple-card setup with the owner's complete fictional configuration.
 - [x] Direct loads of every PWA route return the application rather than 404.
 - [x] Mobile widths 320 px and 390 px plus desktop pass in light and dark modes.
-- [ ] Publish the capture-hardening follow-up, then manually accept Expense,
-  Income, Transfer and provider-unavailable recovery on the final domain.
+- [x] Publish the capture-hardening follow-up and manually accept Expense,
+  Income, Transfer and exact-text manual recovery on the final domain.
+- [ ] Exercise real provider-unavailable recovery on the final domain.
 - [ ] Re-run the 50 capture, 30 auto-tag and 24 assistant hosted fictional gates.
 - [ ] API and browser logs contain no tokens or financial payloads.
 - [ ] Sanitized cold/warm authenticated latency is recorded without request or
