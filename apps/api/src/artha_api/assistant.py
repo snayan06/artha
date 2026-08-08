@@ -415,6 +415,9 @@ class AssistantStatus(StrictModel):
     active_provider: LlmProvider | None = None
     ollama_fallback_enabled: bool
     detail: Literal["ready", "disabled", "missing_api_key", "unavailable"]
+    data_policy: Literal["sample_only", "private_approved"] = "sample_only"
+    personal_data_enabled: bool = False
+    is_demo: bool = False
 
 
 class AssistantChatResponse(StrictModel):

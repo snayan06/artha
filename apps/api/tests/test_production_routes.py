@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from artha_api import production_routes
 from artha_api.assistant import (
     AssistantChatRequest,
+    AssistantStatus,
     CaptureClarification,
     CaptureInterpretationResponse,
     LlmProvider,
@@ -24,6 +25,7 @@ from artha_api.production_routes import (
     ProductionSplit,
     ProductionTagSuggestionRequest,
     assistant_chat,
+    assistant_status,
     assistant_tag_suggestion,
     confirm_transaction,
     list_transactions,
@@ -42,6 +44,12 @@ DESTINATION_ACCOUNT_ID = "00000000-0000-0000-0000-000000000107"
 CATEGORY_ID = "00000000-0000-0000-0000-000000000104"
 USER_ID = "00000000-0000-0000-0000-000000000105"
 TRANSACTION_ID = "00000000-0000-0000-0000-000000000106"
+
+
+@pytest.fixture(autouse=True)
+def approve_private_ai_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARTHA_AI_DATA_POLICY", "private_approved")
+    monkeypatch.delenv("ARTHA_DEMO_ACCOUNT_USER_ID", raising=False)
 
 
 class FakeCaptureContextClient:
@@ -730,6 +738,7 @@ async def test_profile_hydrates_server_owned_household_and_participants() -> Non
     assert result == {
         "display_name": "Owner",
         "household_name": "Test household",
+        "is_demo": False,
         "members": [
             {
                 "id": MEMBER_ID,
@@ -739,6 +748,142 @@ async def test_profile_hydrates_server_owned_household_and_participants() -> Non
             }
         ],
     }
+
+
+async def test_profile_marks_only_the_configured_authenticated_uuid_as_demo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_DEMO_ACCOUNT_USER_ID", USER_ID)
+
+    result = await profile(
+        cast(SupabaseRestClient, FakeProductionClient()),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert result["is_demo"] is True
+
+
+async def test_sample_only_policy_blocks_personal_capture_before_model_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_AI_DATA_POLICY", "sample_only")
+
+    def unexpected_assistant() -> None:
+        raise AssertionError("personal text must not reach the configured model")
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", unexpected_assistant
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await parse_draft(
+            ParseRequest(text="Paid 500 for lunch", timezone="Asia/Kolkata"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 403
+    assert error.value.detail == (
+        "AI features are not enabled for personal financial data in this "
+        "deployment; use manual entry."
+    )
+
+
+async def test_sample_only_policy_allows_the_configured_demo_uuid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_AI_DATA_POLICY", "sample_only")
+    monkeypatch.setenv("ARTHA_DEMO_ACCOUNT_USER_ID", USER_ID)
+
+    async def clarify(
+        _self: LocalFinancialAssistant,
+        _message: str,
+        _context: object,
+    ) -> CaptureInterpretationResponse:
+        return CaptureInterpretationResponse(
+            provider=LlmProvider.GEMINI,
+            model="test-model",
+            result=CaptureClarification(
+                outcome="clarify",
+                question="Which account should this use?",
+                missing=["source_account_id"],
+            ),
+        )
+
+    monkeypatch.setattr(LocalFinancialAssistant, "interpret_capture", clarify)
+
+    with pytest.raises(HTTPException) as error:
+        await parse_draft(
+            ParseRequest(text="Paid 500 for lunch", timezone="Asia/Kolkata"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 422
+    assert error.value.detail == "Which account should this use?"
+
+
+async def test_sample_only_policy_blocks_personal_chat_and_tag_before_model_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_AI_DATA_POLICY", "sample_only")
+
+    def unexpected_assistant() -> None:
+        raise AssertionError("personal text must not reach the configured model")
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", unexpected_assistant
+    )
+
+    with pytest.raises(HTTPException) as chat_error:
+        await assistant_chat(
+            AssistantChatRequest(message="Show my spending"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            AuthContext(user_id=USER_ID),
+        )
+    with pytest.raises(HTTPException) as tag_error:
+        await assistant_tag_suggestion(
+            ProductionTagSuggestionRequest(
+                description="Food purchase",
+                amount_paise=12_000,
+                direction="expense",
+            ),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert chat_error.value.status_code == 403
+    assert tag_error.value.status_code == 403
+
+
+async def test_assistant_status_exposes_policy_without_demo_uuid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_AI_DATA_POLICY", "sample_only")
+    monkeypatch.setenv("ARTHA_DEMO_ACCOUNT_USER_ID", USER_ID)
+
+    class StatusAssistant:
+        async def status(self) -> AssistantStatus:
+            return AssistantStatus(
+                configured=True,
+                provider=LlmProvider.GEMINI,
+                model="test-model",
+                available=True,
+                active_provider=LlmProvider.GEMINI,
+                ollama_fallback_enabled=False,
+                detail="ready",
+            )
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", StatusAssistant
+    )
+
+    result = await assistant_status(AuthContext(user_id=USER_ID))
+
+    assert result.data_policy == "sample_only"
+    assert result.personal_data_enabled is False
+    assert result.is_demo is True
+    assert "demo_user_id" not in result.model_dump(mode="json")
 
 
 async def test_parse_draft_returns_model_clarification_without_inventing_a_draft(

@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .ai_policy import AiAccessPolicy
 from .assistant import (
     AssistantChatRequest,
     AssistantChatResponse,
@@ -31,7 +32,7 @@ from .assistant import (
     TagSuggestionRequest,
     TagSuggestionResponse,
 )
-from .auth import AuthDependency
+from .auth import AuthContext, AuthDependency
 from .recovery import RecoveryBundle
 from .schemas import (
     AccountCreate,
@@ -55,6 +56,17 @@ async def production_client(
 
 
 ClientDependency = Annotated[SupabaseRestClient, Depends(production_client)]
+
+
+def require_ai_access(auth: AuthContext) -> AiAccessPolicy:
+    policy = AiAccessPolicy.from_env()
+    if not policy.can_send_financial_text(auth.user_id):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "AI features are not enabled for personal financial data in this "
+            "deployment; use manual entry.",
+        )
+    return policy
 
 
 class ProductionOnboardingRequest(BaseModel):
@@ -288,6 +300,7 @@ async def profile(
     return {
         "display_name": owner["display_name"],
         "household_name": households[0]["name"],
+        "is_demo": AiAccessPolicy.from_env().is_demo(auth.user_id),
         "members": [
             public_member(member)
             for member in members
@@ -730,6 +743,7 @@ async def parse_draft(
     client: ClientDependency,
     auth: AuthDependency,
 ) -> dict[str, Any]:
+    require_ai_access(auth)
     household_id = await current_household(client)
     assert household_id is not None
     accounts = await account_rows(client, household_id)
@@ -847,8 +861,16 @@ def safe_label(value: Any, fallback: str = "Uncategorized") -> str:
 
 
 @router.get("/api/v1/assistant/status", response_model=AssistantStatus, tags=["assistant"])
-async def assistant_status(_auth: AuthDependency) -> AssistantStatus:
-    return await LocalFinancialAssistant().status()
+async def assistant_status(auth: AuthDependency) -> AssistantStatus:
+    status_response = await LocalFinancialAssistant().status()
+    policy = AiAccessPolicy.from_env()
+    return status_response.model_copy(
+        update={
+            "data_policy": policy.data_policy.value,
+            "personal_data_enabled": policy.data_policy.value == "private_approved",
+            "is_demo": policy.is_demo(auth.user_id),
+        }
+    )
 
 
 @router.post(
@@ -861,6 +883,7 @@ async def assistant_chat(
     client: ClientDependency,
     auth: AuthDependency,
 ) -> AssistantChatResponse:
+    require_ai_access(auth)
     summary = await dashboard(client, auth)
     context = AssistantFinancialContext(
         total_balance_paise=int(summary["total_balance_paise"]),
@@ -918,8 +941,9 @@ async def assistant_chat(
 async def assistant_tag_suggestion(
     payload: ProductionTagSuggestionRequest,
     client: ClientDependency,
-    _auth: AuthDependency,
+    auth: AuthDependency,
 ) -> TagSuggestionResponse:
+    require_ai_access(auth)
     household_id = await current_household(client)
     assert household_id is not None
     category_types = {payload.direction, "both"}
