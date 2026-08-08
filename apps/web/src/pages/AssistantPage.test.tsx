@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chatAssistant } from '../lib/api'
@@ -42,6 +42,33 @@ describe('AssistantPage generated UI', () => {
     const dataTable = screen.getByRole('table', { name: 'Monthly spend values' })
     expect(within(dataTable).getByRole('rowheader', { name: 'August' })).toBeInTheDocument()
     expect(within(dataTable).getByRole('cell', { name: '15000' })).toBeInTheDocument()
+  })
+
+  it('submits with Enter and documents Shift+Enter', async () => {
+    vi.mocked(chatAssistant).mockResolvedValue({
+      message: 'Here is your spending overview.',
+      provider: 'Test provider',
+      widgets: []
+    })
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+
+    await user.type(screen.getByLabelText('Ask Artha'), 'Show my spending{enter}')
+
+    await waitFor(() => expect(chatAssistant).toHaveBeenCalledWith('Show my spending'))
+    expect(screen.getByText(/Enter to continue/i)).toHaveTextContent(/Shift\+Enter for a new line/i)
+  })
+
+  it('does not submit Shift+Enter or an IME composition Enter', async () => {
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+    const composer = screen.getByLabelText('Ask Artha')
+
+    await user.type(composer, 'Show my spending')
+    fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true })
+    fireEvent.keyDown(composer, { key: 'Enter', isComposing: true })
+
+    expect(chatAssistant).not.toHaveBeenCalled()
   })
 
   it('renders a chart-specific empty state instead of a broken graph', async () => {

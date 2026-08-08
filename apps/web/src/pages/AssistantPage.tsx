@@ -65,9 +65,10 @@ export function AssistantPage() {
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
           <label htmlFor="assistant-message" className="sr-only">Ask Artha</label>
           <div className="flex items-end gap-2 rounded-[20px] border border-line bg-white p-2 focus-within:border-moss-400 focus-within:ring-4 focus-within:ring-moss-100">
-            <textarea id="assistant-message" name="assistant-message" autoComplete="off" rows={2} value={message} disabled={loading} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() } }} placeholder="Ask about spending, balances, or trends…" className="assistant-input min-h-11 flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60" />
+            <textarea id="assistant-message" name="assistant-message" autoComplete="off" rows={2} value={message} disabled={loading} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return; event.preventDefault(); if (!message.trim() || loading) return; void send() }} placeholder="Ask about spending, balances, or trends…" className="assistant-input min-h-11 flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60" />
             <Button type="submit" disabled={!message.trim()} loading={loading} className="h-11 w-11 shrink-0 rounded-2xl px-0" aria-label="Send question"><Send className="h-4 w-4" aria-hidden="true" /></Button>
           </div>
+          <p className="mt-2 px-2 text-xs text-[#7b8781] tone-muted">Enter to continue · Shift+Enter for a new line.</p>
         </form>
       </Card>
     </div>

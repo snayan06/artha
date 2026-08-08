@@ -62,6 +62,34 @@ describe('QuickAddPage', () => {
     expect(await screen.findByText(/added to your artha/i)).toBeInTheDocument()
   })
 
+  it('creates only an unsaved review draft when Enter is pressed', async () => {
+    const user = userEvent.setup()
+    const parseSpy = vi.spyOn(api, 'parseDraft')
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    const composer = screen.getByLabelText(/your message/i)
+    await user.type(composer, 'Paid 540 at Zomato{enter}')
+
+    await waitFor(() => expect(parseSpy).toHaveBeenCalledWith('Paid 540 at Zomato', []))
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByText(/Enter to continue/i)).toHaveTextContent(/Shift\+Enter for a new line/i)
+  })
+
+  it('keeps Shift+Enter as a newline and ignores composing Enter', async () => {
+    const user = userEvent.setup()
+    const parseSpy = vi.spyOn(api, 'parseDraft')
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    const composer = screen.getByLabelText(/your message/i)
+    await user.type(composer, 'Paid 540')
+    fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true })
+    expect(parseSpy).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(composer, { key: 'Enter', isComposing: true })
+    expect(parseSpy).not.toHaveBeenCalled()
+  })
+
   it('offers a form-first entry with an explicit date picker', async () => {
     const user = userEvent.setup()
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
