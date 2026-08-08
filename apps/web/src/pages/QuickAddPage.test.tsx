@@ -199,15 +199,18 @@ describe('QuickAddPage', () => {
     expect(screen.queryByRole('heading', { name: 'Suggested category' })).not.toBeInTheDocument()
     expect(screen.queryByText("Burger King is in Artha's food merchant catalog.")).not.toBeInTheDocument()
     expect(screen.getByLabelText('Category')).toHaveValue('')
+    expect(screen.getByLabelText('Subcategory')).toHaveValue('')
 
     await user.selectOptions(screen.getByLabelText('Category'), 'Other')
 
     await user.clear(screen.getByLabelText('Platform'))
+    await user.type(screen.getByLabelText('Platform'), 'Direct')
+    expect(screen.queryByText('Delivery')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
     const submitted = onConfirm.mock.calls[0]?.[0] as TransactionDraft
-    expect(submitted.platform).toBeUndefined()
-    expect(submitted.metadata?.evidence.platform).toBeUndefined()
+    expect(submitted.platform).toBe('Direct')
+    expect(submitted.metadata?.evidence.platform).toMatchObject({ source: 'user_corrected' })
     expect(submitted.metadata?.attributes).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'order_channel' })
     ]))
