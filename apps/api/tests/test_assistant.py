@@ -1000,6 +1000,11 @@ async def test_gemini_capture_interpretation_resolves_25k_transfer() -> None:
     assert "freelance income, refunds, and interest" in normalized_prompt
     assert "named date such as 2 aug" in normalized_prompt
     assert "payment to a person" in normalized_prompt
+    assert "never select or default a source account" in normalized_prompt
+    assert "meal_occasion values must be exactly" in normalized_prompt
+    assert "order_channel values must be exactly" in normalized_prompt
+    assert "tags may only be these canonical names" in normalized_prompt
+    assert "office lunch is an explicit work meal phrase" in normalized_prompt
 
 
 @pytest.mark.asyncio

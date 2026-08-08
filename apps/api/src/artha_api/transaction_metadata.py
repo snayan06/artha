@@ -174,6 +174,39 @@ SAFE_TAG_PHRASES: dict[str, tuple[str, ...]] = {
     "Work Meal": ("work meal", "client meal", "office lunch"),
 }
 
+CANONICAL_ATTRIBUTE_VALUES: dict[AttributeKey, dict[str, str]] = {
+    "meal_occasion": {
+        "breakfast": "Breakfast",
+        "brunch": "Brunch",
+        "lunch": "Lunch",
+        "dinner": "Dinner",
+        "snack": "Snack",
+    },
+    "order_channel": {
+        "delivery": "Delivery",
+        "pickup": "Pickup",
+        "takeout": "Pickup",
+        "takeaway": "Pickup",
+        "dine in": "Dine In",
+        "dine-in": "Dine In",
+        "in store": "In Store",
+        "in-store": "In Store",
+        "online": "Online",
+    },
+}
+
+
+def _canonical_attribute_value(key: AttributeKey, value: str) -> str | None:
+    normalized = normalize_key(value)
+    allowed = CANONICAL_ATTRIBUTE_VALUES[key]
+    if normalized in allowed:
+        return allowed[normalized]
+    if key == "meal_occasion":
+        for phrase, canonical in allowed.items():
+            if re.search(rf"\b{re.escape(phrase)}\b", normalized):
+                return canonical
+    return None
+
 
 def _category_by_id(
     categories: list[dict[str, Any]], category_id: str
@@ -302,15 +335,32 @@ def suggest_transaction_metadata(
         if normalize_key(model_subcategory) in allowed_subcategories:
             subcategory = normalize_label(model_subcategory)
 
+    source_key = normalize_key(source_text)
     attributes_by_key: dict[str, ReviewedAttribute] = {}
     for model_attribute in model_attributes:
+        canonical_value = _canonical_attribute_value(
+            model_attribute.key, model_attribute.value
+        )
+        if canonical_value is None:
+            continue
         attributes_by_key[model_attribute.key] = ReviewedAttribute(
             key=model_attribute.key,
-            value=model_attribute.value,
+            value=canonical_value,
             source=model_attribute.source,
             confidence=model_attribute.confidence,
         )
-    if platform_entry is not None and "order_channel" not in attributes_by_key:
+    if "meal_occasion" not in attributes_by_key:
+        canonical_meals = CANONICAL_ATTRIBUTE_VALUES["meal_occasion"]
+        for phrase, canonical_meal in canonical_meals.items():
+            if re.search(rf"\b{re.escape(phrase)}\b", source_key):
+                attributes_by_key["meal_occasion"] = ReviewedAttribute(
+                    key="meal_occasion",
+                    value=canonical_meal,
+                    source="user_explicit",
+                    confidence=1.0,
+                )
+                break
+    if platform_entry is not None:
         attributes_by_key["order_channel"] = ReviewedAttribute(
             key="order_channel",
             value=platform_entry[1],
@@ -328,7 +378,6 @@ def suggest_transaction_metadata(
         )
         if value
     }
-    source_key = normalize_key(source_text)
     tags: list[SuggestedTag] = []
     seen_tags: set[str] = set()
     for model_tag in model_tags:
@@ -355,6 +404,23 @@ def suggest_transaction_metadata(
                 normalized_name=normalized_name,
                 source=model_tag.source,
                 confidence=model_tag.confidence,
+            )
+        )
+    for canonical_tag, phrases in SAFE_TAG_PHRASES.items():
+        normalized_name = normalize_key(canonical_tag)
+        if (
+            normalized_name in reserved
+            or normalized_name in seen_tags
+            or not any(phrase in source_key for phrase in phrases)
+        ):
+            continue
+        seen_tags.add(normalized_name)
+        tags.append(
+            SuggestedTag(
+                name=canonical_tag,
+                normalized_name=normalized_name,
+                source="user_explicit",
+                confidence=1.0,
             )
         )
 

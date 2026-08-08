@@ -240,9 +240,9 @@ Current local release-candidate evidence:
 | Gate | Result |
 | --- | --- |
 | Web | 19 test files, 184 tests passed |
-| API | 254 tests passed |
+| API | 256 tests passed |
 | AI contracts | 60 capture, 30 auto-tag and 24 assistant cases valid |
-| Hosted Gemini on sample data | New capture run: 50/60 exact cases, 94.3% structured fields, 100% provider availability; metadata canonicalization and one missing-account clarification remain release work |
+| Hosted Gemini on sample data | Baseline capture run: 50/60 exact cases, 94.3% structured fields, 100% provider availability; affected metadata cases were hardened with canonical labels and explicit-source guardrails, pending the combined full rerun |
 | Production UI | All six primary pages fit at 320 px, 390 px and 1440 px; light/dark controls and mobile/desktop dark UI verified |
 | Production flows | Magic-link new/returning login, session persistence, onboarding, expense, income, transfer, split, filters, assistant and encrypted export passed |
 

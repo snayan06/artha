@@ -28,7 +28,7 @@ Status: PR #23 open; merge held for companion feature and final-domain acceptanc
 Fresh `make check` before the documentation pass:
 
 - Web: 19 files, 184 tests passed.
-- API: 254 tests passed.
+- API: 256 tests passed.
 - ESLint, TypeScript, Ruff and strict mypy passed.
 - Production PWA build passed.
 - Eight migrations, seed and four SQL contract files parsed.
@@ -56,10 +56,15 @@ diagnostics or the normal unavailable state, never a raw provider exception.
 The rate-limited rerun then completed all 60 cases with 100% provider
 availability. Exact-case accuracy was 50/60 (83.3%) and structured-field
 accuracy was 94.3%. Amounts were 48/48, kinds 48/48, source accounts 48/48 and
-destination accounts 9/9. The ten exact misses are concentrated in metadata
-display/canonicalization and one missing-account clarification; those remain
-combined-release work rather than being presented as green. Deployed acceptance
-also remains a release gate after the companion feature is ready.
+destination accounts 9/9. The ten exact misses were concentrated in metadata
+display/canonicalization and one missing-account clarification. The affected
+path now compares labels case-insensitively, stores one canonical display form,
+derives only allow-listed attributes/tags explicit in the source, lets the safe
+platform catalog own order-channel values, and instructs Gemini never to default
+an unmentioned account. A hosted targeted rerun passed 8/10 raw model cases on
+its first pass; the two raw omissions are both filled by the tested server-owned
+canonicalization layer before review. The combined full hosted rerun and
+deployed acceptance remain release gates.
 
 ## Persistence and privacy
 

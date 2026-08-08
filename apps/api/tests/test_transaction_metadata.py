@@ -37,13 +37,13 @@ def test_burger_king_via_zomato_keeps_merchant_and_platform_distinct() -> None:
         model_attributes=[
             ModelAttribute(
                 key="meal_occasion",
-                value="Dinner",
+                value="DINNER",
                 source="user_explicit",
                 confidence=0.99,
             )
         ],
         model_tags=[
-            ModelTag(name="Date Night", source="user_explicit", confidence=0.98)
+            ModelTag(name="date NIGHT", source="user_explicit", confidence=0.98)
         ],
         categories=[FOOD_CATEGORY, TRAVEL_CATEGORY],
         merchant_rules=[],
@@ -72,6 +72,46 @@ def test_burger_king_via_zomato_keeps_merchant_and_platform_distinct() -> None:
         },
     ]
     assert [tag.name for tag in result.tags] == ["Date Night"]
+
+
+def test_safe_metadata_canonicalizes_model_labels_and_platform_channel() -> None:
+    result = suggest_transaction_metadata(
+        source_text="office lunch 920 at Burger King via Zomato",
+        merchant="Burger King",
+        platform="Zomato",
+        model_category_id=None,
+        model_category_name=None,
+        model_subcategory=None,
+        model_attributes=[
+            ModelAttribute(
+                key="order_channel",
+                value="Zomato",
+                source="model_suggested",
+                confidence=0.7,
+            ),
+        ],
+        model_tags=[],
+        categories=[FOOD_CATEGORY],
+        merchant_rules=[],
+    )
+
+    assert [item.model_dump() for item in result.attributes] == [
+        {
+            "key": "meal_occasion",
+            "value": "Lunch",
+            "source": "user_explicit",
+            "confidence": 1.0,
+            "review_status": "needs_review",
+        },
+        {
+            "key": "order_channel",
+            "value": "Delivery",
+            "source": "safe_catalog",
+            "confidence": 1.0,
+            "review_status": "needs_review",
+        },
+    ]
+    assert [tag.name for tag in result.tags] == ["Work Meal"]
 
 
 def test_personal_merchant_rule_wins_over_catalog_and_model() -> None:

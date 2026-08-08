@@ -72,6 +72,19 @@ def test_versioned_suite_loads_and_validates_without_a_provider() -> None:
     assert report["failures"] == []
 
 
+def test_metadata_cases_match_the_reviewed_product_contract() -> None:
+    cases = {case.id: case for case in _suite().cases}
+
+    assert cases["CAP-055"].expected["category_id"] == "cat-food"
+    assert cases["CAP-060"].expected == {"missing": ["source_account_id"]}
+    for case_id in ("CAP-051", "CAP-052", "CAP-053", "CAP-056", "CAP-058", "CAP-059"):
+        attributes = cases[case_id].expected["attributes"]
+        assert isinstance(attributes, list)
+        assert {item["key"]: item["value"] for item in attributes}[
+            "order_channel"
+        ] == "Delivery"
+
+
 def test_scoring_compares_structured_subset_and_omits_free_text() -> None:
     case = CaptureEvalCase(
         id="CAP-TEST",
