@@ -21,7 +21,7 @@ Sprint 1 dependency.
 
 | Area | Status | What this means |
 | --- | --- | --- |
-| AI-primary release candidate | Locally verified, not deployed | Production capture and assistant are model-only; failures are honest, the product story/architecture are updated, and the final local gate is 153 web + 209 API + 104 AI contracts |
+| AI-primary release candidate | Locally verified, not deployed | Production capture and assistant are model-only; failures are honest, the product story/architecture are updated, and the final local gate is 154 web + 209 API + 104 AI contracts |
 | Public repository and CI | Attention | Repository and workflows are configured, but GitHub did not create runs for the latest PRs/pushes; restore reliable triggering before the next code release |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
@@ -128,7 +128,7 @@ restore and log-redaction gates.
 - [x] Verify production Gemini capture plus read-only metric/chart assistant responses; retain the 30/30 hosted auto-tag gate as the current tagging evidence.
 - [x] Remove deterministic production language interpretation; preserve exact text and open manual review when model capture is unavailable.
 - [x] Constrain assistant output to an approved intent narrative and the exact server-owned widget bundle.
-- [x] Pass final local AI-primary gates: 153 web tests, 209 API tests, 8 migrations, 4 SQL contracts and 104 keyless AI cases.
+- [x] Pass final local AI-primary gates: 154 web tests, 209 API tests, 8 migrations, 4 SQL contracts and 104 keyless AI cases.
 - [x] Manually verify fictional capture success, zero/incomplete-transfer guards, assistant success/failure and no 320/390/1440 Quick Add/Assistant overflow in light/dark.
 - [ ] Re-run hosted fictional Gemini gates with the ignored server-side key for this candidate.
 - [ ] Repeat authenticated capture-unavailable recovery and assistant acceptance on the final deployed domain.

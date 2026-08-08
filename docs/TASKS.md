@@ -70,7 +70,7 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Select Gemini 3.5 Flash-Lite for fictional pilot traffic and configure it server-side only.
 - [x] Remove deterministic production language parsing and fail into exact-text manual review without saving.
 - [x] Restrict assistant responses to approved intents and exact server-owned, database-grounded widget bundles.
-- [x] Pass the AI-primary candidate local gate: 153 web, 209 API and 104 AI contract cases.
+- [x] Pass the AI-primary candidate local gate: 154 web, 209 API and 104 AI contract cases.
 - [ ] Re-run the hosted fictional Gemini gates for the AI-primary candidate.
 - [ ] Deploy the AI-primary candidate and repeat authenticated capture/assistant success and unavailable-state acceptance.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
