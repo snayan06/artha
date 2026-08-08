@@ -51,7 +51,7 @@ VALID_INTENTS = {
     "clarification",
     "unsupported",
 }
-VALID_WIDGET_TYPES = {"metric", "chart", "table", "insight", "clarification"}
+VALID_WIDGET_TYPES = {"metric", "chart", "table", "clarification"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,8 +247,8 @@ def score_assistant_case(
 ) -> AssistantScore:
     widget_types = tuple(widget.type for widget in completion.widgets)
     values = _assistant_values(completion)
-    numeric_mismatch = any(value not in values for value in case.expected_values_paise)
-    widget_mismatch = any(required not in widget_types for required in case.required_widget_types)
+    numeric_mismatch = values != case.expected_values_paise
+    widget_mismatch = widget_types != case.required_widget_types
     passed = (
         completion.intent == case.expected_intent and not widget_mismatch and not numeric_mismatch
     )
@@ -547,8 +547,6 @@ async def _run(root: Path, suite_name: str) -> int:
     settings = assistant.settings
     if settings.provider is LlmProvider.GEMINI and not settings.gemini_api_key:
         raise ValueError("ARTHA_GEMINI_API_KEY is required for hosted evaluation")
-    if settings.provider is LlmProvider.GROQ and not settings.groq_api_key:
-        raise ValueError("ARTHA_GROQ_API_KEY is required for hosted evaluation")
     if settings.provider is LlmProvider.DISABLED:
         raise ValueError("a hosted provider is required for hosted evaluation")
     output_dir = root / "evals" / "reports"

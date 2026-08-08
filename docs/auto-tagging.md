@@ -3,65 +3,86 @@
 Auto-tagging is a suggestion pipeline. It never posts or rewrites a transaction
 without confirmation.
 
-## Decision order
+## Current production behavior
 
-1. Normalize the merchant and description: lowercase, collapse whitespace, and
-   remove payment-network noise that does not identify the merchant.
-2. Match an active household `merchant_rules` entry by priority (`exact`, then
-   `contains`, then carefully validated `regex`).
-3. Apply safe built-in signals for obvious income, transfers, and settlements.
-4. If the category is still unresolved, request a structured suggestion from
-   the configured model provider.
-5. Validate that the returned category already exists in the household and show
-   its confidence and reason in the draft review.
-6. Save only after the user confirms. When the user corrects the category, offer
-   to remember that merchant-to-category rule for future drafts.
+Supabase production Quick Add sends the authenticated capture context directly
+to Gemini, including the household's existing category allow-list. It does not
+currently load or apply `merchant_rules` before interpretation. Gemini's
+allow-listed category selection is surfaced inside the unsaved Quick Add review
+draft. If interpretation is unavailable or invalid, category selection remains
+manual.
 
-## Model input
+The standalone `POST /api/v1/assistant/tag-suggestion` endpoint is a bounded
+Gemini API contract. The caller sends only description, amount and direction;
+it cannot supply a category allow-list. FastAPI loads up to 200 active categories
+from the authenticated household, keeps only categories eligible for the
+transaction direction, and accepts only an exact ID/name pair from that set.
+The endpoint returns no suggestion when the model is missing, unavailable or
+invalid. The V1 web application does not call this endpoint, so its result must
+not be described as part of the web review flow. Neither path creates a fallback
+category.
 
-The model receives only the minimum needed fields:
+Only explicit transaction confirmation can save the reviewed draft.
+
+## Local/demo rule behavior
+
+The SQLAlchemy local/demo path implements merchant-rule-first behavior. It
+normalizes merchant text, matches household rules by `exact`, `contains`, then
+validated `regex`, and asks the configured model only when no rule matches. A
+confirmed correction can prospectively create or update a rule for later local
+entries.
+
+Production Supabase integration for matching and learning these rules is
+planned. Until it ships, rule-first categorization must not be presented as a
+production capability.
+
+## Production API contract
+
+Request body:
+
+```json
+{"description":"weekly groceries at reliance fresh","amount_paise":184000,"direction":"expense"}
+```
+
+Successful response envelope:
 
 ```json
 {
-  "merchant": "reliance fresh",
-  "description": "weekly groceries",
-  "direction": "expense",
-  "amount_paise": 184000,
-  "allowed_categories": ["Groceries", "Dining", "Transport", "Utilities"]
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "mode": "model",
+  "result": {
+    "category_id": "<existing-household-category-id>",
+    "category_name": "Groceries",
+    "confidence": 0.96,
+    "reason": "The description indicates a grocery purchase."
+  }
 }
 ```
 
-It does not receive account numbers, card numbers, database credentials, raw
-household history, or arbitrary SQL access.
+The API rejects caller-supplied extra fields, unknown/mismatched categories,
+malformed model output and out-of-range confidence. It does not receive account
+numbers, card numbers, database credentials or raw household history.
 
-## Model output
+The internal local/demo assistant contract may accept an explicit category
+allow-list for isolated tests. That is not the public production request schema.
 
-```json
-{
-  "category": "Groceries",
-  "confidence": 0.96,
-  "reason": "The merchant is a grocery retailer."
-}
-```
+## Learning contract
 
-The API rejects unknown categories, malformed JSON, and out-of-range confidence.
-A high-confidence result is preselected but remains an unsaved draft. A lower
-confidence result is presented as a suggestion or clarification question.
-
-## Learning behavior
-
-Learning is household-specific and prospective. A correction may create or
-update a `merchant_rules` row, so later entries become deterministic and do not
-consume model quota. Existing confirmed transactions are never silently
-retagged. Bulk historical retagging, if added later, must be an explicit preview
-and confirmation workflow.
+Where learning is enabled on the local/demo path, it is household-specific and
+prospective. Existing confirmed transactions are never silently retagged. The
+planned production integration must preserve the same rule: corrections affect
+future suggestions only, and any bulk historical retagging requires an explicit
+preview and confirmation workflow.
 
 ## Provider behavior
 
-The private-pilot candidate is `gemini-3.5-flash-lite` through Google's official
-SDK. Groq and local Qwen through Ollama remain provider alternatives. All
-providers implement the same internal interface, constrained schema and
-allow-list grounding. When a provider is missing, rate-limited, unavailable or
-returns invalid output, Artha falls back to manual category selection without
-blocking transaction entry. Gemini requests use `store=false`; provider storage
-does not replace Artha's household-scoped, consent-controlled audit design.
+The production private pilot uses `gemini-3.5-flash-lite` through Google's
+official SDK. For the standalone endpoint, server code supplies the authenticated
+household category allow-list to Gemini. When Gemini is missing, rate-limited,
+unavailable or invalid, no category is selected. Explicit Ollama selection may
+be used in local development, but it is not a production provider or recovery
+path.
+
+Gemini requests use `store=false`; provider storage does not replace Artha's
+household-scoped, consent-controlled audit design.

@@ -5,8 +5,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from artha_api.assistant import (
+    ASSISTANT_INTENT_MESSAGES,
     AssistantCompletion,
     AssistantIntent,
     AssistantSettings,
@@ -21,6 +23,7 @@ from artha_api.feature_evals import (
     build_decision,
     load_assistant_suite,
     load_tag_suite,
+    main,
     run_tag_suite,
     score_assistant_case,
     score_tag_case,
@@ -76,7 +79,6 @@ async def test_hosted_tag_benchmark_dispatches_to_selected_gemini_model() -> Non
         AssistantSettings(
             provider=LlmProvider.GEMINI,
             gemini_api_key="gemini-test-key",
-            groq_api_key=None,
         ),
         gemini_client=gemini,
     )
@@ -99,6 +101,18 @@ async def test_hosted_tag_benchmark_dispatches_to_selected_gemini_model() -> Non
     assert calls[0]["model"] == "gemini-3.5-flash-lite"
     assert report["model"] == "gemini-3.5-flash-lite"
     assert report["summary"]["case_accuracy"] == 1.0
+
+
+def test_hosted_feature_eval_requires_gemini_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+
+    with pytest.raises(
+        ValueError, match="ARTHA_GEMINI_API_KEY is required for hosted evaluation"
+    ):
+        main(["--mode", "run", "--suite", "tag"])
 
 
 def test_tag_scoring_distinguishes_correct_null_and_invented_category() -> None:
@@ -163,6 +177,7 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
         tags=("summary",),
     )
     correct = AssistantCompletion(
+        message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
         intent=AssistantIntent.SUMMARY,
         widgets=[
             MetricWidget(
@@ -173,6 +188,7 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
         ],
     )
     wrong_number = AssistantCompletion(
+        message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
         intent=AssistantIntent.SUMMARY,
         widgets=[MetricWidget(type="metric", title="Balance", value_paise=1_400_000)],
     )
@@ -181,6 +197,156 @@ def test_assistant_scoring_checks_intent_widget_and_financial_values() -> None:
     wrong = score_assistant_case(case, wrong_number)
     assert wrong.passed is False
     assert wrong.numeric_mismatch is True
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        (1, 2, 3, 3),
+        (1, 2),
+        (3, 2, 1),
+    ],
+)
+def test_assistant_scoring_requires_exact_value_order_and_multiplicity(
+    values: tuple[int, ...],
+) -> None:
+    case = AssistantEvalCase(
+        id="AST-ORDER",
+        message="Overview",
+        expected_intent="summary",
+        required_widget_types=("metric", "metric", "metric"),
+        expected_values_paise=(1, 2, 3),
+        tags=("summary",),
+    )
+    completion = AssistantCompletion(
+        message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        intent=AssistantIntent.SUMMARY,
+        widgets=[
+            MetricWidget(type="metric", title=f"Metric {index}", value_paise=value)
+            for index, value in enumerate(values)
+        ],
+    )
+
+    score = score_assistant_case(case, completion)
+
+    assert score.passed is False
+    assert score.numeric_mismatch is True
+
+
+def test_assistant_scoring_requires_exact_widget_order() -> None:
+    case = AssistantEvalCase(
+        id="AST-WIDGET-ORDER",
+        message="Spending",
+        expected_intent="spending",
+        required_widget_types=("metric", "chart"),
+        expected_values_paise=(250_000, 120_000),
+        tags=("spending",),
+    )
+    completion = AssistantCompletion.model_validate(
+        {
+            "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
+            "intent": AssistantIntent.SPENDING,
+            "widgets": [
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [{"label": "Food", "value_paise": 120_000}],
+                },
+                {"type": "metric", "title": "Spending", "value_paise": 250_000},
+            ],
+        }
+    )
+
+    assert score_assistant_case(case, completion).passed is False
+
+
+@pytest.mark.parametrize(
+    "widget",
+    [
+        {
+            "type": "chart",
+            "title": "Categories",
+            "chart_type": "bar",
+            "points": [{"label": "Invented", "value_paise": 120_000}],
+        },
+        {"type": "metric", "title": "Invented", "value_paise": 999_999},
+    ],
+)
+@pytest.mark.asyncio
+async def test_hosted_assistant_eval_rejects_ungrounded_widgets_before_scoring(
+    widget: dict[str, object],
+) -> None:
+    suite = load_assistant_suite(
+        ROOT / "evals" / "assistant-context-v1.json",
+        ROOT / "evals" / "assistant-questions-v1.jsonl",
+    )
+    completion = {
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        "intent": "summary",
+        "widgets": [widget],
+    }
+
+    class Interactions:
+        async def create(self, **_body: object) -> SimpleNamespace:
+            return SimpleNamespace(output_text=json.dumps(completion))
+
+    assistant = LocalFinancialAssistant(
+        AssistantSettings(provider=LlmProvider.GEMINI, gemini_api_key="test-key"),
+        gemini_client=SimpleNamespace(
+            aio=SimpleNamespace(interactions=Interactions(), models=SimpleNamespace())
+        ),
+    )
+
+    with pytest.raises(ValueError, match="grounded"):
+        await assistant.complete_with_selected_model("Show balance", suite.context)
+
+
+@pytest.mark.parametrize(
+    "message",
+    ["Your available balance is 15000.", "Your balance is ९९ crore.", "INR one hundred."],
+)
+def test_assistant_eval_rejects_unsafe_prose_before_scoring(message: str) -> None:
+    # Schema validation rejects unsafe model prose before the scoring layer receives it.
+    with pytest.raises(ValidationError):
+        AssistantCompletion(
+            message=message,
+            intent=AssistantIntent.SUMMARY,
+            widgets=[
+                MetricWidget(
+                    type="metric",
+                    title="Balance",
+                    value_paise=1_500_000,
+                )
+            ],
+        )
+
+
+@pytest.mark.parametrize(
+    ("intent", "message"),
+    [
+        (AssistantIntent.SUMMARY, "Here is your spending overview."),
+        (AssistantIntent.SUMMARY, "  Here is your current account overview.  "),
+        (AssistantIntent.SUMMARY, "Your balance is a grand."),
+        (AssistantIntent.INCOME, "This benign arbitrary sentence is not approved."),
+    ],
+)
+def test_assistant_eval_rejects_unapproved_intent_narrative_before_scoring(
+    intent: AssistantIntent,
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        AssistantCompletion(
+            message=message,
+            intent=intent,
+            widgets=[
+                MetricWidget(
+                    type="metric",
+                    title="Balance",
+                    value_paise=1_500_000,
+                )
+            ],
+        )
 
 
 def test_decision_rejects_any_safety_failure_and_requires_full_coverage() -> None:

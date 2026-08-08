@@ -24,10 +24,10 @@ key, and never calls a model.
 After configuring the server-only provider environment, run the full benchmark:
 
 ```bash
-ARTHA_LLM_PROVIDER=groq make eval-capture-hosted
+ARTHA_LLM_PROVIDER=gemini make eval-capture-hosted
 ```
 
-`ARTHA_GROQ_API_KEY` must be supplied through the shell or deployment secret
+`ARTHA_GEMINI_API_KEY` must be supplied through the shell or deployment secret
 store and must never be pasted into documentation, committed, or passed as a
 command-line argument. The runner calls the same `LocalFinancialAssistant`
 capture adapter used by the API, runs sequentially with one-second pacing, and
@@ -70,10 +70,10 @@ make eval-capture-validate
 make eval-feature-validate
 ```
 
-After configuring the server-only key, run the GPT-OSS 20B feature suites with:
+After configuring the server-only key, run the Gemini feature suites with:
 
 ```bash
-ARTHA_LLM_PROVIDER=groq ARTHA_GROQ_MODEL=openai/gpt-oss-20b make eval-feature-hosted
+ARTHA_LLM_PROVIDER=gemini ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite make eval-feature-hosted
 ```
 
 The Vitest suite imports the capture dataset and gates the common and

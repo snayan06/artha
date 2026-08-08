@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, ChevronRight, Info, RotateCcw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
-import { getAccounts, parseDraft } from '../lib/api'
+import { CaptureDraftUnavailableError, getAccounts, parseDraft } from '../lib/api'
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import { localDateOffset } from '../lib/date'
 import { useRouter } from '../lib/router'
@@ -18,13 +18,17 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   const [error, setError] = useState('')
   const [usedFallback, setUsedFallback] = useState(false)
   const [accounts, setAccounts] = useState<LedgerAccount[]>([])
+  const accountsRef = useRef<LedgerAccount[]>([])
   const confirmationAttempt = useRef<{ fingerprint: string; key: string } | null>(null)
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null)
+  const manualRecoveryFocusPending = useRef(false)
   const starterPrompts = [members[0] ? `Paid 850 for dinner yesterday, split with ${members[0].name}` : 'Paid 850 for dinner yesterday', 'Received 45,000 salary today in ICICI Bank', 'Spent 320 on Uber from HDFC Card']
 
   useEffect(() => {
     void getAccounts().then((loadedAccounts) => {
+      accountsRef.current = loadedAccounts
       setAccounts(loadedAccounts)
-      setDraft((current) => current && current.sourceText === '' && current.sourceAccountId === undefined && loadedAccounts[0]
+      setDraft((current) => current && current.sourceAccountId === undefined && loadedAccounts[0]
         ? { ...current, account: loadedAccounts[0].name, sourceAccountId: loadedAccounts[0].id }
         : current)
     })
@@ -43,23 +47,35 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
   }, [capture, draft, success])
 
+  useEffect(() => {
+    if (!draft || !manualRecoveryFocusPending.current) return
+    reviewHeadingRef.current?.focus()
+    manualRecoveryFocusPending.current = false
+  }, [draft])
+
   async function makeDraft(text = capture) {
     if (!text.trim()) return
     setParsing(true)
     setError('')
     try {
-      const response = await parseDraft(text.trim(), members)
+      const response = await parseDraft(text, members)
       setDraft(response.data)
       setUsedFallback(response.demo)
     } catch (caught) {
-      setError(userFacingFailure(caught, 'We could not read that. Try including an amount and what it was for.'))
+      if (caught instanceof CaptureDraftUnavailableError) {
+        manualRecoveryFocusPending.current = true
+        startManualEntry(caught.sourceText)
+        setError(`${caught.message} Your text is still here; enter the remaining details below. Nothing was saved.`)
+      } else {
+        setError(userFacingFailure(caught, 'We could not read that. Try including an amount and what it was for.'))
+      }
     } finally {
       setParsing(false)
     }
   }
 
   async function confirm() {
-    if (!draft || draft.amountPaise <= 0) return
+    if (!draft || draft.amountPaise <= 0 || !draft.sourceAccountId) return
     setSaving(true)
     setError('')
     try {
@@ -84,9 +100,9 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     setError('')
   }
 
-  function startManualEntry() {
-    const firstAccount = accounts[0]
-    setDraft({ kind: 'debit', amountPaise: 0, merchant: '', category: 'Other', account: firstAccount?.name ?? 'Primary account', sourceAccountId: firstAccount?.id, occurredAt: localDateOffset(0), note: '', memberSplits: [], confidence: 'review', sourceText: '' })
+  function startManualEntry(sourceText = '') {
+    const firstAccount = accountsRef.current[0]
+    setDraft({ kind: 'debit', amountPaise: 0, merchant: '', category: 'Other', account: firstAccount?.name ?? 'Primary account', sourceAccountId: firstAccount?.id, occurredAt: localDateOffset(0), note: '', memberSplits: [], confidence: 'review', sourceText })
     setUsedFallback(false)
     setError('')
   }
@@ -127,7 +143,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
       <Card className="p-4 sm:p-5">
         <label htmlFor="capture" className="text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</label>
         <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => setCapture(event.target.value)} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
-        <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={startManualEntry}>Enter details manually</Button></div>
+        <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={() => startManualEntry()}>Enter details manually</Button></div>
         {!draft && (
           <div className="mt-5 border-t border-line pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#8a958f] tone-subtle">Try an example</p>
@@ -145,7 +161,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
           <div className="mb-3 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#88938d] tone-subtle">Unsaved draft</p>
-              <h2 id="review-heading" className="font-display mt-1 text-xl font-bold">Review the details</h2>
+              <h2 ref={reviewHeadingRef} id="review-heading" tabIndex={-1} className="font-display mt-1 text-xl font-bold">Review the details</h2>
             </div>
             <Badge tone={draft.confidence === 'high' ? 'green' : 'amber'}>{draft.confidence === 'high' ? 'Looks good' : 'Needs review'}</Badge>
           </div>
@@ -182,7 +198,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
             <div className="border-t border-line bg-[#fbfcfa] p-5 dark:bg-night-raised">
               <div className="mb-4 flex items-start gap-2 text-xs text-[#6f7b75] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" aria-hidden="true" /><p><strong className="text-ink">Nothing has been saved yet.</strong> Confirm only after these details look right.{usedFallback && ' Parsed safely on this device while the API is unavailable.'}</p></div>
-              <Button onClick={() => void confirm()} loading={saving} disabled={draft.amountPaise <= 0 || !draft.merchant.trim() || (draft.kind === 'transfer' && (!draft.destinationAccountId || draft.destinationAccountId === draft.sourceAccountId))} className="w-full" icon={<Check className="h-4 w-4" aria-hidden="true" />}>Confirm and add transaction</Button>
+              <Button onClick={() => void confirm()} loading={saving} disabled={draft.amountPaise <= 0 || !draft.merchant.trim() || !draft.sourceAccountId || (draft.kind === 'transfer' && (!draft.destinationAccountId || draft.destinationAccountId === draft.sourceAccountId))} className="w-full" icon={<Check className="h-4 w-4" aria-hidden="true" />}>Confirm and add transaction</Button>
             </div>
           </Card>
           {draft.confidence === 'review' && <div className="mt-3 flex items-start gap-2 text-xs text-amber-800"><Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><div><p>One or more fields need review. Please check them carefully.</p>{draft.warnings && draft.warnings.length > 0 && <ul className="mt-1 list-disc pl-4">{draft.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}</div></div>}

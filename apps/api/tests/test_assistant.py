@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from artha_api.assistant import (
+    ASSISTANT_INTENT_MESSAGES,
+    AssistantCompletion,
     AssistantFinancialContext,
+    AssistantIntent,
     AssistantSettings,
+    AssistantUnavailableError,
     CaptureAccount,
     CaptureCategory,
     CaptureContext,
@@ -21,8 +25,11 @@ from artha_api.assistant import (
     ContextTransaction,
     LlmProvider,
     LocalFinancialAssistant,
+    MetricWidget,
     TagCategory,
     TagSuggestionRequest,
+    _allowed_widgets_for_intent,
+    _ground_completion,
 )
 
 
@@ -53,18 +60,23 @@ class FakeGeminiClient:
         )
 
 
-def test_groq_defaults_to_gpt_oss_20b(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_groq_provider_is_rejected_as_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ARTHA_LLM_PROVIDER", "groq")
-    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "test-key")
-    monkeypatch.delenv("ARTHA_GROQ_MODEL", raising=False)
 
-    direct = AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key")
-    from_env = AssistantSettings.from_env()
+    with pytest.raises(ValueError, match="unsupported LLM provider: groq"):
+        AssistantSettings.from_env()
 
-    assert direct.groq_model == "openai/gpt-oss-20b"
-    assert from_env.groq_model == "openai/gpt-oss-20b"
-    assert "test-key" not in repr(direct)
-    assert "test-key" not in str(asdict(direct) | {"groq_api_key": "redacted"})
+
+def test_legacy_groq_key_does_not_auto_select_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARTHA_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "legacy-key")
+
+    assert AssistantSettings.from_env().provider is LlmProvider.DISABLED
 
 
 def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
@@ -72,7 +84,6 @@ def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
 ) -> None:
     monkeypatch.delenv("ARTHA_LLM_PROVIDER", raising=False)
     monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "gemini-test-key")
-    monkeypatch.setenv("ARTHA_GROQ_API_KEY", "groq-test-key")
     monkeypatch.delenv("ARTHA_GEMINI_MODEL", raising=False)
 
     direct = AssistantSettings(
@@ -86,6 +97,52 @@ def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
     assert "gemini-test-key" not in repr(direct)
 
 
+def test_explicit_ollama_selection_remains_supported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "development")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "ollama")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+
+    assert AssistantSettings.from_env().provider is LlmProvider.OLLAMA
+
+
+@pytest.mark.parametrize("provider", ["disabled", "ollama"])
+def test_production_requires_gemini_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    provider: str,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", provider)
+
+    with pytest.raises(ValueError, match="production requires the Gemini provider"):
+        AssistantSettings.from_env()
+
+
+def test_production_forbids_ollama_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "gemini-test-key")
+    monkeypatch.setenv("ARTHA_OLLAMA_FALLBACK", "true")
+
+    with pytest.raises(ValueError, match="production forbids Ollama fallback"):
+        AssistantSettings.from_env()
+
+
+def test_production_requires_gemini_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("ARTHA_OLLAMA_FALLBACK", "false")
+
+    with pytest.raises(ValueError, match="production requires a Gemini API key"):
+        AssistantSettings.from_env()
+
+
 @pytest.fixture
 def financial_context() -> AssistantFinancialContext:
     return AssistantFinancialContext(
@@ -93,7 +150,8 @@ def financial_context() -> AssistantFinancialContext:
         current_month_spend_paise=250_000,
         current_month_income_paise=800_000,
         member_balances=[
-            ContextMemberBalance(member_name="Avery", balance_paise=40_000)
+            ContextMemberBalance(member_name="Avery", balance_paise=40_000),
+            ContextMemberBalance(member_name="Blair", balance_paise=-15_000),
         ],
         top_categories=[ContextCategory(category="Food", amount_paise=120_000)],
         monthly=[ContextMonth(month="Aug", income_paise=800_000, spend_paise=250_000)],
@@ -108,15 +166,280 @@ def financial_context() -> AssistantFinancialContext:
     )
 
 
+def canonical_widgets(
+    intent: AssistantIntent,
+    context: AssistantFinancialContext,
+) -> list[dict[str, object]]:
+    bundles: dict[AssistantIntent, list[dict[str, object]]] = {
+        AssistantIntent.SUMMARY: [
+            {
+                "type": "metric",
+                "title": "Total account balance",
+                "value_paise": context.total_balance_paise,
+                "caption": None,
+                "tone": "neutral",
+            },
+            {
+                "type": "metric",
+                "title": "Spending this month",
+                "value_paise": context.current_month_spend_paise,
+                "caption": None,
+                "tone": "warning",
+            },
+            {
+                "type": "metric",
+                "title": "Income this month",
+                "value_paise": context.current_month_income_paise,
+                "caption": None,
+                "tone": "positive",
+            },
+        ],
+        AssistantIntent.SPENDING: [
+            {
+                "type": "metric",
+                "title": "Spending this month",
+                "value_paise": context.current_month_spend_paise,
+                "caption": None,
+                "tone": "warning",
+            },
+            {
+                "type": "chart",
+                "title": "Top spending categories",
+                "chart_type": "bar",
+                "points": [
+                    {"label": item.category, "value_paise": item.amount_paise}
+                    for item in context.top_categories
+                ],
+            },
+        ],
+        AssistantIntent.INCOME: [
+            {
+                "type": "metric",
+                "title": "Income this month",
+                "value_paise": context.current_month_income_paise,
+                "caption": None,
+                "tone": "positive",
+            }
+        ],
+        AssistantIntent.CASHFLOW: [
+            {
+                "type": "chart",
+                "title": "Monthly income",
+                "chart_type": "line",
+                "points": [
+                    {"label": item.month, "value_paise": item.income_paise}
+                    for item in context.monthly
+                ],
+            },
+            {
+                "type": "chart",
+                "title": "Monthly spending",
+                "chart_type": "line",
+                "points": [
+                    {"label": item.month, "value_paise": item.spend_paise}
+                    for item in context.monthly
+                ],
+            },
+        ],
+        AssistantIntent.SHARED: [
+            {
+                "type": "table",
+                "title": "Household balances",
+                "rows": [
+                    {
+                        "label": item.member_name,
+                        "amount_paise": item.balance_paise,
+                        "date": None,
+                        "kind": None,
+                    }
+                    for item in context.member_balances
+                ],
+            }
+        ],
+        AssistantIntent.TRANSACTIONS: [
+            {
+                "type": "table",
+                "title": "Recent activity",
+                "rows": [
+                    {
+                        "label": item.category,
+                        "amount_paise": item.personal_share_paise,
+                        "date": item.occurred_on,
+                        "kind": item.kind,
+                    }
+                    for item in context.recent_transactions
+                ],
+            }
+        ],
+        AssistantIntent.CLARIFICATION: [
+            {
+                "type": "clarification",
+                "question": "What would you like to review?",
+                "choices": [
+                    "Account balance",
+                    "Monthly spending",
+                    "Income",
+                    "Shared balances",
+                ],
+            }
+        ],
+        AssistantIntent.UNSUPPORTED: [
+            {
+                "type": "clarification",
+                "question": "Would you like to review your ledger instead?",
+                "choices": ["Account balance", "Monthly spending", "Recent activity"],
+            }
+        ],
+    }
+    return bundles[intent]
+
+
+def completion_with_widgets(
+    intent: AssistantIntent,
+    widgets: list[dict[str, object]],
+) -> AssistantCompletion:
+    return AssistantCompletion.model_validate(
+        {
+            "message": ASSISTANT_INTENT_MESSAGES[intent],
+            "intent": intent,
+            "widgets": widgets,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        pytest.param(None, id="missing"),
+        pytest.param("   \n\t", id="blank"),
+        pytest.param("x" * 401, id="too-long"),
+    ],
+)
+def test_assistant_completion_requires_a_nonblank_bounded_model_message(
+    message: str | None,
+) -> None:
+    payload: dict[str, object] = {
+        "intent": AssistantIntent.SUMMARY,
+        "widgets": [
+            MetricWidget(
+                type="metric",
+                title="Available balance",
+                value_paise=1_500_000,
+            )
+        ],
+    }
+    if message is not None:
+        payload["message"] = message
+
+    with pytest.raises(ValidationError):
+        AssistantCompletion.model_validate(payload)
+
+
+def test_assistant_completion_keeps_the_400_character_schema_bound() -> None:
+    assert AssistantCompletion.model_json_schema()["properties"]["message"]["maxLength"] == 400
+
+
+def test_assistant_completion_schema_advertises_only_approved_messages() -> None:
+    message_schema = AssistantCompletion.model_json_schema()["properties"]["message"]
+
+    assert set(message_schema["enum"]) == {
+        "Here is your current account overview.",
+        "Here is your spending overview.",
+        "Here is your income overview.",
+        "Here is your cash-flow overview.",
+        "Here are your shared balances.",
+        "Here is your recent ledger activity.",
+        "I need a little more detail to answer that.",
+        "I can only help with read-only ledger questions.",
+    }
+
+
+def test_assistant_completion_schema_rejects_the_ungrounded_insight_channel() -> None:
+    with pytest.raises(ValidationError):
+        AssistantCompletion.model_validate(
+            {
+                "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+                "intent": "summary",
+                "widgets": [
+                    {
+                        "type": "insight",
+                        "title": "Model narrative",
+                        "body": "An arbitrary second narrative channel.",
+                    }
+                ],
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Your balance is 99 crore.",
+        "Your balance is ninety nine crore.",
+        "Your balance is ninety-nine crore.",
+        "Your balance is ९९ crore.",
+        "Your balance is a dollar.",
+        "Your balance is a euro.",
+        "Your balance is a grand.",
+        "The weather outside is pleasant.",
+        "Your balance is one lakh rupees.",
+        "Your savings rate is fifty percent.",
+        "INR one hundred is shown below.",
+        "Your balance is ₹crore.",
+        "Your balance is $high.",
+        "Your balance is €high.",
+        "Your balance is £high.",
+        "Your savings rate is %high.",
+    ],
+)
+def test_assistant_completion_rejects_unapproved_narrative(
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        AssistantCompletion(
+            message=message,
+            intent=AssistantIntent.SUMMARY,
+            widgets=[
+                MetricWidget(
+                    type="metric",
+                    title="Available balance",
+                    value_paise=1_500_000,
+                )
+            ],
+        )
+
+
+@pytest.mark.parametrize(("intent", "message"), ASSISTANT_INTENT_MESSAGES.items())
+def test_assistant_completion_accepts_only_the_message_for_its_intent(
+    intent: AssistantIntent,
+    message: str,
+) -> None:
+    completion = AssistantCompletion(
+        message=message,
+        intent=intent,
+        widgets=[
+            MetricWidget(
+                type="metric",
+                title="Available balance",
+                value_paise=1_500_000,
+            )
+        ],
+    )
+
+    assert completion.message == message
+
+
+def test_every_assistant_intent_has_one_approved_message() -> None:
+    assert set(ASSISTANT_INTENT_MESSAGES) == set(AssistantIntent)
+
+
 @pytest.mark.asyncio
-async def test_disabled_assistant_uses_deterministic_fallback(
+async def test_disabled_assistant_is_unavailable(
     financial_context: AssistantFinancialContext,
 ) -> None:
     assistant = LocalFinancialAssistant(AssistantSettings(provider=LlmProvider.DISABLED))
 
     status = await assistant.status()
-    response = await assistant.chat("How much did I spend?", financial_context)
-
     assert status.model_dump() == {
         "configured": False,
         "provider": "disabled",
@@ -126,67 +449,10 @@ async def test_disabled_assistant_uses_deterministic_fallback(
         "ollama_fallback_enabled": False,
         "detail": "disabled",
     }
-    assert response.mode == "deterministic_fallback"
-    assert response.result.intent == "spending"
-    assert response.result.widgets[0].type == "metric"
-
-
-@pytest.mark.asyncio
-async def test_groq_uses_strict_structured_output_without_tools_or_raw_rows(
-    financial_context: AssistantFinancialContext,
-) -> None:
-    seen_request: dict[str, object] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen_request["authorization"] = request.headers.get("Authorization")
-        body = json.loads(request.content)
-        seen_request["body"] = body
-        completion = {
-            "intent": "spending",
-            "widgets": [
-                {
-                    "type": "metric",
-                    "title": "Spending this month",
-                    "value_paise": 250000,
-                    "caption": None,
-                    "tone": "neutral",
-                }
-            ],
-        }
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(completion)}}]},
-        )
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
-        transport=httpx.MockTransport(handler),
-    )
-    response = await assistant.chat("Show spending", financial_context)
-
-    assert response.mode == "model"
-    assert response.provider == "groq"
-    assert seen_request["authorization"] == "Bearer test-key"
-    body = seen_request["body"]
-    assert isinstance(body, dict)
-    assert "tools" not in body
-    assert body["temperature"] == 0
-    response_format = body["response_format"]
-    assert response_format["type"] == "json_schema"
-    assert response_format["json_schema"]["name"] == "artha_assistant_completion"
-    assert response_format["json_schema"]["strict"] is True
-    schema = response_format["json_schema"]["schema"]
-    assert schema["additionalProperties"] is False
-    assert set(schema["required"]) == set(schema["properties"])
-    assert body["reasoning_effort"] == "low"
-    system_prompt = body["messages"][0]["content"]
-    assert "intent=unsupported" in system_prompt
-    assert "cashflow" in system_prompt
-    assert "recent activity" in system_prompt.casefold()
-    prompt = body["messages"][1]["content"]
-    assert "account_id" not in prompt
-    assert "description" not in prompt
-    assert "notes" not in prompt
+    with pytest.raises(
+        AssistantUnavailableError, match="AI assistant is unavailable"
+    ):
+        await assistant.chat("How much did I spend?", financial_context)
 
 
 @pytest.mark.asyncio
@@ -194,16 +460,9 @@ async def test_gemini_uses_private_stateless_structured_output(
     financial_context: AssistantFinancialContext,
 ) -> None:
     completion = {
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
         "intent": "spending",
-        "widgets": [
-            {
-                "type": "metric",
-                "title": "Spending this month",
-                "value_paise": 250000,
-                "caption": None,
-                "tone": "neutral",
-            }
-        ],
+        "widgets": canonical_widgets(AssistantIntent.SPENDING, financial_context),
     }
     gemini = FakeGeminiClient(json.dumps(completion))
 
@@ -217,6 +476,7 @@ async def test_gemini_uses_private_stateless_structured_output(
 
     assert response.mode == "model"
     assert response.provider == "gemini"
+    assert response.result.message == ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING]
     body = gemini.aio.interactions.calls[0]
     assert body["model"] == "gemini-3.5-flash-lite"
     assert body["store"] is False
@@ -227,68 +487,421 @@ async def test_gemini_uses_private_stateless_structured_output(
     normalized_prompt = " ".join(body["system_instruction"].casefold().split())
     assert "top spending categories must use a chart" in normalized_prompt
     assert "cashflow comparison must use a chart" in normalized_prompt
+    assert "return exactly its approved message" in normalized_prompt
+    assert "financial numbers only in allow-listed widgets" in normalized_prompt
+    for intent, message in ASSISTANT_INTENT_MESSAGES.items():
+        assert f'intent={intent.value}: message="{message.casefold()}"' in normalized_prompt
     assert "tools" not in body
+    assert "Allowed widget bundles by intent" in body["input"]
+    assert '"spending":[{"type":"metric","title":"Spending this month"' in body["input"]
 
 
+@pytest.mark.parametrize(
+    "widget",
+    [
+        {"type": "metric", "title": "Invented", "value_paise": 999_999},
+        {
+            "type": "chart",
+            "title": "Categories",
+            "chart_type": "bar",
+            "points": [{"label": "Invented", "value_paise": 120_000}],
+        },
+        {
+            "type": "chart",
+            "title": "Categories",
+            "chart_type": "bar",
+            "points": [{"label": "Food", "value_paise": 999_999}],
+        },
+        {
+            "type": "table",
+            "title": "Activity",
+            "rows": [
+                {
+                    "label": "Invented",
+                    "amount_paise": 42_000,
+                    "date": "2026-08-04",
+                    "kind": "expense",
+                }
+            ],
+        },
+        {
+            "type": "table",
+            "title": "Activity",
+            "rows": [
+                {
+                    "label": "Food",
+                    "amount_paise": 999_999,
+                    "date": "2026-08-04",
+                    "kind": "expense",
+                }
+            ],
+        },
+    ],
+)
 @pytest.mark.asyncio
-async def test_groq_capture_interpretation_resolves_25k_transfer_to_allowed_accounts() -> None:
-    context = CaptureContext(
-        today="2026-08-04",
-        timezone="Asia/Kolkata",
-        accounts=[
-            CaptureAccount(id="icici-id", name="ICICI Bank", kind="bank"),
-            CaptureAccount(id="hdfc-id", name="HDFC Bank", kind="bank"),
-        ],
-        categories=[CaptureCategory(id="other-id", name="Other", kind="both")],
-    )
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        assert "25k means 25,000 rupees" in body["messages"][0]["content"]
-        assert "include every field required" in body["messages"][0]["content"]
-        assert "selected outcome schema" in body["messages"][0]["content"]
-        response_format = body["response_format"]
-        assert response_format["type"] == "json_schema"
-        assert response_format["json_schema"]["name"] == "artha_capture_interpretation"
-        assert response_format["json_schema"]["strict"] is True
-        assert body["reasoning_effort"] == "low"
-        interpretation = {
-            "outcome": "draft",
-            "kind": "transfer",
-            "amount_paise": 2_500_000,
-            "description": "Self transfer",
-            "category_id": None,
-            "category_name": None,
-            "source_account_id": "icici-id",
-            "destination_account_id": "hdfc-id",
-            "member_ids": [],
-            "split_equally": False,
-            "occurred_on": "2026-08-04",
-            "confidence": 0.99,
-            "warnings": [],
-        }
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {"message": {"content": json.dumps({"result": interpretation})}}
-                ]
-            },
-        )
-
+async def test_chat_rejects_ungrounded_model_widgets(
+    widget: dict[str, object],
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = {
+        "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SUMMARY],
+        "intent": "summary",
+        "widgets": [widget],
+    }
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
-        transport=httpx.MockTransport(handler),
-    )
-    response = await assistant.interpret_capture(
-        "self transfer 25k ICICI -> HDFC", context
+        AssistantSettings(
+            provider=LlmProvider.GEMINI,
+            gemini_api_key="gemini-test-key",
+        ),
+        gemini_client=FakeGeminiClient(json.dumps(completion)),
     )
 
-    assert response is not None
-    assert response.mode == "model"
-    assert response.result.amount_paise == 2_500_000
-    assert response.result.source_account_id == "icici-id"
-    assert response.result.destination_account_id == "hdfc-id"
+    with pytest.raises(AssistantUnavailableError, match="AI assistant is unavailable"):
+        await assistant.chat("Show my ledger", financial_context)
+
+
+@pytest.mark.parametrize("intent", list(AssistantIntent))
+def test_grounding_accepts_the_exact_canonical_bundle_for_every_intent(
+    intent: AssistantIntent,
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = completion_with_widgets(
+        intent,
+        canonical_widgets(intent, financial_context),
+    )
+    allowed = _allowed_widgets_for_intent(intent, financial_context)
+
+    assert [item.model_dump(mode="json") for item in allowed] == canonical_widgets(
+        intent, financial_context
+    )
+    assert _ground_completion(completion, financial_context) is completion
+
+
+@pytest.mark.parametrize(
+    ("intent", "widgets"),
+    [
+        (
+            AssistantIntent.SUMMARY,
+            [
+                {
+                    "type": "metric",
+                    "title": "Total account balance",
+                    "value_paise": 250_000,
+                    "tone": "neutral",
+                },
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 1_500_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "tone": "positive",
+                },
+            ],
+        ),
+        (
+            AssistantIntent.INCOME,
+            [
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "caption": "Invented caption",
+                    "tone": "positive",
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Renamed categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                        {"label": "Bills", "value_paise": 50_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SHARED,
+            [
+                {
+                    "type": "table",
+                    "title": "Renamed balances",
+                    "rows": [
+                        {"label": "Avery", "amount_paise": 40_000},
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                        {"label": "Bills", "value_paise": 50_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.TRANSACTIONS,
+            [
+                {
+                    "type": "table",
+                    "title": "Recent activity",
+                    "rows": [
+                        {
+                            "label": "Food",
+                            "amount_paise": 42_000,
+                            "date": "2026-08-04",
+                            "kind": "expense",
+                        },
+                        {
+                            "label": "Food",
+                            "amount_paise": 42_000,
+                            "date": "2026-08-04",
+                            "kind": "expense",
+                        },
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SHARED,
+            [
+                {
+                    "type": "table",
+                    "title": "Household balances",
+                    "rows": [{"label": "Avery", "amount_paise": 40_000}],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Bills", "value_paise": 50_000},
+                        {"label": "Transport", "value_paise": 80_000},
+                        {"label": "Food", "value_paise": 120_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SHARED,
+            [
+                {
+                    "type": "table",
+                    "title": "Household balances",
+                    "rows": [
+                        {"label": "Blair", "amount_paise": -15_000},
+                        {"label": "Avery", "amount_paise": 40_000},
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.SPENDING,
+            [
+                {
+                    "type": "metric",
+                    "title": "Spending this month",
+                    "value_paise": 250_000,
+                    "tone": "warning",
+                },
+                {
+                    "type": "chart",
+                    "title": "Top spending categories",
+                    "chart_type": "bar",
+                    "points": [
+                        {"label": "Food", "value_paise": 120_000},
+                        {"label": "Aug", "value_paise": 800_000},
+                    ],
+                },
+            ],
+        ),
+        (
+            AssistantIntent.SUMMARY,
+            [
+                {
+                    "type": "metric",
+                    "title": "Total account balance",
+                    "value_paise": 1_500_000,
+                    "tone": "neutral",
+                }
+            ],
+        ),
+        (
+            AssistantIntent.INCOME,
+            [
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "tone": "positive",
+                },
+                {
+                    "type": "metric",
+                    "title": "Income this month",
+                    "value_paise": 800_000,
+                    "tone": "positive",
+                },
+            ],
+        ),
+        (
+            AssistantIntent.CASHFLOW,
+            [
+                {
+                    "type": "chart",
+                    "title": "Monthly cash flow",
+                    "chart_type": "line",
+                    "points": [
+                        {"label": "Jul", "value_paise": 750_000},
+                        {"label": "Jul", "value_paise": 300_000},
+                        {"label": "Aug", "value_paise": 800_000},
+                        {"label": "Aug", "value_paise": 250_000},
+                    ],
+                }
+            ],
+        ),
+        (
+            AssistantIntent.CLARIFICATION,
+            [
+                {
+                    "type": "clarification",
+                    "question": "Tell me anything.",
+                    "choices": ["Everything"],
+                }
+            ],
+        ),
+    ],
+)
+def test_grounding_rejects_semantic_widget_mutations(
+    intent: AssistantIntent,
+    widgets: list[dict[str, object]],
+    financial_context: AssistantFinancialContext,
+) -> None:
+    completion = completion_with_widgets(intent, widgets)
+
+    with pytest.raises(ValueError, match="canonical bundle"):
+        _ground_completion(completion, financial_context)
+
+
+@pytest.mark.parametrize(
+    ("intent", "question"),
+    [
+        (
+            AssistantIntent.SHARED,
+            "No household balances are available. What would you like to review?",
+        ),
+        (
+            AssistantIntent.TRANSACTIONS,
+            "No recent activity is available. What would you like to review?",
+        ),
+    ],
+)
+def test_empty_context_uses_exact_safe_clarification_bundle(
+    intent: AssistantIntent,
+    question: str,
+    financial_context: AssistantFinancialContext,
+) -> None:
+    empty_context = financial_context.model_copy(
+        update={
+            "member_balances": []
+            if intent is AssistantIntent.SHARED
+            else financial_context.member_balances,
+            "recent_transactions": []
+            if intent is AssistantIntent.TRANSACTIONS
+            else financial_context.recent_transactions,
+        }
+    )
+    completion = completion_with_widgets(
+        intent,
+        [
+            {
+                "type": "clarification",
+                "question": question,
+                "choices": ["Account balance", "Monthly spending"],
+            }
+        ],
+    )
+
+    assert _ground_completion(completion, empty_context) is completion
+
+
+def test_shared_bundle_includes_all_twenty_bounded_context_members(
+    financial_context: AssistantFinancialContext,
+) -> None:
+    context = financial_context.model_copy(
+        update={
+            "member_balances": [
+                ContextMemberBalance(member_name=f"Member {index}", balance_paise=index)
+                for index in range(20)
+            ]
+        }
+    )
+
+    widgets = _allowed_widgets_for_intent(AssistantIntent.SHARED, context)
+
+    assert len(widgets) == 1
+    assert len(widgets[0].model_dump(mode="json")["rows"]) == 20
 
 
 @pytest.mark.asyncio
@@ -362,7 +975,7 @@ async def test_capture_diagnostics_classify_rate_limit_without_provider_text() -
         )
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
 
@@ -400,12 +1013,11 @@ async def test_capture_interpretation_rejects_invented_account_id() -> None:
             "warnings": [],
         }
         return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(interpretation)}}]},
+            200, json={"message": {"content": json.dumps(interpretation)}}
         )
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
 
@@ -427,13 +1039,10 @@ async def test_capture_interpretation_can_request_clarification_without_a_draft(
             "missing": ["source_account_id"],
             "warnings": [],
         }
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(result)}}]},
-        )
+        return httpx.Response(200, json={"message": {"content": json.dumps(result)}})
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
+        AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
     response = await assistant.interpret_capture("25k", context)
@@ -444,26 +1053,17 @@ async def test_capture_interpretation_can_request_clarification_without_a_draft(
 
 
 @pytest.mark.asyncio
-async def test_groq_failure_can_use_opt_in_ollama_fallback(
+async def test_gemini_failure_can_use_opt_in_ollama_fallback(
     financial_context: AssistantFinancialContext,
 ) -> None:
     requested_hosts: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requested_hosts.append(request.url.host or "")
-        if request.url.host == "api.groq.com":
-            return httpx.Response(503, json={"error": "unavailable"})
         completion = {
+            "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SHARED],
             "intent": "shared",
-            "widgets": [
-                {
-                    "type": "metric",
-                    "title": "Shared balance",
-                    "value_paise": 40000,
-                    "caption": None,
-                    "tone": "neutral",
-                }
-            ],
+            "widgets": canonical_widgets(AssistantIntent.SHARED, financial_context),
         }
         return httpx.Response(
             200,
@@ -472,22 +1072,24 @@ async def test_groq_failure_can_use_opt_in_ollama_fallback(
 
     assistant = LocalFinancialAssistant(
         AssistantSettings(
-            provider=LlmProvider.GROQ,
-            groq_api_key="test-key",
+            provider=LlmProvider.GEMINI,
+            gemini_api_key="test-key",
             ollama_fallback_enabled=True,
         ),
         transport=httpx.MockTransport(handler),
+        gemini_client=FakeGeminiClient("invalid model response"),
     )
     response = await assistant.chat("What is the shared balance?", financial_context)
 
-    assert requested_hosts == ["api.groq.com", "127.0.0.1"]
+    assert requested_hosts == ["127.0.0.1"]
     assert response.mode == "model"
     assert response.provider == "ollama"
     assert response.model == "qwen3:4b-instruct"
+    assert response.result.message == ASSISTANT_INTENT_MESSAGES[AssistantIntent.SHARED]
 
 
 @pytest.mark.asyncio
-async def test_invalid_model_payload_falls_back_deterministically(
+async def test_invalid_model_payload_makes_assistant_unavailable(
     financial_context: AssistantFinancialContext,
 ) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
@@ -498,6 +1100,7 @@ async def test_invalid_model_payload_falls_back_deterministically(
                 "message": {
                     "content": json.dumps(
                         {
+                            "message": ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
                             "intent": "spending",
                             "widgets": [
                                 {
@@ -519,81 +1122,10 @@ async def test_invalid_model_payload_falls_back_deterministically(
         AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
-    response = await assistant.chat("Show spending", financial_context)
-
-    assert response.mode == "deterministic_fallback"
-    assert response.result.intent == "spending"
-
-
-@pytest.mark.asyncio
-async def test_status_never_serializes_groq_key() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/openai/v1/models"
-        return httpx.Response(200, json={"data": []})
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="never-return-me"),
-        transport=httpx.MockTransport(handler),
-    )
-    status = await assistant.status()
-
-    serialized = status.model_dump_json()
-    assert status.available is True
-    assert status.active_provider == "groq"
-    assert "never-return-me" not in serialized
-
-
-@pytest.mark.asyncio
-async def test_tag_suggestion_is_grounded_in_allowed_categories() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        response_format = body["response_format"]
-        assert response_format["type"] == "json_schema"
-        assert response_format["json_schema"]["name"] == "artha_tag_suggestion"
-        assert response_format["json_schema"]["strict"] is True
-        assert body["reasoning_effort"] == "low"
-        system_prompt = body["messages"][0]["content"]
-        assert "generic payment" in system_prompt
-        assert "transfers and card payments" in system_prompt
-        prompt = json.loads(
-            body["messages"][1]["content"].split("\nRequired response JSON schema:\n")[0]
-        )
-        assert set(prompt) == {
-            "description",
-            "amount_paise",
-            "direction",
-            "allowed_categories",
-        }
-        suggestion = {
-            "category_id": "food",
-            "category_name": "Food",
-            "confidence": 0.91,
-            "reason": "The merchant is a restaurant.",
-        }
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"content": json.dumps(suggestion)}}]},
-        )
-
-    assistant = LocalFinancialAssistant(
-        AssistantSettings(provider=LlmProvider.GROQ, groq_api_key="test-key"),
-        transport=httpx.MockTransport(handler),
-    )
-    response = await assistant.suggest_tag(
-        TagSuggestionRequest(
-            description="Corner restaurant",
-            amount_paise=85000,
-            direction="expense",
-            allowed_categories=[
-                TagCategory(id="food", name="Food"),
-                TagCategory(id="travel", name="Travel"),
-            ],
-        )
-    )
-
-    assert response.mode == "model"
-    assert response.result.category_id == "food"
-    assert response.result.confidence == 0.91
+    with pytest.raises(
+        AssistantUnavailableError, match="AI assistant is unavailable"
+    ):
+        await assistant.chat("Show spending", financial_context)
 
 
 @pytest.mark.asyncio
@@ -632,8 +1164,35 @@ async def test_gemini_tag_suggestion_is_grounded_in_allowed_categories() -> None
     assert "generic payment" in body["system_instruction"]
 
 
+def test_tag_suggestion_request_accepts_production_category_capacity() -> None:
+    categories = [
+        TagCategory(id=f"category-{index}", name=f"Category {index}")
+        for index in range(200)
+    ]
+
+    request = TagSuggestionRequest(
+        description="Household transaction",
+        amount_paise=1_000,
+        direction="expense",
+        allowed_categories=categories,
+    )
+
+    assert len(request.allowed_categories) == 200
+
+    with pytest.raises(ValidationError, match="List should have at most 200 items"):
+        TagSuggestionRequest(
+            description="Household transaction",
+            amount_paise=1_000,
+            direction="expense",
+            allowed_categories=[
+                *categories,
+                TagCategory(id="category-200", name="Category 200"),
+            ],
+        )
+
+
 @pytest.mark.asyncio
-async def test_invented_tag_is_rejected_and_gracefully_falls_back() -> None:
+async def test_invented_tag_makes_category_suggestion_unavailable() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/chat"
         suggestion = {
@@ -651,22 +1210,21 @@ async def test_invented_tag_is_rejected_and_gracefully_falls_back() -> None:
         AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
-    response = await assistant.suggest_tag(
-        TagSuggestionRequest(
-            description="Unknown merchant",
-            amount_paise=5000,
-            direction="expense",
-            allowed_categories=[TagCategory(id="food", name="Food")],
+    with pytest.raises(
+        AssistantUnavailableError, match="AI category suggestion is unavailable"
+    ):
+        await assistant.suggest_tag(
+            TagSuggestionRequest(
+                description="Unknown merchant",
+                amount_paise=5000,
+                direction="expense",
+                allowed_categories=[TagCategory(id="food", name="Food")],
+            )
         )
-    )
-
-    assert response.mode == "deterministic_fallback"
-    assert response.result.category_id is None
-    assert response.result.confidence == 0
 
 
 @pytest.mark.asyncio
-async def test_assistant_endpoints_are_read_only_when_provider_is_disabled(
+async def test_disabled_assistant_endpoints_return_503_without_changing_ledger(
     client: httpx.AsyncClient,
     bootstrapped: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
@@ -692,8 +1250,15 @@ async def test_assistant_endpoints_are_read_only_when_provider_is_disabled(
 
     assert status_response.status_code == 200
     assert status_response.json()["detail"] == "disabled"
-    assert chat_response.status_code == 200
-    assert chat_response.json()["mode"] == "deterministic_fallback"
-    assert tag_response.status_code == 200
-    assert tag_response.json()["result"]["category_id"] == "food"
+    assert chat_response.status_code == 503
+    assert chat_response.json() == {
+        "detail": "AI is temporarily unavailable; the ledger was not changed."
+    }
+    assert tag_response.status_code == 503
+    assert tag_response.json() == {
+        "detail": (
+            "AI category suggestion is temporarily unavailable; "
+            "the ledger was not changed."
+        )
+    }
     assert before == after

@@ -55,7 +55,7 @@ def _response(**updates: object) -> CaptureInterpretationResponse:
     }
     payload.update(updates)
     return CaptureInterpretationResponse(
-        provider=LlmProvider.GROQ,
+        provider=LlmProvider.GEMINI,
         model="test-model",
         result=CaptureDraftInterpretation.model_validate(payload),
     )
@@ -297,8 +297,8 @@ def test_run_mode_fails_closed_without_a_provider_key(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "groq")
-    monkeypatch.delenv("ARTHA_GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
 
     exit_code = main(
         [
@@ -311,5 +311,5 @@ def test_run_mode_fails_closed_without_a_provider_key(
 
     output = capsys.readouterr().out
     assert exit_code == 2
-    assert "server-side key is missing" in output
+    assert "Gemini is selected but its server-side key is missing" in output
     assert not list(tmp_path.iterdir())

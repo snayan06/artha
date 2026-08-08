@@ -24,3 +24,5 @@ supabase/.temp/
 evals/reports/*
 !evals/reports/README.md
 .vercel
+.superpowers/
+.worktrees/

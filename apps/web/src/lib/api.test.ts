@@ -1,6 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TransactionDraft } from '../types'
 
+function assistantEnvelope(widget: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'gemini',
+    model: 'gemini-3.5-flash-lite',
+    mode: 'model',
+    result: {
+      message: 'Here is your current account overview.',
+      intent: 'summary',
+      widgets: [widget]
+    },
+    ...overrides
+  }
+}
+
 describe('FastAPI adapter', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -78,6 +92,49 @@ describe('FastAPI adapter', () => {
     expect(parsed.demo).toBe(true)
     expect(parsed.data.amountPaise).toBe(25_000)
     expect(parsed.data.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('fails closed when demo mode is not explicitly enabled', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', '')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 503 })))
+    const { CaptureDraftUnavailableError, parseDraft } = await import('./api')
+    const sourceText = 'self transfer 25k ICICI -> HDFC'
+
+    await expect(parseDraft(sourceText)).rejects.toEqual(expect.objectContaining({
+      name: 'CaptureDraftUnavailableError',
+      sourceText
+    }))
+    await expect(parseDraft(sourceText)).rejects.toBeInstanceOf(CaptureDraftUnavailableError)
+  })
+
+  it('never interprets production capture locally after an AI or API failure', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/drafts/parse')) return new Response('{}', { status: 503 })
+      if (url.endsWith('/api/v1/accounts')) {
+        return new Response(JSON.stringify([
+          { id: 1, name: 'ICICI', type: 'bank' },
+          { id: 2, name: 'HDFC', type: 'bank' }
+        ]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/api/v1/members')) {
+        return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { CaptureDraftUnavailableError, parseDraft } = await import('./api')
+    const sourceText = 'self transfer 25k ICICI -> HDFC'
+    const parsing = parseDraft(sourceText)
+
+    await expect(parsing).rejects.toEqual(expect.objectContaining({
+      name: 'CaptureDraftUnavailableError',
+      sourceText
+    }))
+    await expect(parsing).rejects.toBeInstanceOf(CaptureDraftUnavailableError)
   })
 
   it('never substitutes fictional ledger data during a production API outage', async () => {
@@ -223,12 +280,11 @@ describe('FastAPI adapter', () => {
   it('maps only approved assistant widgets from the strict API response', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      provider: 'disabled', model: null, mode: 'deterministic_fallback',
-      result: { intent: 'spending', widgets: [
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your spending overview.', intent: 'spending', widgets: [
         { type: 'metric', title: 'Spend', value_paise: 12345, caption: 'This month', tone: 'neutral' },
         { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Aug', value_paise: 5000 }] },
-        { type: 'clarification', question: 'Which period?', choices: ['This month'] },
-        { type: 'html', content: '<img src=x onerror=alert(1)>' }
+        { type: 'clarification', question: 'Which period?', choices: ['This month'] }
       ] }
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
@@ -236,9 +292,219 @@ describe('FastAPI adapter', () => {
 
     const reply = await chatAssistant('Show spending')
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ message: 'Show spending' })
-    expect(reply.deterministicFallback).toBe(true)
+    expect(reply.message).toBe('Here is your spending overview.')
+    expect(reply.provider).toBe('gemini · gemini-3.5-flash-lite')
+    expect(Object.keys(reply).sort()).toEqual(['message', 'provider', 'widgets'])
     expect(reply.widgets.map((widget) => widget.type)).toEqual(['metric', 'line_chart', 'clarification'])
     expect(JSON.stringify(reply)).not.toContain('onerror')
+  })
+
+  it('accepts an empty optional metric caption and omits the UI detail', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(assistantEnvelope({
+      type: 'metric', title: 'Balance', value_paise: 12345, caption: ''
+    })), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { chatAssistant } = await import('./api')
+
+    const reply = await chatAssistant('Show my balance')
+
+    expect(reply.widgets).toEqual([expect.objectContaining({
+      type: 'metric',
+      title: 'Balance',
+      detail: undefined
+    })])
+  })
+
+  it('accepts all twenty server-bounded household table rows', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope({
+      type: 'table',
+      title: 'Household balances',
+      rows: Array.from({ length: 20 }, (_, index) => ({
+        label: `Member ${index}`,
+        amount_paise: index
+      }))
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    const reply = await chatAssistant('Show shared balances')
+
+    expect(reply.widgets[0]?.type).toBe('table')
+    if (reply.widgets[0]?.type !== 'table') throw new Error('Expected a table widget')
+    expect(reply.widgets[0].rows).toHaveLength(20)
+  })
+
+  it.each([
+    ['arbitrary financial prose', 'summary', 'Your balance is a grand.'],
+    ['approved message for the wrong intent', 'summary', 'Here is your spending overview.'],
+    ['whitespace-modified approved message', 'summary', '  Here is your current account overview.  ']
+  ])('rejects assistant narrative contract violation: %s', async (_case, intent, message) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope({ type: 'metric', title: 'Balance', value_paise: 12345 })
+    payload.result.intent = intent
+    payload.result.message = message
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it('publishes the exact browser-side assistant narrative contract', async () => {
+    const api = await import('./api')
+
+    expect(api).toHaveProperty('APPROVED_ASSISTANT_MESSAGES', {
+      summary: 'Here is your current account overview.',
+      spending: 'Here is your spending overview.',
+      income: 'Here is your income overview.',
+      cashflow: 'Here is your cash-flow overview.',
+      shared: 'Here are your shared balances.',
+      transactions: 'Here is your recent ledger activity.',
+      clarification: 'I need a little more detail to answer that.',
+      unsupported: 'I can only help with read-only ledger questions.'
+    })
+  })
+
+  it('rejects a successful response without a model-written assistant message', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: {
+        intent: 'summary',
+        widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }]
+      }
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it('rejects a legacy top-level assistant payload without a result envelope', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      provider: 'gemini',
+      model: 'gemini-3.5-flash-lite',
+      mode: 'model',
+      message: 'Legacy top-level model copy.',
+      widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it.each([
+    ['missing mode', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite',
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['deterministic mode', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'deterministic_fallback',
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['missing intent', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['unknown intent', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', intent: 'forecast', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['missing widgets', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', intent: 'summary' }
+    }],
+    ['empty widgets', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [] }
+    }],
+    ['overlong message', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'x'.repeat(401), intent: 'summary', widgets: [{ type: 'metric', title: 'Balance', value_paise: 12345 }] }
+    }],
+    ['unknown widget', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'html', content: '<b>unsafe</b>' }] }
+    }],
+    ['legacy widget alias', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'bar_chart', title: 'Trend', data: [{ label: 'Now', value: 1 }] }] }
+    }],
+    ['invalid chart widget', {
+      provider: 'gemini', model: 'gemini-3.5-flash-lite', mode: 'model',
+      result: { message: 'Here is your current account overview.', intent: 'summary', widgets: [{ type: 'chart', title: 'Trend', chart_type: 'line', points: [] }] }
+    }]
+  ])('rejects an invalid assistant envelope with %s', async (_case, payload) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it.each([
+    ['malformed metric fields', { type: 'metric', title: 123, value_paise: 'oops' }],
+    ['metric extra key', { type: 'metric', title: 'Balance', value_paise: 12345, sql: 'select 1' }],
+    ['invalid chart type', { type: 'chart', title: 'Trend', chart_type: 'area', points: [{ label: 'Now', value_paise: 1 }] }],
+    ['oversized chart points', { type: 'chart', title: 'Trend', chart_type: 'line', points: Array.from({ length: 13 }, (_, index) => ({ label: `P${index}`, value_paise: index })) }],
+    ['invalid chart point label', { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 123, value_paise: 1 }] }],
+    ['invalid chart point value', { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Now', value_paise: 'oops' }] }],
+    ['empty table rows', { type: 'table', title: 'Activity', rows: [] }],
+    ['oversized table rows', { type: 'table', title: 'Activity', rows: Array.from({ length: 21 }, (_, index) => ({ label: `R${index}`, amount_paise: index })) }],
+    ['invalid table date', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, date: '7 Aug' }] }],
+    ['invalid table kind', { type: 'table', title: 'Activity', rows: [{ label: 'Rent', amount_paise: 1, kind: 'forecast' }] }],
+    ['ungrounded insight widget', { type: 'insight', title: 'Note', body: 'An arbitrary second narrative.' }],
+    ['blank insight body', { type: 'insight', title: 'Note', body: '   ' }],
+    ['overlong insight body', { type: 'insight', title: 'Note', body: 'x'.repeat(401) }],
+    ['overlong clarification question', { type: 'clarification', question: 'x'.repeat(241), choices: [] }],
+    ['too many clarification choices', { type: 'clarification', question: 'Choose a period', choices: ['A', 'B', 'C', 'D', 'E'] }],
+    ['invalid clarification choice', { type: 'clarification', question: 'Choose a period', choices: ['   '] }]
+  ])('rejects malformed assistant widget schema: %s', async (_case, widget) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(assistantEnvelope(widget)), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it.each([
+    ['unknown provider', { provider: 'disabled' }],
+    ['missing model', { model: undefined }],
+    ['blank model', { model: '   ' }],
+    ['overlong model', { model: 'x'.repeat(81) }]
+  ])('rejects invalid assistant provider metadata: %s', async (_case, overrides) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope({ type: 'metric', title: 'Balance', value_paise: 12345 }, overrides)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid')
+  })
+
+  it('propagates assistant provider failures in demo mode without fabricating local widgets', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('What is my available balance?')).rejects.toThrow('API request failed (503)')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('previews and restores a recovery bundle with an idempotency key', async () => {

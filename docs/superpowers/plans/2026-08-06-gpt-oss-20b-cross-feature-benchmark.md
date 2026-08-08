@@ -1,5 +1,10 @@
 # GPT-OSS 20B Cross-Feature Benchmark Implementation Plan
 
+> **Superseded historical plan — 7 August 2026.** Do not execute this plan as
+> current product guidance. Artha production uses Gemini through Google's
+> official server-side SDK. Groq and Qwen are not current providers or fallback
+> paths; Ollama remains optional for local development only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make GPT-OSS 20B the candidate for every hosted AI path, benchmark capture, tagging and assistant behavior with fictional fixtures, and publish an evidence-based adopt or reject decision.

@@ -7,15 +7,22 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from artha_api.assistant import (
+    AssistantChatRequest,
     CaptureClarification,
     CaptureInterpretationResponse,
     LlmProvider,
     LocalFinancialAssistant,
+    TagSuggestion,
+    TagSuggestionRequest,
+    TagSuggestionResponse,
 )
 from artha_api.auth import AuthContext
 from artha_api.production_routes import (
     ProductionDraft,
     ProductionSplit,
+    ProductionTagSuggestionRequest,
+    assistant_chat,
+    assistant_tag_suggestion,
     confirm_transaction,
     list_transactions,
     member_balances,
@@ -33,6 +40,53 @@ DESTINATION_ACCOUNT_ID = "00000000-0000-0000-0000-000000000107"
 CATEGORY_ID = "00000000-0000-0000-0000-000000000104"
 USER_ID = "00000000-0000-0000-0000-000000000105"
 TRANSACTION_ID = "00000000-0000-0000-0000-000000000106"
+
+
+async def test_production_assistant_routes_return_503_when_provider_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "disabled")
+    auth = AuthContext(user_id=USER_ID)
+
+    async def empty_dashboard(_client: object, _auth: AuthContext) -> dict[str, object]:
+        return {
+            "total_balance_paise": 0,
+            "spend_paise": 0,
+            "income_paise": 0,
+            "member_balances": [],
+            "spend_by_category": [],
+            "monthly": [],
+            "recent_transactions": [],
+        }
+
+    monkeypatch.setattr("artha_api.production_routes.dashboard", empty_dashboard)
+
+    with pytest.raises(HTTPException) as chat_error:
+        await assistant_chat(
+            AssistantChatRequest(message="Show my spending"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            auth,
+        )
+    with pytest.raises(HTTPException) as tag_error:
+        await assistant_tag_suggestion(
+            ProductionTagSuggestionRequest(
+                description="Food purchase",
+                amount_paise=12_000,
+                direction="expense",
+            ),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            auth,
+        )
+
+    assert chat_error.value.status_code == 503
+    assert chat_error.value.detail == (
+        "AI is temporarily unavailable; the ledger was not changed."
+    )
+    assert tag_error.value.status_code == 503
+    assert tag_error.value.detail == (
+        "AI category suggestion is temporarily unavailable; "
+        "the ledger was not changed."
+    )
 
 
 class FakeProductionClient:
@@ -134,6 +188,209 @@ class FakeProductionClient:
         raise AssertionError(f"unexpected path: {path}")
 
 
+class FakeTagSuggestionClient:
+    def __init__(
+        self,
+        categories: list[dict[str, str]],
+        *,
+        household_id: str | None = HOUSEHOLD_ID,
+    ) -> None:
+        self.categories = categories
+        self.household_id = household_id
+        self.category_params: dict[str, str] | None = None
+
+    async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
+        assert name == "get_current_household"
+        assert payload is None
+        return self.household_id
+
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
+        assert method == "GET"
+        assert path == "categories"
+        self.category_params = kwargs["params"]
+        return self.categories
+
+
+def test_production_tag_suggestion_rejects_caller_owned_category_allow_list() -> None:
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ProductionTagSuggestionRequest.model_validate(
+            {
+                "description": "Food purchase",
+                "amount_paise": 12_000,
+                "direction": "expense",
+                "allowed_categories": [{"id": "invented", "name": "Invented"}],
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    ("direction", "expected_ids"),
+    [
+        ("expense", ["expense-category", "both-category"]),
+        ("income", ["income-category", "both-category"]),
+    ],
+)
+async def test_production_tag_suggestion_uses_only_eligible_household_categories(
+    monkeypatch: pytest.MonkeyPatch,
+    direction: str,
+    expected_ids: list[str],
+) -> None:
+    client = FakeTagSuggestionClient(
+        [
+            {"id": "expense-category", "name": "Food", "category_type": "expense"},
+            {"id": "income-category", "name": "Salary", "category_type": "income"},
+            {"id": "both-category", "name": "Other", "category_type": "both"},
+        ]
+    )
+    captured: list[Any] = []
+
+    class CapturingAssistant:
+        async def suggest_tag(self, payload: Any) -> TagSuggestionResponse:
+            captured.append(payload)
+            category = payload.allowed_categories[0]
+            return TagSuggestionResponse(
+                provider=LlmProvider.GEMINI,
+                model="test-model",
+                mode="model",
+                result=TagSuggestion(
+                    category_id=category.id,
+                    category_name=category.name,
+                    confidence=0.9,
+                    reason="Grounded in the household category list.",
+                ),
+            )
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", CapturingAssistant
+    )
+
+    await assistant_tag_suggestion(
+        ProductionTagSuggestionRequest(
+            description="  Food   purchase  ",
+            amount_paise=12_000,
+            direction=direction,
+        ),
+        cast(SupabaseRestClient, client),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert client.category_params == {
+        "household_id": f"eq.{HOUSEHOLD_ID}",
+        "is_archived": "eq.false",
+        "select": "id,name,category_type",
+    }
+    assert len(captured) == 1
+    assert isinstance(captured[0], TagSuggestionRequest)
+    assert captured[0].description == "Food purchase"
+    assert [category.id for category in captured[0].allowed_categories] == expected_ids
+
+
+async def test_production_tag_suggestion_passes_more_than_fifty_categories(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeTagSuggestionClient(
+        [
+            {
+                "id": f"category-{index}",
+                "name": f"Category {index}",
+                "category_type": "expense",
+            }
+            for index in range(51)
+        ]
+    )
+    captured: list[TagSuggestionRequest] = []
+
+    class CapturingAssistant:
+        async def suggest_tag(
+            self, payload: TagSuggestionRequest
+        ) -> TagSuggestionResponse:
+            captured.append(payload)
+            category = payload.allowed_categories[-1]
+            return TagSuggestionResponse(
+                provider=LlmProvider.GEMINI,
+                model="test-model",
+                mode="model",
+                result=TagSuggestion(
+                    category_id=category.id,
+                    category_name=category.name,
+                    confidence=0.9,
+                    reason="Grounded in the complete household category list.",
+                ),
+            )
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", CapturingAssistant
+    )
+
+    result = await assistant_tag_suggestion(
+        ProductionTagSuggestionRequest(
+            description="Household transaction",
+            amount_paise=12_000,
+            direction="expense",
+        ),
+        cast(SupabaseRestClient, client),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert len(captured) == 1
+    assert len(captured[0].allowed_categories) == 51
+    assert result.result.category_id == "category-50"
+
+
+async def test_production_tag_suggestion_rejects_when_no_category_is_eligible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeTagSuggestionClient(
+        [{"id": "income-category", "name": "Salary", "category_type": "income"}]
+    )
+
+    def unexpected_assistant() -> None:
+        raise AssertionError("model must not be called without an eligible category")
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", unexpected_assistant
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await assistant_tag_suggestion(
+            ProductionTagSuggestionRequest(
+                description="Food purchase",
+                amount_paise=12_000,
+                direction="expense",
+            ),
+            cast(SupabaseRestClient, client),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 422
+
+
+async def test_production_tag_suggestion_requires_an_authenticated_household(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeTagSuggestionClient([], household_id=None)
+
+    def unexpected_assistant() -> None:
+        raise AssertionError("model must not be called without a household")
+
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", unexpected_assistant
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await assistant_tag_suggestion(
+            ProductionTagSuggestionRequest(
+                description="Food purchase",
+                amount_paise=12_000,
+                direction="expense",
+            ),
+            cast(SupabaseRestClient, client),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 409
+
+
 async def test_production_confirmation_adds_owner_share_to_atomic_rpc() -> None:
     fake = FakeProductionClient()
     draft = ProductionDraft(
@@ -193,7 +450,7 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
         _context: object,
     ) -> CaptureInterpretationResponse:
         return CaptureInterpretationResponse(
-            provider=LlmProvider.GROQ,
+            provider=LlmProvider.GEMINI,
             model="test-model",
             result=CaptureClarification(
                 outcome="clarify",
@@ -213,6 +470,32 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
 
     assert error.value.status_code == 422
     assert error.value.detail == "Which account should this use?"
+
+
+async def test_parse_draft_returns_sanitized_503_when_ai_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unavailable(
+        _self: LocalFinancialAssistant,
+        _message: str,
+        _context: object,
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(LocalFinancialAssistant, "interpret_capture", unavailable)
+
+    with pytest.raises(HTTPException) as error:
+        await parse_draft(
+            ParseRequest(text="self transfer 25k ICICI -> HDFC", timezone="Asia/Kolkata"),
+            cast(SupabaseRestClient, FakeProductionClient()),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 503
+    assert error.value.detail == (
+        "Automatic interpretation is temporarily unavailable; "
+        "review the details manually."
+    )
 
 
 def test_production_draft_rejects_inexact_split_total() -> None:

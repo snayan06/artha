@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 7 August 2026
+Updated: 8 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -21,6 +21,7 @@ Sprint 1 dependency.
 
 | Area | Status | What this means |
 | --- | --- | --- |
+| AI-primary release candidate | Locally verified, not deployed | Production capture and assistant are model-only; failures are honest, the product story/architecture are updated, and the final local gate is 154 web + 209 API + 104 AI contracts |
 | Public repository and CI | Attention | Repository and workflows are configured, but GitHub did not create runs for the latest PRs/pushes; restore reliable triggering before the next code release |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
@@ -35,6 +36,32 @@ Sprint 1 dependency.
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
 | Production acceptance | In progress | Authenticated happy path and responsive sweep passed; two-owner isolation and encrypted restore remain |
+
+## Senior product audit — net-new additions
+
+The full journey review is in
+[`artifacts/product/2026-08-08-senior-product-usability-audit.md`](artifacts/product/2026-08-08-senior-product-usability-audit.md).
+Existing isolation, recovery, Accounts & family, correction, settlement,
+invitation and assistant-evidence tasks remain unchanged; this table contains
+only additions that were missing from the board.
+
+| ID | Status | Placement | Net-new task | Acceptance gate |
+| --- | --- | --- | --- | --- |
+| PA-01 | Next | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
+| PA-02 | Planned | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
+| PA-03 | Planned | First Sprint 2 slice; real-data gate | Post-confirm **View transaction** recovery entry point | Reuses audited edit/soft-delete; balances recalculate atomically; retries are idempotent |
+| PA-04 | Planned | Fictional-pilot hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Fictional-only restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
+| PA-05 | Planned | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
+| PA-06 | Planned | Before candidate publication | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
+| PA-07 | Planned | Sprint 2 product quality | Resumable onboarding, field errors and first-transaction guidance | Refresh preserves safe setup fields; each error identifies its field; empty states offer a next action |
+| PA-08 | Planned | Sprint 2 shared-money slice | Member-paid expense capture in the web | Owner account does not move; owner's payable and member balance update; settlement later clears without income/spend |
+| PA-09 | Planned | Sprint 2 measurement | Privacy-safe activation/capture/reliability events | No text, amounts, balances, emails, account/member names or assistant questions are emitted |
+| PA-10 | Later | After daily capture is proven | Optional missing-transaction reminder and weekly review | User-controlled cadence; no financial content in notifications; dismissal/snooze supported |
+
+PA-01 through PA-06 do not block deployment for continued fictional testing
+when engineering gates are green. They do block representing the product as
+ready for real family-finance data, together with the existing isolation,
+restore and log-redaction gates.
 
 ## Sprint 1 — trust and capture foundation
 
@@ -91,12 +118,20 @@ Sprint 1 dependency.
 - [x] Validate dataset IDs, allow-listed entities, outcomes and integer-paise values in CI.
 - [x] Gate 22 common/safety-critical deterministic drafts plus negative, ambiguous and unknown-member input.
 - [x] Add a hosted-model evaluation runner with field/outcome/tag slices and sanitized reports.
-- [x] Preserve the Qwen/Groq baseline as historical provider evidence.
-- [x] Add Gemini through the official server-side SDK with `store=false` and deterministic fallback.
+- [x] Archive the superseded Qwen/Groq baseline as historical provider evidence;
+  neither provider is part of the current production runtime or fallback path.
+- [x] Add Gemini through the official server-side SDK with `store=false`, strict
+  validation and exact-text manual recovery when interpretation is unavailable.
 - [x] Separate HTTP/rate-limit/timeout/schema/grounding failures from model correctness without persisting private text.
 - [x] Respect `Retry-After`, back off safely, checkpoint progress and resume unfinished cases.
 - [x] Pass the hosted fictional gates: capture 50/50, auto-tag 30/30 and assistant 24/24.
 - [x] Verify production Gemini capture plus read-only metric/chart assistant responses; retain the 30/30 hosted auto-tag gate as the current tagging evidence.
+- [x] Remove deterministic production language interpretation; preserve exact text and open manual review when model capture is unavailable.
+- [x] Constrain assistant output to an approved intent narrative and the exact server-owned widget bundle.
+- [x] Pass final local AI-primary gates: 154 web tests, 209 API tests, 8 migrations, 4 SQL contracts and 104 keyless AI cases.
+- [x] Manually verify fictional capture success, zero/incomplete-transfer guards, assistant success/failure and no 320/390/1440 Quick Add/Assistant overflow in light/dark.
+- [ ] Re-run hosted fictional Gemini gates with the ignored server-side key for this candidate.
+- [ ] Repeat authenticated capture-unavailable recovery and assistant acceptance on the final deployed domain.
 
 ## Sprint 2 — Accounts & family
 

@@ -3,14 +3,14 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff and release guard.
 
-Updated: 7 August 2026
+Updated: 8 August 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
 
 ## Live launch status
 
-**Current stage:** V1 is live and the authenticated fictional-data journey is green. Do not enter real financial data until every remaining P0 security/recovery item below is complete.
+**Current stage:** V1 is live and the authenticated fictional-data journey is green. The AI-primary candidate is locally verified but not deployed. Do not enter real financial data until every remaining P0 security/recovery item below is complete.
 
 - [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
 - [ ] Restore reliable GitHub Actions triggering and obtain fresh green `main` CI/CodeQL runs; do not normalize owner overrides.
@@ -68,10 +68,56 @@ For the current ordered delivery view, blockers and user actions, see
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
 - [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the pilot model.
 - [x] Select Gemini 3.5 Flash-Lite for fictional pilot traffic and configure it server-side only.
+- [x] Remove deterministic production language parsing and fail into exact-text manual review without saving.
+- [x] Restrict assistant responses to approved intents and exact server-owned, database-grounded widget bundles.
+- [x] Pass the AI-primary candidate local gate: 154 web, 209 API and 104 AI contract cases.
+- [ ] Re-run the hosted fictional Gemini gates for the AI-primary candidate.
+- [ ] Deploy the AI-primary candidate and repeat authenticated capture/assistant success and unavailable-state acceptance.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
+
+### Net-new gaps from the senior product audit
+
+These additions are not duplicates of the existing isolation, recovery,
+correction, Accounts & family, settlement, invitation or assistant-evidence
+work. Full rationale and acceptance criteria:
+[`artifacts/product/2026-08-08-senior-product-usability-audit.md`](artifacts/product/2026-08-08-senior-product-usability-audit.md).
+
+**Before real financial data:**
+
+- [ ] Make manual recovery support Expense, Income and Transfer, including safe
+  type correction and exact-text preservation.
+- [ ] Replace free-text category correction with server-owned, direction-valid
+  category selection and explicit unavailable/retry states.
+- [ ] Add an immediate **View transaction** recovery entry point after confirm;
+  reuse the planned audited correction/soft-delete workflow rather than adding
+  another mutation path.
+- [ ] Show an in-product Gemini/provider data-use disclosure and keep the
+  fictional-data restriction visible until an approved real-data privacy
+  configuration exists.
+- [ ] Give Quick Add account-context loading an accessible error, retry action
+  and explicit disabled-confirm reason without losing the draft.
+- [ ] Remove stale active-QA claims of deterministic production capture or
+  assistant fallback; keep provider benchmarks historical.
+
+**Sprint 2 product quality:**
+
+- [ ] Preserve unfinished onboarding locally, add field-level errors and guide a
+  completed setup to its first transaction.
+- [ ] Record member-paid shared expenses in the web without moving the owner's
+  account; complete this with the already planned settlement UI.
+- [ ] Add privacy-safe funnel/reliability instrumentation using only event names,
+  coarse durations, edited-field names and failure classes—never financial or
+  identifying content.
+
+**Later, after daily capture is proven:**
+
+- [ ] Add an optional missing-transaction reminder and weekly ledger review.
 
 ### P2 — expansion after the private pilot
 
+- [ ] Either align the optional local demo parser with the production capture
+  examples (`25k`, transfers and custom accounts) or replace it with a clearly
+  manual-only offline demo contract.
 - [ ] Add optional WhatsApp or Telegram capture.
 - [ ] Add investments, liabilities and net-worth tracking.
 
@@ -115,7 +161,7 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Check learned merchant rules before requesting an LLM suggestion.
 - [x] Constrain LLM tagging output to existing household categories with confidence.
 - [x] Fall back to manual review when parsing is incomplete.
-- [x] Keep the flow functional without an AI provider.
+- [x] Keep dashboard and manual review available when production AI is unavailable; never substitute a production language-parser guess.
 
 ## Milestone 3 — mobile PWA
 
@@ -182,7 +228,8 @@ For the current ordered delivery view, blockers and user actions, see
   - [ ] Cover empty, duplicate-name, outstanding-over-limit and archived-account edge cases.
   - [ ] Verify the management screens at 320 px, 390 px and desktop in light and dark modes.
 - [ ] Invite selected participants as authenticated household members.
-- [x] Add Gemini, hosted Groq/open-weight and local Ollama provider adapters.
+- [x] Add Gemini through the official server-side SDK and retain explicit local
+  Ollama for development; retire hosted alternate providers from active runtime.
 - [x] Add analytics assistant with user-scoped read-only summaries.
 - [x] Return validated metric, chart and transaction-table schemas.
 - [ ] Show evidence date range, source count and matching transactions.

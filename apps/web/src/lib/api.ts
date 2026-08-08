@@ -3,10 +3,22 @@ import type { AccountSetupInput, AssistantReply, AssistantWidget, Dashboard, Hou
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
-const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== 'false'
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 const TIMEOUT_MS = 10_000
 const RETRY_DELAY_MS = 250
 const TRANSIENT_STATUSES = new Set([502, 503, 504])
+export const APPROVED_ASSISTANT_MESSAGES = {
+  summary: 'Here is your current account overview.',
+  spending: 'Here is your spending overview.',
+  income: 'Here is your income overview.',
+  cashflow: 'Here is your cash-flow overview.',
+  shared: 'Here are your shared balances.',
+  transactions: 'Here is your recent ledger activity.',
+  clarification: 'I need a little more detail to answer that.',
+  unsupported: 'I can only help with read-only ledger questions.'
+} as const
+type AssistantIntent = keyof typeof APPROVED_ASSISTANT_MESSAGES
+const ASSISTANT_PROVIDERS = new Set(['gemini', 'ollama'])
 const RETRYABLE_POST_PATHS = new Set([
   '/api/v1/drafts/parse',
   '/api/v1/assistant/chat'
@@ -51,6 +63,16 @@ export interface RecoveryRestoreResult {
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message)
+  }
+}
+
+export class CaptureDraftUnavailableError extends Error {
+  readonly sourceText: string
+
+  constructor(sourceText: string, options?: ErrorOptions) {
+    super('Automatic interpretation is temporarily unavailable.', options)
+    this.name = 'CaptureDraftUnavailableError'
+    this.sourceText = sourceText
   }
 }
 
@@ -121,53 +143,103 @@ function formatAssistantPaise(value: number): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value / 100)
 }
 
-function mapAssistantWidgets(raw: unknown): AssistantWidget[] {
-  if (!Array.isArray(raw)) return []
-  return raw.slice(0, 8).flatMap<AssistantWidget>((item) => {
-    if (!item || typeof item !== 'object') return []
-    const widget = item as JsonObject
-    const rawType = safeText(widget.type)
-    if (rawType === 'metric') {
-      const metricValue = typeof widget.value_paise === 'number' ? formatAssistantPaise(widget.value_paise) : safeText(widget.value, '—', 80)
-      return [{ type: 'metric' as const, title: safeText(widget.title ?? widget.label, 'Metric', 80), value: metricValue, detail: safeText(widget.caption ?? widget.detail ?? widget.subtitle, '', 160) || undefined }]
+function isJsonObject(value: unknown): value is JsonObject {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isAssistantIntent(value: string): value is AssistantIntent {
+  return Object.hasOwn(APPROVED_ASSISTANT_MESSAGES, value)
+}
+
+function hasExactKeys(value: JsonObject, allowed: readonly string[], required: readonly string[]): boolean {
+  const keys = Object.keys(value)
+  return keys.every((key) => allowed.includes(key)) && required.every((key) => Object.hasOwn(value, key))
+}
+
+function isBoundedText(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.length >= 1 && value.length <= maxLength && Boolean(value.trim())
+}
+
+function isSafePaise(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
+}
+
+function parseAssistantWidget(raw: unknown): AssistantWidget | null {
+  if (!isJsonObject(raw) || typeof raw.type !== 'string') return null
+
+  if (raw.type === 'metric') {
+    if (
+      !hasExactKeys(raw, ['type', 'title', 'value_paise', 'caption', 'tone'], ['type', 'title', 'value_paise'])
+      || !isBoundedText(raw.title, 80)
+      || !isSafePaise(raw.value_paise)
+      || (raw.caption !== undefined && raw.caption !== null && (typeof raw.caption !== 'string' || raw.caption.length > 160))
+      || (raw.tone !== undefined && raw.tone !== 'neutral' && raw.tone !== 'positive' && raw.tone !== 'warning')
+    ) return null
+    return {
+      type: 'metric',
+      title: raw.title,
+      value: formatAssistantPaise(raw.value_paise),
+      detail: typeof raw.caption === 'string' && raw.caption.length > 0 ? raw.caption : undefined
     }
-    if (rawType === 'chart' || rawType === 'bar' || rawType === 'bar_chart' || rawType === 'line' || rawType === 'line_chart') {
-      const dataRaw = Array.isArray(widget.points) ? widget.points : Array.isArray(widget.data) ? widget.data : []
-      const data = dataRaw.slice(0, 24).flatMap((point) => {
-        if (!point || typeof point !== 'object') return []
-        const row = point as JsonObject
-        const value = typeof row.value_paise === 'number' ? row.value_paise / 100 : row.value
-        return typeof value === 'number' && Number.isFinite(value) ? [{ label: safeText(row.label ?? row.name, 'Item', 50), value }] : []
-      })
-      if (!data.length) return []
-      const chartKind = safeText(widget.chart_type, rawType)
-      return [{ type: chartKind.startsWith('line') ? 'line_chart' as const : 'bar_chart' as const, title: safeText(widget.title, 'Chart', 80), data }]
-    }
-    if (rawType === 'table') {
-      const rawRows = (Array.isArray(widget.rows) ? widget.rows : []).slice(0, 30)
-      const hasStructuredRows = rawRows.some((row) => row && typeof row === 'object' && !Array.isArray(row))
-      const columns = hasStructuredRows ? ['Item', 'Amount', 'Date'] : (Array.isArray(widget.columns) ? widget.columns : []).slice(0, 8).map((column) => safeText(column, 'Column', 60))
-      const rows = rawRows.flatMap((row) => {
-        if (Array.isArray(row)) return [row.slice(0, columns.length || 8).map((cell) => safeText(String(cell), '', 120))]
-        if (!row || typeof row !== 'object') return []
-        const structured = row as JsonObject
-        return [[safeText(structured.label, 'Item', 80), typeof structured.amount_paise === 'number' ? formatAssistantPaise(structured.amount_paise) : '—', safeText(structured.date, '—', 10)]]
-      })
-      if (!columns.length || !rows.length) return []
-      return [{ type: 'table' as const, title: safeText(widget.title, 'Details', 80), columns, rows }]
-    }
-    if (rawType === 'insight') {
-      const body = safeText(widget.body ?? widget.text, '', 800)
-      return body ? [{ type: 'insight' as const, title: safeText(widget.title, 'Insight', 80), body }] : []
-    }
-    if (rawType === 'clarification') {
-      const question = safeText(widget.question ?? widget.text, '', 300)
-      const optionSource = Array.isArray(widget.choices) ? widget.choices : Array.isArray(widget.options) ? widget.options : []
-      const options = optionSource.slice(0, 6).map((option) => safeText(option, '', 100)).filter(Boolean)
-      return question ? [{ type: 'clarification' as const, question, options }] : []
-    }
-    return []
-  })
+  }
+
+  if (raw.type === 'chart') {
+    if (
+      !hasExactKeys(raw, ['type', 'title', 'chart_type', 'points'], ['type', 'title', 'chart_type', 'points'])
+      || !isBoundedText(raw.title, 80)
+      || (raw.chart_type !== 'bar' && raw.chart_type !== 'line')
+      || !Array.isArray(raw.points)
+      || raw.points.length < 1
+      || raw.points.length > 12
+    ) return null
+    const points = raw.points.flatMap((point) => {
+      if (
+        !isJsonObject(point)
+        || !hasExactKeys(point, ['label', 'value_paise'], ['label', 'value_paise'])
+        || !isBoundedText(point.label, 40)
+        || !isSafePaise(point.value_paise)
+      ) return []
+      return [{ label: point.label, value: point.value_paise / 100 }]
+    })
+    if (points.length !== raw.points.length) return null
+    return { type: raw.chart_type === 'line' ? 'line_chart' : 'bar_chart', title: raw.title, data: points }
+  }
+
+  if (raw.type === 'table') {
+    if (
+      !hasExactKeys(raw, ['type', 'title', 'rows'], ['type', 'title', 'rows'])
+      || !isBoundedText(raw.title, 80)
+      || !Array.isArray(raw.rows)
+      || raw.rows.length < 1
+      || raw.rows.length > 20
+    ) return null
+    const rows = raw.rows.flatMap((row) => {
+      if (
+        !isJsonObject(row)
+        || !hasExactKeys(row, ['label', 'amount_paise', 'date', 'kind'], ['label', 'amount_paise'])
+        || !isBoundedText(row.label, 80)
+        || !isSafePaise(row.amount_paise)
+        || (row.date !== undefined && row.date !== null && (typeof row.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)))
+        || (row.kind !== undefined && row.kind !== null && row.kind !== 'expense' && row.kind !== 'income' && row.kind !== 'transfer' && row.kind !== 'settlement')
+      ) return []
+      return [[row.label, formatAssistantPaise(row.amount_paise), typeof row.date === 'string' ? row.date : '—']]
+    })
+    if (rows.length !== raw.rows.length) return null
+    return { type: 'table', title: raw.title, columns: ['Item', 'Amount', 'Date'], rows }
+  }
+
+  if (raw.type === 'clarification') {
+    if (
+      !hasExactKeys(raw, ['type', 'question', 'choices'], ['type', 'question'])
+      || !isBoundedText(raw.question, 240)
+      || (raw.choices !== undefined && !Array.isArray(raw.choices))
+    ) return null
+    const choices = raw.choices ?? []
+    if (choices.length > 4 || choices.some((choice) => !isBoundedText(choice, 80))) return null
+    return { type: 'clarification', question: raw.question, options: choices }
+  }
+
+  return null
 }
 
 function entityId(value: unknown): string | number | undefined {
@@ -401,33 +473,43 @@ export async function getAccounts(): Promise<LedgerAccount[]> {
 }
 
 export async function chatAssistant(message: string): Promise<AssistantReply> {
-  try {
-    const response = await request<JsonObject>('/api/v1/assistant/chat', {
-      method: 'POST',
-      body: JSON.stringify({ message })
-    })
-    const result = response.result && typeof response.result === 'object' ? response.result as JsonObject : response
-    const providerRaw = response.provider_status && typeof response.provider_status === 'object' ? response.provider_status as JsonObject : response
-    const provider = safeText(providerRaw.provider ?? providerRaw.name ?? response.provider, 'Artha assistant', 80)
-    const model = safeText(response.model, '', 80)
-    const intent = safeText(result.intent, 'ledger', 40).replaceAll('_', ' ')
-    return {
-      message: safeText(response.message ?? response.answer ?? response.content, `Here is your ${intent} view.`, 2000),
-      widgets: mapAssistantWidgets(result.widgets ?? response.widgets),
-      provider: model ? `${provider} · ${model}` : provider,
-      deterministicFallback: response.mode === 'deterministic_fallback' || response.deterministic_fallback === true || providerRaw.deterministic_fallback === true || providerRaw.status === 'fallback'
-    }
-  } catch (error) {
-    if (!DEMO_MODE) throw error
-    return {
-      message: 'The AI provider is unavailable, so this is a deterministic preview using local demo totals.',
-      provider: 'Deterministic local preview',
-      deterministicFallback: true,
-      widgets: [
-        { type: 'metric', title: 'Available balance', value: `₹${(demoDashboard.availablePaise / 100).toLocaleString('en-IN')}`, detail: 'Demo data, not your live ledger' },
-        { type: 'insight', title: 'Safe fallback', body: `Your demo spend is ₹${(demoDashboard.spendPaise / 100).toLocaleString('en-IN')}. Connect the API to ask questions about your own ledger.` }
-      ]
-    }
+  const response = await request<JsonObject>('/api/v1/assistant/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message })
+  })
+  if (
+    !hasExactKeys(response, ['provider', 'model', 'mode', 'result'], ['provider', 'model', 'mode', 'result'])
+    || response.mode !== 'model'
+    || !ASSISTANT_PROVIDERS.has(String(response.provider))
+    || !isBoundedText(response.model, 80)
+    || !isJsonObject(response.result)
+    || !hasExactKeys(response.result, ['message', 'intent', 'widgets'], ['message', 'intent', 'widgets'])
+  ) {
+    throw new Error('Assistant response was invalid.')
+  }
+  const result = response.result
+  const rawWidgets = result.widgets
+  const rawMessage = result.message
+  const intent = safeText(result.intent)
+  if (
+    !isAssistantIntent(intent)
+    || !Array.isArray(rawWidgets)
+    || rawWidgets.length < 1
+    || rawWidgets.length > 5
+    || typeof rawMessage !== 'string'
+    || rawMessage !== APPROVED_ASSISTANT_MESSAGES[intent]
+  ) {
+    throw new Error('Assistant response was invalid.')
+  }
+  const assistantMessage = rawMessage
+  const widgets = rawWidgets.map(parseAssistantWidget)
+  if (widgets.some((widget) => widget === null)) throw new Error('Assistant response was invalid.')
+  const provider = response.provider as 'gemini' | 'ollama'
+  const model = response.model as string
+  return {
+    message: assistantMessage,
+    widgets: widgets as AssistantWidget[],
+    provider: `${provider} · ${model}`
   }
 }
 
@@ -510,17 +592,8 @@ export async function parseDraft(text: string, membersForFallback: HouseholdMemb
     }
   } catch (error) {
     if (error instanceof ApiError && error.status >= 400 && error.status < 500) throw error
-    const fallback = parseCaptureLocally(text, membersForFallback)
-    if (!DEMO_MODE) {
-      const accounts = await getAccounts()
-      const parsed = parseCaptureLocally(text, membersForFallback, accounts)
-      if (!parsed.sourceAccountId) throw new Error('Create an account before adding a transaction')
-      return {
-        data: parsed,
-        demo: false
-      }
-    }
-    return { data: fallback, demo: true }
+    if (DEMO_MODE) return { data: parseCaptureLocally(text, membersForFallback), demo: true }
+    throw new CaptureDraftUnavailableError(text, { cause: error })
   }
 }
 

@@ -1,5 +1,10 @@
 # GPT-OSS 20B cross-feature benchmark design
 
+> **Superseded historical artifact — 7 August 2026.** This candidate design is
+> retained only as pre-Gemini evaluation history. Artha production uses Gemini
+> through Google's official server-side SDK. Groq and Qwen are not current
+> providers or fallback paths; Ollama remains optional for local development only.
+
 Date: 6 August 2026  
 Candidate: `openai/gpt-oss-20b` through Groq
 

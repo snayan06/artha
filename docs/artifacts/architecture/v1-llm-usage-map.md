@@ -1,54 +1,80 @@
 # LLM usage map and safety boundary
 
-Date: 4 August 2026  
-Status: structured Qwen adapter implemented; hosted provider disabled pending key and benchmark
+Date: 7 August 2026
+Status: Gemini production paths implemented and deployed for the private pilot
 
-## Where an LLM is used
+## Current production usage
 
-| Feature | Model job | Deterministic boundary | May write data? |
-| --- | --- | --- | --- |
-| Quick Add | Interpret natural text into a proposed structured draft | Pydantic schema, account/member/category allow-lists, integer paise and date validation | No |
-| Auto-tagging | Suggest an existing category only when merchant rules cannot decide | Learned rule first; model may select only an existing category ID | No |
-| Assistant | Choose a read-only analysis intent and validated metric/chart/table widgets | Server calculates ledger totals; widget schemas limit output | No |
+| Feature | Gemini job | Code-owned boundary | Failure behavior | May write? |
+| --- | --- | --- | --- | --- |
+| Quick Add | Interpret authenticated natural text into a proposed structured draft | Strict Pydantic schema; account/member/category allow-lists; integer paise; date and split validation | Preserve exact text and open the manual form | No |
+| Auto-tagging | Suggest one existing category | Caller supplies description/amount/direction only; server loads up to 200 authenticated household categories and validates the returned ID/name pair | Return no suggestion | No |
+| Assistant | Select a supported intent and copy its exact approved narrative/widget bundle | Server owns titles, labels, values, rows, points, order and cardinality; strict equality validation; React-owned rendering | Sanitized `503` and honest UI error | No |
+
+The current pilot configuration is `gemini-3.5-flash-lite`, called server-side
+through Google's official SDK. Explicit Ollama selection is available only for
+local developer use; it is not a production provider or a production fallback.
 
 ## Quick Add decision flow
 
-```mermaid
-flowchart TD
-    T[User text] --> C[Server context: today, timezone and allowed IDs]
-    C --> Q{Hosted Qwen enabled?}
-    Q -->|Yes| J[Strict JSON interpretation]
-    Q -->|No or unavailable| R[Deterministic parser]
-    J --> V[Pydantic plus allow-list validation]
-    V -->|Invalid or invented ID| R
-    V --> D[Unsaved review draft]
-    R --> D
-    D --> E[User edits and confirms]
-    E --> L[Deterministic ledger RPC]
+```text
+User text
+   │
+   ▼
+Authenticated household context and allowed IDs
+   │
+   ▼
+Gemini strict interpretation
+   ├── valid ─► schema + allow-list + money/split validation
+   │                      │
+   │                      ▼
+   │              unsaved review draft ─► user edits/confirms ─► ledger RPC
+   │
+   └── unavailable, unsure or invalid
+                          │
+                          ▼
+                preserve exact source text
+                   + open manual form
+                  no guess, no write
 ```
 
-The model is allowed to reason about phrases such as `25k`, `three days ago`,
-account aliases and transfer direction. It is not allowed to invent an account,
-member or category, calculate the authoritative balance, or bypass confirmation.
-Ambiguous input returns a clarification question and unsafe input returns a
-rejection; neither is coerced into a positive draft.
+Gemini may interpret phrases such as `25k`, `three days ago`, account aliases
+and transfer direction. It may not invent an account, member or category,
+calculate an authoritative balance, bypass confirmation or alter the ledger.
+Production recovery never substitutes the local demo/evaluation parser.
 
-## Current runtime truth
+Production Quick Add and production tag suggestion call Gemini without loading
+`merchant_rules`. For the standalone tag endpoint, FastAPI—not the caller—loads
+up to 200 active, direction-eligible categories from the authenticated household
+and supplies that allow-list to the model. The V1 web app does not call this
+endpoint; its Quick Add category is separate capture output. Merchant-rule-first
+matching and prospective learning exist on the local SQLAlchemy demo path;
+Supabase production integration remains planned. An explicit allow-list remains
+available only to the internal local/demo contract for isolated testing.
 
-- The open-weight family selected for the private pilot is Qwen.
-- Hosted inference is wired through Groq; local private inference is wired
-  through Ollama.
-- No hosted model runs until `ARTHA_GROQ_API_KEY` is configured directly on the
-  API deployment.
-- Until then, common capture uses the deterministic parser and ambiguous input
-  remains in review or clarification.
-- Enabling a key is not the production lock-in decision. The versioned benchmark
-  must pass first.
+## Assistant value flow
+
+1. FastAPI creates a bounded authenticated snapshot containing total balance,
+   current-month spending/income, up to 20 member balances, 5 categories, 6
+   monthly points and 8 recent transaction summaries.
+2. Server code creates one exact canonical widget bundle for each intent:
+   `summary`, `spending`, `income`, `cashflow`, `shared`, `transactions`,
+   `clarification` and `unsupported`.
+3. Gemini selects an intent and copies its approved narrative and widget array.
+4. FastAPI requires exact equality for narrative, titles, labels, values, rows,
+   points, order and cardinality.
+5. React renders repository-owned components.
+
+Model-authored HTML, arbitrary numeric prose and ledger changes are outside the
+contract. An invalid response is unavailable, not a partial answer.
 
 ## Implementation and evaluation
 
-- Structured schema and provider adapter: `apps/api/src/artha_api/assistant.py`
-- Production parse endpoint: `apps/api/src/artha_api/production_routes.py`
-- Schema/provider tests: `apps/api/tests/test_assistant.py`
-- Dataset: `evals/capture-parser-v1.jsonl`
+- Provider and strict schemas: `apps/api/src/artha_api/assistant.py`
+- Production capture orchestration: `apps/api/src/artha_api/production_routes.py`
+- Assistant and provider contracts: `apps/api/tests/test_assistant.py`
+- Fictional capture dataset: `evals/capture-parser-v1.jsonl`
 - Dataset contract checker: `scripts/check_capture_evals.py`
+
+Dated benchmark artifacts may retain earlier provider baselines as historical
+evidence. They do not describe the active production runtime.

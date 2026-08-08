@@ -7,13 +7,14 @@ from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .assistant import (
     AssistantChatRequest,
     AssistantChatResponse,
     AssistantFinancialContext,
     AssistantStatus,
+    AssistantUnavailableError,
     CaptureAccount,
     CaptureCategory,
     CaptureClarification,
@@ -26,6 +27,7 @@ from .assistant import (
     ContextMonth,
     ContextTransaction,
     LocalFinancialAssistant,
+    TagCategory,
     TagSuggestionRequest,
     TagSuggestionResponse,
 )
@@ -57,6 +59,22 @@ class ProductionOnboardingRequest(BaseModel):
 class ProductionSplit(BaseModel):
     member_id: UUID
     amount_paise: int = Field(gt=0)
+
+
+class ProductionTagSuggestionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    description: str = Field(min_length=1, max_length=160)
+    amount_paise: int = Field(gt=0)
+    direction: Literal["expense", "income"]
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, description: str) -> str:
+        normalized = " ".join(description.split())
+        if not normalized:
+            raise ValueError("description cannot be blank")
+        return normalized
 
 
 class ProductionDraft(BaseModel):
@@ -680,8 +698,9 @@ async def parse_draft(
     interpreted = await LocalFinancialAssistant().interpret_capture(payload.text, context)
     if interpreted is None:
         raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            "hosted capture interpretation is unavailable; use the validated client parser",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Automatic interpretation is temporarily unavailable; "
+            "review the details manually.",
         )
     result = interpreted.result
     if isinstance(result, CaptureClarification):
@@ -802,7 +821,13 @@ async def assistant_chat(
             for row in list(summary["recent_transactions"])[:8]
         ],
     )
-    return await LocalFinancialAssistant().chat(payload.message, context)
+    try:
+        return await LocalFinancialAssistant().chat(payload.message, context)
+    except AssistantUnavailableError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "AI is temporarily unavailable; the ledger was not changed.",
+        ) from error
 
 
 @router.post(
@@ -811,7 +836,36 @@ async def assistant_chat(
     tags=["assistant"],
 )
 async def assistant_tag_suggestion(
-    payload: TagSuggestionRequest,
+    payload: ProductionTagSuggestionRequest,
+    client: ClientDependency,
     _auth: AuthDependency,
 ) -> TagSuggestionResponse:
-    return await LocalFinancialAssistant().suggest_tag(payload)
+    household_id = await current_household(client)
+    assert household_id is not None
+    category_types = {payload.direction, "both"}
+    allowed_categories = [
+        TagCategory(id=category_id, name=str(category["name"]))
+        for category_id, category in (await categories_by_id(client, household_id)).items()
+        if category.get("category_type") in category_types
+    ]
+    if not allowed_categories:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "no eligible household categories are available for this direction",
+        )
+    request = TagSuggestionRequest(
+        description=payload.description,
+        amount_paise=payload.amount_paise,
+        direction=payload.direction,
+        allowed_categories=allowed_categories,
+    )
+    try:
+        return await LocalFinancialAssistant().suggest_tag(request)
+    except AssistantUnavailableError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            (
+                "AI category suggestion is temporarily unavailable; "
+                "the ledger was not changed."
+            ),
+        ) from error

@@ -862,10 +862,6 @@ async def _run_model_evaluation(
         raise RuntimeError(
             "capture model is disabled; configure the server-side provider or use --mode validate"
         )
-    if settings.provider is LlmProvider.GROQ and not settings.groq_api_key:
-        raise RuntimeError(
-            "Groq is selected but its server-side key is missing; use --mode validate"
-        )
     if settings.provider is LlmProvider.GEMINI and not settings.gemini_api_key:
         raise RuntimeError(
             "Gemini is selected but its server-side key is missing; use --mode validate"

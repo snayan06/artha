@@ -16,20 +16,36 @@ Natural language produces a `TransactionDraft`. Only the confirmation endpoint m
 
 Account balances, spending and shared receivables are derived from immutable-style ledger facts. Corrections are audited and deletes are soft.
 
-## ADR-005: constrained V2 agent
+## ADR-005: constrained read-only assistant
 
-The V2 agent receives only predefined read-only analytics tools. It cannot execute SQL or render arbitrary code. Its structured output maps to reviewed React components.
+The assistant operates on a bounded, server-built financial snapshot. Gemini
+selects one supported intent and must copy its exact approved narrative and
+canonical widget bundle. FastAPI rejects changed titles, labels, values, rows,
+points, order or cardinality before React renders repository-owned components.
+The assistant cannot alter the ledger or render arbitrary model code.
 
-## ADR-006: experimental Qwen default and deferred model benchmark
+## ADR-006: Gemini is the production private-pilot model
 
-The private pilot uses `qwen/qwen3.6-27b` through Groq as its experimental
-hosted model because it supports text, images, reasoning, tool use and structured
-JSON through one provider. Deterministic parsing and merchant rules still run
-first, and the model cannot write transactions or calculate ledger totals.
+**Decision date:** 7 August 2026
 
-A representative Artha evaluation and comparison against other hosted models is
-required before a production model is locked. That evaluation is backlog work
-and does not block the V1 private pilot.
+**Decision:** Use Gemini as the only hosted production LLM for the private
+pilot. Keep explicit Ollama selection development-only.
+
+**Rationale:** One hosted path keeps deployment, privacy review and failure
+handling explicit. Gemini passed the fictional capture, tagging and assistant
+schema gates while preserving Artha's review-before-write boundary.
+
+**Consequences:** Model output remains untrusted and fail-closed. Capture can
+create only a validated unsaved draft; category suggestions must match
+server-owned authenticated household categories; assistant output must equal an
+intent's canonical server-owned bundle. Unavailable or invalid output never
+creates a guessed ledger fact or fabricated answer. Production merchant-rule
+integration remains planned.
+
+Mutable provider configuration, bounded contexts and failure flows belong in
+the [system architecture](system-architecture.md) and
+[LLM usage map](artifacts/architecture/v1-llm-usage-map.md), not this decision
+record.
 
 ## ADR-007: Vercel Hobby and Supabase Free for the private pilot
 

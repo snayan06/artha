@@ -38,7 +38,7 @@ let supabaseClient: SupabaseClient | null = null
 const AUTH_CALLBACK_PARAMETERS = ['code', 'sb_flow_id', 'error', 'error_code', 'error_description'] as const
 
 export function isDemoMode(): boolean {
-  return import.meta.env.VITE_DEMO_MODE !== 'false'
+  return import.meta.env.VITE_DEMO_MODE === 'true'
 }
 
 function authConfiguration(): { url: string; anonKey: string } | null {

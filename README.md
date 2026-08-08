@@ -30,34 +30,46 @@ shared family expenses consistent.
 
 ## Why Artha?
 
-Most expense trackers make capture slower than the purchase itself. Artha is
-built around a five-second workflow:
+Money tracking often fails at the exact moment it asks you to stop and do
+bookkeeping. Artha starts with the sentence already in your head:
 
-1. Write `Paid 1840 for groceries from HDFC UPI, split with family, 3 days ago`.
-2. Review the parsed amount, account, category and split.
-3. Confirm explicitly.
-4. See account movement, personal spending and the shared balance update.
+> `Paid ₹1,840 for groceries from HDFC, split with Krima, three days ago.`
 
-The important product rule is simple: **understanding is automated; saving is
-not**. Parsing never writes directly to the ledger. Common capture works through
-a deterministic parser, while Gemini can propose a structured draft grounded
-only in the user's existing accounts, categories and household participants.
-Every write still requires review and confirmation.
+Or simply:
+
+> `self transfer 25k ICICI -> HDFC`
+
+Artha turns that into an **unsaved draft** containing the amount, transaction
+type, accounts, date, category and sharing details. Review the displayed type;
+correct the amount, description, category, accounts, date or equal-split member
+selection; then confirm. Only confirmation changes the ledger.
+
+That gives you one private view across bank accounts, cards, internal transfers,
+personal spending and expenses shared with family or friends—without making
+capture itself feel like accounting.
+
+> **AI interprets. Artha validates. You decide what gets saved.**
 
 ## Core journeys
 
 1. **Set up once.** Add multiple bank, cash, wallet and credit-card accounts,
    opening balances, card details and people you split expenses with.
 2. **Write naturally.** Try `self transfer 25k ICICI -> HDFC` or
-   `Paid 1840 for groceries from HDFC, split with Mira, 3 days ago`.
-3. **Review before saving.** Check the amount, date, type, account, category and
-   split. Nothing reaches the ledger until confirmation.
+   `Paid 1840 for groceries from HDFC, split with Krima, 3 days ago`.
+3. **Review before saving.** Check the displayed transaction type, then correct
+   the amount, description, category, account, date or equal-split member
+   selection. Nothing reaches the ledger until confirmation.
 4. **Understand the result.** See balances, personal spending, income, account
    activity, shared receivables and a six-month trend.
-5. **Ask the ledger.** The read-only Gemini assistant returns approved metric,
-   chart and table components—never model-authored HTML or direct writes.
+5. **Ask the ledger.** Gemini selects one supported intent, then must return that
+   intent's exact approved narrative and server-owned widget bundle—never model-
+   authored HTML, model-calculated balances or direct writes.
 6. **Keep control.** Export a client-side encrypted backup whose passphrase never
    reaches the API.
+
+If Gemini cannot interpret Quick Add, Artha keeps the exact text and opens the
+manual form. It does not guess. Dashboard and manual entry remain available;
+the assistant shows an honest error when its model is unavailable.
 
 ## What V1 includes
 
@@ -66,7 +78,8 @@ Every write still requires review and confirmation.
 - Natural-language INR capture with a review-before-write workflow.
 - Indian amount shorthand and account-to-account transfer capture such as
   `self transfer 25k ICICI -> HDFC`.
-- Accounts, opening balances, income, expenses, transfers and settlements.
+- Accounts, opening balances, income, expenses and transfers. The settlement
+  accounting foundation exists in the backend; its recording UI is planned.
 - Shared-expense accounting that separates cash movement from personal share.
 - Transaction search plus type and per-account activity filters, including both
   sides of internal transfers.
@@ -76,7 +89,7 @@ Every write still requires review and confirmation.
 - Installable React and TypeScript PWA with responsive bottom navigation.
 - Dashboard balances, six-month cash-flow chart and recent activity.
 - First-run setup for multiple bank, cash, wallet and credit-card accounts.
-- Configurable household participants and exact per-person expense splits.
+- Equal expense splits across the selected household participants.
 - Read-only Gemini assistant with safe inline metrics, charts and tables.
 - Light, dark and system theme support across mobile and desktop.
 
@@ -89,26 +102,28 @@ Every write still requires review and confirmation.
   passphrase never leaves the browser.
 - Privacy-filtered Vercel Web Analytics and Speed Insights; telemetry keeps the
   route but removes URL query strings and fragments before sending.
-- Local SQLite demo that requires no cloud account or paid AI service.
+- Local SQLite demo for manual ledger and UI exploration without a cloud
+  account. The production-grade natural-language examples use configured
+  Gemini; the local deterministic parser remains limited to demo fixtures.
 
 The backend uses FastAPI, Pydantic and SQLAlchemy, and stores money as integer
 paise rather than floating-point values.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    PWA["React PWA"] -->|"validated draft and confirmation"| API["FastAPI"]
-    API --> PARSER["Deterministic capture parser"]
-    API -. "optional structured interpretation" .-> GEMINI["Gemini via official SDK"]
-    API --> LEDGER["Ledger service"]
-    LEDGER --> LOCAL["SQLite local demo"]
-    LEDGER --> DB["Supabase Postgres and RLS"]
-    API --> ASSISTANT["Validated assistant UI"]
-    ASSISTANT -. "hosted model" .-> GEMINI
-    ASSISTANT -. "optional open-weight provider" .-> GROQ["Groq"]
-    ASSISTANT -. "local fallback" .-> OLLAMA["Ollama and Qwen3 4B"]
-```
+![Artha review-before-save architecture](docs/assets/artha-architecture.svg)
+
+Gemini interprets authenticated household context, but strict application code
+owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
+authentication, RLS, idempotency and ledger invariants. A draft is not a
+transaction; only the reviewed confirmation can write.
+
+The assistant follows the same separation. FastAPI builds a bounded snapshot
+from database-backed dashboard data and the canonical widget bundle for every
+supported intent. Gemini chooses the intent and must copy its exact narrative
+and bundle; titles, labels, values, rows, order and widget count cannot change.
+React renders the validated result. Model failure produces no guessed draft or
+assistant answer.
 
 | Layer | Technology |
 |---|---|
@@ -116,13 +131,14 @@ flowchart LR
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async |
 | Local data | SQLite and aiosqlite |
 | Production data | Supabase Postgres, Auth, RLS and REST/RPC adapter |
-| Optional AI | Gemini via the official Google SDK, with Groq or local Ollama alternatives; validated output and deterministic fallback |
+| Production AI | Gemini via the official Google SDK; strict schemas and allow-lists; manual recovery when interpretation is unavailable |
 | Quality | Vitest, pytest, ESLint, Ruff and strict mypy |
 | CI | GitHub Actions |
 
 Money is stored as integer paise. Balances are derived from opening balances and
-ledger movements. Transfers and settlements are not counted as spending or
-income, and confirmed writes are idempotent.
+ledger movements. Transfers are not counted as spending or income, and
+confirmed writes are idempotent. The backend settlement foundation applies the
+same accounting rule; its user-facing workflow is planned.
 
 ## Repository layout
 
@@ -134,7 +150,7 @@ artha/
 ├── supabase/
 │   ├── migrations/       # Schema, constraints, RLS and RPC functions
 │   └── tests/            # SQL catalog assertions
-├── docs/                 # PRD, architecture, deployment and decisions
+├── docs/                 # PRD, architecture, deployment, decisions and assets
 ├── evals/                # Versioned fictional model/parser evaluation data
 ├── scripts/              # Repository contract and evaluation helpers
 ├── .github/workflows/    # CI
@@ -172,11 +188,12 @@ make dev-web
 Open <http://127.0.0.1:5173>. Interactive API documentation is available at
 <http://127.0.0.1:8000/docs>.
 
-### Optional Gemini assistant
+### Gemini in the private pilot
 
-Capture and manual analytics work without an LLM. The private pilot uses
-`gemini-3.5-flash-lite` behind the provider adapter; it is not trusted to write
-or calculate ledger values. Keep the API key only in the server environment:
+Production natural-language capture and the assistant require configured
+Gemini. The current pilot model is `gemini-3.5-flash-lite`, called only from the
+server through the official SDK. It is not trusted to write or calculate ledger
+values. Keep the API key only in the server environment:
 
 ```dotenv
 ARTHA_LLM_PROVIDER=gemini
@@ -185,12 +202,16 @@ ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 Gemini requests are stateless (`store=false`) and model output is validated by
-Artha before use. Google's free tier may use submitted content to improve its
-products, so use fictional data on the free tier; real family finance should use
-an appropriate paid privacy configuration. For a private local fallback, install
-Ollama, pull `qwen3:4b-instruct`, and set `ARTHA_LLM_PROVIDER=ollama`. Provider
-failure falls back to deterministic cards and manual tagging; it never blocks
-ledger capture.
+Artha before use. If capture interpretation fails, the exact input is preserved
+and the manual transaction form opens; no guessed draft is created. If the
+assistant model fails, Artha returns a sanitized unavailable response rather
+than fabricating an answer. Manual entry and database-backed dashboards remain
+available without an LLM.
+
+Google's free tier may use submitted content to improve its products, so use
+fictional data on the free tier; real family finance should use an appropriate
+paid privacy configuration. Developers may explicitly select Ollama for local
+experimentation, but it is not part of the production pilot path.
 
 ## Quality gate
 
@@ -204,7 +225,7 @@ This runs web linting, TypeScript checks, Vitest, the production PWA build,
 Ruff, strict mypy, pytest, every SQL syntax contract, and both keyless validators
 for the 50-case capture dataset and hosted-model runner.
 
-Current release evidence:
+Previous release evidence (recorded before the current documentation pass):
 
 | Gate | Result |
 | --- | --- |
@@ -225,8 +246,8 @@ Current release evidence:
 | `POST` | `/api/v1/onboarding/setup` | Atomically create accounts and household members |
 | `GET` | `/api/v1/profile` | Load the authenticated user's server-owned profile and household |
 | `GET/POST` | `/api/v1/members` | List or create household participants |
-| `GET/POST` | `/api/v1/merchant-rules` | Manage deterministic household auto-tag rules |
-| `POST` | `/api/v1/merchant-rules/learn` | Explicitly remember a prospective merchant rule |
+| `GET/POST` | `/api/v1/merchant-rules` | Manage stored household rules; production Quick Add integration is planned |
+| `POST` | `/api/v1/merchant-rules/learn` | Store a prospective rule; production Quick Add integration is planned |
 | `POST` | `/api/v1/drafts/parse` | Parse an unsaved transaction draft |
 | `POST` | `/api/v1/transactions/confirm` | Confirm a reviewed draft idempotently |
 | `GET` | `/api/v1/transactions` | List confirmed transactions |
@@ -235,7 +256,7 @@ Current release evidence:
 | `GET` | `/api/v1/shared-balances` | Per-member receivables and payables |
 | `GET` | `/api/v1/assistant/status` | Report configured assistant provider without exposing secrets |
 | `POST` | `/api/v1/assistant/chat` | Return validated read-only cards, charts or tables |
-| `POST` | `/api/v1/assistant/tag-suggestion` | Suggest an allow-listed category without saving it |
+| `POST` | `/api/v1/assistant/tag-suggestion` | Bounded server-grounded category API; not called by V1 web |
 | `GET` | `/api/v1/recovery/export` | Export the authenticated household bundle for client-side encryption |
 | `POST` | `/api/v1/recovery/preview` | Validate and summarize a decrypted bundle without writing it |
 | `POST` | `/api/v1/recovery/restore` | Atomically restore a validated bundle into a fresh/empty household |
