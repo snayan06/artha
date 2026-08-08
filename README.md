@@ -111,9 +111,12 @@ paise rather than floating-point values.
 
 ## Architecture
 
-![Artha review-before-save architecture](docs/assets/artha-architecture.svg)
+![Artha product architecture: capture, review, ledger and read-only assistant](docs/assets/artha-architecture.svg)
 
-[Open the editable Excalidraw board.](docs/assets/artha-architecture.excalidraw)
+[Open the editable overview](docs/assets/artha-architecture.excalidraw) or
+[browse the complete architecture pack](docs/artifacts/architecture/README.md),
+including focused boards for capture and metadata, ledger and shared money,
+identity isolation, Ask Artha, and deployment and recovery.
 
 Gemini interprets authenticated household context, but strict application code
 owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
