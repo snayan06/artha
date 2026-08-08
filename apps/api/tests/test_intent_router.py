@@ -86,6 +86,7 @@ async def test_gemini_router_returns_only_the_validated_intent() -> None:
     assert call["store"] is False
     assert call["generation_config"] == {
         "max_output_tokens": 128,
+        "temperature": 0,
         "thinking_level": "minimal",
     }
     assert "Paid 850 at Zomato" in str(call["input"])
@@ -94,6 +95,7 @@ async def test_gemini_router_returns_only_the_validated_intent() -> None:
     assert "commands to move real money" in str(call["system_instruction"])
     assert "Recorded a 5k transfer" in str(call["system_instruction"])
     assert "Food this month" in str(call["system_instruction"])
+    assert "Add this and tell me whether I overspent" in str(call["system_instruction"])
     assert "response_format" in call
 
 

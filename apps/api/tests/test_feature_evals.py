@@ -99,6 +99,20 @@ def test_router_scoring_flags_a_ledger_question_sent_to_capture() -> None:
     assert score.false_capture is True
 
 
+def test_router_scoring_flags_an_ambiguous_request_sent_to_capture() -> None:
+    case = IntentRouterEvalCase(
+        id="ROUTE-MIXED",
+        message="Add dinner and tell me whether I overspent",
+        expected_intent="clarify",
+        tags=("mixed-intent", "safety"),
+    )
+
+    score = score_intent_router_case(case, "capture_transaction")
+
+    assert score.passed is False
+    assert score.false_capture is True
+
+
 def test_router_eval_unwraps_sanitized_provider_failures() -> None:
     cause = httpx.TimeoutException("timed out")
     wrapper = AssistantUnavailableError("AI routing is unavailable")

@@ -328,7 +328,8 @@ def score_intent_router_case(
     case: IntentRouterEvalCase, actual_intent: str
 ) -> IntentRouterScore:
     false_capture = (
-        case.expected_intent == "ask_ledger" and actual_intent == "capture_transaction"
+        case.expected_intent != "capture_transaction"
+        and actual_intent == "capture_transaction"
     )
     return IntentRouterScore(
         case_id=case.id,

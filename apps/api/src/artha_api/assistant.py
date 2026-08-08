@@ -1090,6 +1090,7 @@ class LocalFinancialAssistant:
         input_text: str,
         schema: dict[str, object] | None,
         max_output_tokens: int = 2_048,
+        temperature: float | None = None,
     ) -> str:
         if self._gemini_client is None:
             raise ValueError("Gemini client is not configured")
@@ -1106,6 +1107,7 @@ class LocalFinancialAssistant:
             generation_config={
                 "max_output_tokens": max_output_tokens,
                 "thinking_level": "minimal",
+                **({"temperature": temperature} if temperature is not None else {}),
             },
             store=False,
             timeout=self.settings.timeout_seconds,
@@ -1139,6 +1141,7 @@ class LocalFinancialAssistant:
             input_text=json.dumps(message, ensure_ascii=False),
             schema=IntentRouteResult.model_json_schema(),
             max_output_tokens=128,
+            temperature=0,
         )
         return IntentRouteResult.model_validate_json(content)
 
