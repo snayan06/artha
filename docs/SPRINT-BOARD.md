@@ -22,7 +22,7 @@ Sprint 1 dependency.
 | Area | Status | What this means |
 | --- | --- | --- |
 | AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
-| V1 capture hardening | Locally verified, not deployed | Manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice pass 170 web + 220 API + 50/30/24 AI contracts; publication and final-domain manual acceptance remain |
+| V1 capture hardening | Locally verified, not deployed | Manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice pass 170 web + 223 API + 50/30/24 AI contracts; publication and final-domain manual acceptance remain |
 | Public repository and CI | Done for AI-primary release | Main CI `31268322011` and CodeQL `31268322023` passed for `69e44a8`; the hardening follow-up still needs its own publication checks |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
@@ -132,7 +132,7 @@ on privacy approval, isolation, restore and log-redaction evidence.
 - [x] Constrain assistant output to an approved intent narrative and the exact server-owned widget bundle.
 - [x] Publish AI-primary PR #20 as `69e44a8`; pass main CI `31268322011`, CodeQL
   `31268322023` and both web/API Vercel deployments.
-- [x] Pass the current hardening branch gate: 170 web tests, 220 API tests, 8
+- [x] Pass the current hardening branch gate: 170 web tests, 223 API tests, 8
   migrations, 4 SQL contracts and 50 capture + 30 auto-tag + 24 assistant cases.
 - [x] Manually verify fictional capture success, zero/incomplete-transfer guards, assistant success/failure and no 320/390/1440 Quick Add/Assistant overflow in light/dark.
 - [ ] Re-run hosted fictional Gemini gates with the ignored server-side key for

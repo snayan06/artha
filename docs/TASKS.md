@@ -83,7 +83,7 @@ then prove two-owner isolation and restore the encrypted fictional backup.
 - [x] Restrict assistant responses to approved intents and exact server-owned, database-grounded widget bundles.
 - [x] Merge AI-primary PR #20 as `69e44a8`; pass main CI, CodeQL and both web/API
   Vercel deployments.
-- [x] Pass the current hardening local gate: 170 web, 220 API, 50 capture, 30
+- [x] Pass the current hardening local gate: 170 web, 223 API, 50 capture, 30
   auto-tag and 24 assistant contracts, plus 8 migrations and 4 SQL contracts.
 - [x] Manually verify authenticated production Gemini capture and read-only
   assistant behavior with fictional data during the prior deployed acceptance.
