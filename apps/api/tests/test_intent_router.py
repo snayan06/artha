@@ -4,8 +4,10 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
+from artha_api.app import create_app
 from artha_api.assistant import (
     AssistantSettings,
     AssistantUnavailableError,
@@ -14,9 +16,11 @@ from artha_api.assistant import (
 )
 from artha_api.intent_router import (
     IntentRouteRequest,
+    IntentRouteResponse,
     IntentRouteResult,
     UnifiedIntent,
 )
+from artha_api.intent_routes import get_intent_assistant
 
 
 class FakeGeminiInteractions:
@@ -112,3 +116,78 @@ async def test_router_fails_closed_when_provider_is_disabled() -> None:
 
     with pytest.raises(AssistantUnavailableError, match="AI routing is unavailable"):
         await assistant.route_intent("Show my spending")
+
+
+class FakeIntentAssistant:
+    async def route_intent(self, message: str) -> IntentRouteResponse:
+        assert message == "Show my last three months"
+        return IntentRouteResponse(
+            provider="gemini",
+            model="gemini-3.5-flash-lite",
+            result=IntentRouteResult(intent=UnifiedIntent.ASK_LEDGER),
+        )
+
+
+@pytest.mark.asyncio
+async def test_intent_endpoint_returns_the_exact_model_contract() -> None:
+    app = create_app("sqlite+aiosqlite:///:memory:")
+    app.dependency_overrides[get_intent_assistant] = FakeIntentAssistant
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/v1/intents/route",
+            json={"message": "  Show  my last three months  "},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "gemini",
+        "model": "gemini-3.5-flash-lite",
+        "mode": "model",
+        "result": {"intent": "ask_ledger"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_intent_endpoint_fails_closed_without_a_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "disabled")
+    monkeypatch.delenv("ARTHA_GEMINI_API_KEY", raising=False)
+    app = create_app("sqlite+aiosqlite:///:memory:")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/v1/intents/route",
+            json={"message": "Show my spending"},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "AI routing is temporarily unavailable; nothing was saved."
+    }
+
+
+@pytest.mark.asyncio
+async def test_intent_endpoint_requires_authentication_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    monkeypatch.setenv("ARTHA_LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "test-key")
+    app = create_app()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/api/v1/intents/route",
+            json={"message": "Show my spending"},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Bearer JWT required"}
