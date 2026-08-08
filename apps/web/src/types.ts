@@ -39,6 +39,7 @@ export interface UserProfile {
   displayName: string
   householdName: string
   members: HouseholdMember[]
+  isDemo: boolean
 }
 
 export interface HouseholdMember {

@@ -110,7 +110,7 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
     setSaving(true)
     setError('')
     try {
-      await onSave(preparedAccounts, { displayName: displayName.trim() || 'You', householdName: householdName.trim() || 'My household', members: memberRows.map((member) => ({ id: `draft-${member.id}`, name: member.name.trim() })) })
+      await onSave(preparedAccounts, { displayName: displayName.trim() || 'You', householdName: householdName.trim() || 'My household', members: memberRows.map((member) => ({ id: `draft-${member.id}`, name: member.name.trim() })), isDemo: false })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Setup could not be saved. Try again or explore the fictional demo.')
     } finally {
@@ -122,7 +122,7 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
     setDemoLoading(true)
     setError('')
     try {
-      await onExploreDemo({ displayName: displayName.trim() || 'You', householdName: householdName.trim() || 'My household', members: memberRows.map((member) => ({ id: `draft-${member.id}`, name: member.name.trim() })).filter((member) => member.name) })
+      await onExploreDemo({ displayName: displayName.trim() || 'You', householdName: householdName.trim() || 'My household', members: memberRows.map((member) => ({ id: `draft-${member.id}`, name: member.name.trim() })).filter((member) => member.name), isDemo: true })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The demo could not be prepared. Please try again.')
     } finally {

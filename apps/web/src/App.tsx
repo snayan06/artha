@@ -18,7 +18,7 @@ import type { AccountSetupInput, Dashboard, Transaction, TransactionDraft, UserP
 
 const SETUP_KEY = 'artha.setup.complete'
 const PROFILE_KEY = 'artha.profile'
-const defaultProfile: UserProfile = { displayName: 'You', householdName: 'My household', members: [] }
+const defaultProfile: UserProfile = { displayName: 'You', householdName: 'My household', members: [], isDemo: false }
 const emptyDashboard: Dashboard = {
   availablePaise: 0,
   incomePaise: 0,
@@ -121,11 +121,16 @@ function loadProfile(profileKey: string): UserProfile {
     return {
       displayName: parsed.displayName?.trim() || defaultProfile.displayName,
       householdName: parsed.householdName?.trim() || defaultProfile.householdName,
-      members: Array.isArray(parsed.members) ? parsed.members.filter((member) => member && typeof member.id === 'string' && typeof member.name === 'string') : []
+      members: Array.isArray(parsed.members) ? parsed.members.filter((member) => member && typeof member.id === 'string' && typeof member.name === 'string') : [],
+      isDemo: parsed.isDemo === true
     }
   } catch {
     return defaultProfile
   }
+}
+
+export function isDemoExperience(localDemo: boolean, profile: UserProfile): boolean {
+  return localDemo || profile.isDemo
 }
 
 function persistSetup(profile: UserProfile, profileKey: string, setupKey: string) {
@@ -154,7 +159,6 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   const [profile, setProfile] = useState<UserProfile>(() => loadProfile(profileKey))
   const [dashboard, setDashboard] = useState<Dashboard>(() => localDemo ? demoDashboard : emptyDashboard)
   const [transactions, setTransactions] = useState<Transaction[]>(() => localDemo ? demoTransactions : [])
-  const [demoMode, setDemoMode] = useState(localDemo)
   const [loadingLedger, setLoadingLedger] = useState(setupComplete)
   const [ledgerIssue, setLedgerIssue] = useState<LedgerLoadIssue | null>(null)
 
@@ -184,7 +188,6 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
       const [dashboardResponse, transactionsResponse] = await Promise.all([getDashboard(), getTransactions()])
       setDashboard(dashboardResponse.data)
       setTransactions(transactionsResponse.data)
-      setDemoMode(dashboardResponse.demo || transactionsResponse.demo)
     } catch (error) {
       setLedgerIssue(ledgerLoadIssue(error, 'ledger'))
     } finally {
@@ -236,6 +239,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   if (loadingLedger) return <SessionLoadingPage />
   if (ledgerIssue) return <LedgerLoadError issue={ledgerIssue} onRetry={refreshLedger} onSignOut={onSignOut} />
 
+  const demoMode = isDemoExperience(localDemo, profile)
   let page = <HomePage dashboard={dashboard} demoMode={demoMode} profile={profile} />
   if (path === '/transactions') page = <TransactionsPage transactions={transactions} demoMode={demoMode} />
   if (path === '/shared') page = <SharedPage transactions={transactions} sharedBalancePaise={dashboard.sharedBalancePaise} memberBalances={dashboard.memberBalances} demoMode={demoMode} profile={profile} />

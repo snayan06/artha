@@ -238,6 +238,7 @@ describe('FastAPI adapter', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       display_name: 'Ari',
       household_name: 'Ari household',
+      is_demo: true,
       members: [{ id: 'member-1', name: 'Sam' }]
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
     const { getUserProfile } = await import('./api')
@@ -245,6 +246,7 @@ describe('FastAPI adapter', () => {
     await expect(getUserProfile()).resolves.toEqual({
       displayName: 'Ari',
       householdName: 'Ari household',
+      isDemo: true,
       members: [{ id: 'member-1', name: 'Sam' }]
     })
   })

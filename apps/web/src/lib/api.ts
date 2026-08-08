@@ -398,7 +398,8 @@ export async function getUserProfile(): Promise<UserProfile> {
   return {
     displayName: stringValue(raw.display_name, 'You'),
     householdName: stringValue(raw.household_name, 'My household'),
-    members: mapMembers(raw.members)
+    members: mapMembers(raw.members),
+    isDemo: raw.is_demo === true
   }
 }
 

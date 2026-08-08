@@ -31,7 +31,7 @@ describe('OnboardingPage', () => {
     expect(onSave).toHaveBeenCalledWith([
       expect.objectContaining({ name: 'HDFC UPI', kind: 'bank', opening_balance_paise: 1_250_000 }),
       expect.objectContaining({ name: 'Travel Card', kind: 'credit_card', opening_balance_paise: -240_000, credit_limit_paise: 10_000_000, statement_day: 5, payment_due_day: 25 })
-    ], { displayName: 'Ari', householdName: 'Shah family', members: [{ id: expect.stringMatching(/^draft-/), name: 'Sam' }] })
+    ], { displayName: 'Ari', householdName: 'Shah family', members: [{ id: expect.stringMatching(/^draft-/), name: 'Sam' }], isDemo: false })
   })
 
   it('offers an explicit fictional demo without saving setup accounts', async () => {
@@ -39,7 +39,7 @@ describe('OnboardingPage', () => {
     const onExploreDemo = vi.fn().mockResolvedValue(undefined)
     render(<OnboardingPage onSave={vi.fn()} onExploreDemo={onExploreDemo} />)
     await user.click(screen.getByRole('button', { name: 'Explore fictional demo' }))
-    await waitFor(() => expect(onExploreDemo).toHaveBeenCalledWith({ displayName: 'You', householdName: 'My household', members: [] }))
+    await waitFor(() => expect(onExploreDemo).toHaveBeenCalledWith({ displayName: 'You', householdName: 'My household', members: [], isDemo: true }))
   })
 
   it('rejects duplicate names across money accounts and credit cards before review', async () => {
