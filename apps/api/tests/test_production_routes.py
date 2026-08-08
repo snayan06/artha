@@ -6,6 +6,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from artha_api import production_routes
 from artha_api.assistant import (
     AssistantChatRequest,
     CaptureClarification,
@@ -40,6 +41,132 @@ DESTINATION_ACCOUNT_ID = "00000000-0000-0000-0000-000000000107"
 CATEGORY_ID = "00000000-0000-0000-0000-000000000104"
 USER_ID = "00000000-0000-0000-0000-000000000105"
 TRANSACTION_ID = "00000000-0000-0000-0000-000000000106"
+
+
+class FakeCaptureContextClient:
+    def __init__(
+        self,
+        *,
+        accounts: list[dict[str, Any]],
+        categories: list[dict[str, Any]],
+        include_owner: bool = True,
+    ) -> None:
+        self.accounts = accounts
+        self.categories = categories
+        self.include_owner = include_owner
+        self.params_by_path: dict[str, dict[str, str]] = {}
+
+    async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
+        if name == "get_current_household":
+            assert payload is None
+            return HOUSEHOLD_ID
+        if name == "get_account_balances":
+            assert payload == {"p_household_id": HOUSEHOLD_ID}
+            return []
+        raise AssertionError(f"unexpected RPC: {name}")
+
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
+        assert method == "GET"
+        self.params_by_path[path] = kwargs["params"]
+        if path == "household_members":
+            return [
+                {
+                    "id": OWNER_ID,
+                    "profile_id": USER_ID if self.include_owner else "another-user",
+                    "display_name": "Owner",
+                    "member_type": "user",
+                    "role": "owner",
+                    "is_active": True,
+                    "created_at": "2026-08-04T00:00:00+00:00",
+                }
+            ]
+        if path == "accounts":
+            return self.accounts
+        if path == "categories":
+            return self.categories
+        raise AssertionError(f"unexpected path: {path}")
+
+
+async def test_production_capture_context_is_household_scoped_and_grounded() -> None:
+    client = FakeCaptureContextClient(
+        accounts=[
+            {
+                "id": ACCOUNT_ID,
+                "name": "Known Bank",
+                "account_type": "bank",
+                "currency": "INR",
+                "opening_balance_paise": 50_000,
+                "credit_limit_paise": None,
+                "statement_day": None,
+                "payment_due_day": None,
+                "is_archived": False,
+                "created_at": "2026-08-04T00:00:00+00:00",
+            }
+        ],
+        categories=[
+            {"id": "expense", "name": "Food", "category_type": "expense"},
+            {"id": "income", "name": "Salary", "category_type": "income"},
+            {"id": "both", "name": "Other", "category_type": "both"},
+            {"id": "invalid", "name": "Invalid", "category_type": "transfer"},
+        ],
+    )
+
+    response = await production_routes.capture_context(
+        cast(SupabaseRestClient, client),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert response.model_dump(mode="json") == {
+        "accounts": [{"id": ACCOUNT_ID, "name": "Known Bank", "kind": "bank"}],
+        "categories": [
+            {"id": "expense", "name": "Food", "kind": "expense"},
+            {"id": "income", "name": "Salary", "kind": "income"},
+            {"id": "both", "name": "Other", "kind": "both"},
+        ],
+    }
+    assert client.params_by_path["accounts"] == expect_capture_scope(
+        "id,name,account_type,currency,opening_balance_paise,credit_limit_paise,"
+        "statement_day,payment_due_day,is_archived,created_at",
+        order="created_at.asc,id.asc",
+    )
+    assert client.params_by_path["categories"] == expect_capture_scope(
+        "id,name,category_type"
+    )
+
+
+async def test_production_capture_context_rejects_a_non_owner() -> None:
+    client = FakeCaptureContextClient(accounts=[], categories=[], include_owner=False)
+
+    with pytest.raises(HTTPException) as error:
+        await production_routes.capture_context(
+            cast(SupabaseRestClient, client),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 403
+
+
+async def test_production_capture_context_returns_empty_lists() -> None:
+    response = await production_routes.capture_context(
+        cast(
+            SupabaseRestClient,
+            FakeCaptureContextClient(accounts=[], categories=[]),
+        ),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert response.model_dump(mode="json") == {"accounts": [], "categories": []}
+
+
+def expect_capture_scope(select: str, *, order: str | None = None) -> dict[str, str]:
+    params = {
+        "household_id": f"eq.{HOUSEHOLD_ID}",
+        "is_archived": "eq.false",
+        "select": select,
+    }
+    if order is not None:
+        params["order"] = order
+    return params
 
 
 async def test_production_assistant_routes_return_503_when_provider_is_disabled(

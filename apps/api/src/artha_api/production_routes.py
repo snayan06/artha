@@ -33,7 +33,14 @@ from .assistant import (
 )
 from .auth import AuthDependency
 from .recovery import RecoveryBundle
-from .schemas import AccountCreate, MemberCreate, ParseRequest
+from .schemas import (
+    AccountCreate,
+    CaptureContextAccount,
+    CaptureContextCategory,
+    CaptureContextResponse,
+    MemberCreate,
+    ParseRequest,
+)
 from .supabase_rest import SupabaseRestClient, rest_client_for_request
 
 router = APIRouter()
@@ -199,6 +206,47 @@ async def list_accounts(client: ClientDependency) -> list[dict[str, Any]]:
     household_id = await current_household(client)
     assert household_id is not None
     return await account_rows(client, household_id)
+
+
+@router.get(
+    "/api/v1/capture-context",
+    response_model=CaptureContextResponse,
+    tags=["transactions"],
+)
+async def capture_context(
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> CaptureContextResponse:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    accounts = await account_rows(client, household_id)
+    categories = (await categories_by_id(client, household_id)).values()
+    return CaptureContextResponse(
+        accounts=[
+            CaptureContextAccount(
+                id=str(account["id"]),
+                name=str(account["name"]),
+                kind=cast(
+                    Literal["bank", "cash", "wallet", "credit_card", "other"],
+                    str(account["kind"]),
+                ),
+            )
+            for account in accounts
+        ],
+        categories=[
+            CaptureContextCategory(
+                id=str(category["id"]),
+                name=str(category["name"]),
+                kind=cast(
+                    Literal["expense", "income", "both"],
+                    str(category["category_type"]),
+                ),
+            )
+            for category in categories
+            if category.get("category_type") in {"expense", "income", "both"}
+        ],
+    )
 
 
 @router.get("/api/v1/members", tags=["members"])

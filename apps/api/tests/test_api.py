@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from fastapi import FastAPI
 from httpx import AsyncClient
+
+from artha_api.models import Account
 
 
 def account_id(data: dict[str, Any], name: str) -> int:
@@ -40,6 +43,39 @@ async def test_concurrent_demo_bootstrap_is_replay_safe(client: AsyncClient) -> 
     assert sorted([first.json()["created"], second.json()["created"]]) == [False, True]
     assert len(first.json()["accounts"]) == len(second.json()["accounts"]) == 2
     assert len(first.json()["transactions"]) == len(second.json()["transactions"]) == 2
+
+
+async def test_capture_context_is_owner_scoped_and_filters_archived_accounts(
+    app: FastAPI,
+    client: AsyncClient,
+) -> None:
+    async with app.state.session_factory() as session:
+        session.add_all(
+            [
+                Account(user_id="demo-user", name="Active bank", kind="bank"),
+                Account(
+                    user_id="demo-user",
+                    name="Archived bank",
+                    kind="bank",
+                    is_archived=True,
+                ),
+                Account(user_id="another-owner", name="Other bank", kind="bank"),
+            ]
+        )
+        await session.commit()
+
+    response = await client.get("/api/v1/capture-context")
+
+    assert response.status_code == 200
+    assert [account["name"] for account in response.json()["accounts"]] == [
+        "Active bank"
+    ]
+    assert response.json()["categories"]
+    assert {category["kind"] for category in response.json()["categories"]} == {
+        "expense",
+        "income",
+        "both",
+    }
 
 
 async def test_seed_dashboard_respects_personal_share_and_account_movement(

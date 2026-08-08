@@ -17,6 +17,23 @@ class HealthResponse(ApiModel):
     version: str
 
 
+class CaptureContextAccount(ApiModel):
+    id: int | str
+    name: str = Field(min_length=1, max_length=100)
+    kind: Literal["bank", "cash", "wallet", "credit_card", "other"]
+
+
+class CaptureContextCategory(ApiModel):
+    id: int | str
+    name: str = Field(min_length=1, max_length=80)
+    kind: Literal["expense", "income", "both"]
+
+
+class CaptureContextResponse(ApiModel):
+    accounts: list[CaptureContextAccount]
+    categories: list[CaptureContextCategory]
+
+
 class AccountCreate(ApiModel):
     name: str = Field(min_length=1, max_length=80)
     kind: AccountKind

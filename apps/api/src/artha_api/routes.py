@@ -38,6 +38,9 @@ from .schemas import (
     AccountRead,
     AccountSetupRequest,
     BootstrapResponse,
+    CaptureContextAccount,
+    CaptureContextCategory,
+    CaptureContextResponse,
     DashboardCategory,
     DashboardMonth,
     DashboardResponse,
@@ -64,6 +67,18 @@ from .schemas import (
 
 router = APIRouter()
 SessionDependency = Annotated[AsyncSession, Depends(get_session)]
+
+LOCAL_CAPTURE_CATEGORIES = (
+    CaptureContextCategory(id="local-groceries", name="Groceries", kind="expense"),
+    CaptureContextCategory(
+        id="local-food-dining", name="Food & Dining", kind="expense"
+    ),
+    CaptureContextCategory(id="local-housing", name="Housing", kind="expense"),
+    CaptureContextCategory(id="local-transport", name="Transport", kind="expense"),
+    CaptureContextCategory(id="local-shopping", name="Shopping", kind="expense"),
+    CaptureContextCategory(id="local-salary", name="Salary", kind="income"),
+    CaptureContextCategory(id="local-other", name="Other", kind="both"),
+)
 
 
 async def account_to_read(session: AsyncSession, account: Account) -> AccountRead:
@@ -142,6 +157,29 @@ async def health() -> HealthResponse:
 async def list_accounts(session: SessionDependency, auth: AuthDependency) -> list[AccountRead]:
     account_models = await list_account_models(session, auth.user_id)
     return [await account_to_read(session, account) for account in account_models]
+
+
+@router.get(
+    "/api/v1/capture-context",
+    response_model=CaptureContextResponse,
+    tags=["transactions"],
+)
+async def capture_context(
+    session: SessionDependency,
+    auth: AuthDependency,
+) -> CaptureContextResponse:
+    accounts = await list_account_models(session, auth.user_id)
+    return CaptureContextResponse(
+        accounts=[
+            CaptureContextAccount(
+                id=account.id,
+                name=account.name,
+                kind=account.kind.value,
+            )
+            for account in accounts
+        ],
+        categories=list(LOCAL_CAPTURE_CATEGORIES),
+    )
 
 
 @router.post(
