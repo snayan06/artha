@@ -29,7 +29,7 @@ const supabase = vi.hoisted(() => {
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => supabase.client) }))
 
 import App from '../App'
-import { AuthProvider, useAuth } from './auth'
+import { AuthProvider, isDemoMode, useAuth } from './auth'
 
 function session(token: string): Session {
   return {
@@ -84,6 +84,12 @@ describe('Supabase auth provider', () => {
     vi.unstubAllEnvs()
     vi.clearAllMocks()
     window.history.replaceState({}, '', '/')
+  })
+
+  it('fails closed when demo auth is not explicitly enabled', () => {
+    vi.stubEnv('VITE_DEMO_MODE', '')
+
+    expect(isDemoMode()).toBe(false)
   })
 
   it('shows an accessible magic-link gate and sends the redirect to this origin', async () => {
