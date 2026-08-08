@@ -79,6 +79,14 @@ class ReviewedAttribute(StrictMetadataModel):
     confidence: float = Field(ge=0, le=1)
     review_status: ReviewStatus = "needs_review"
 
+    @field_validator("value")
+    @classmethod
+    def normalize_value(cls, value: str) -> str:
+        normalized = normalize_label(value)
+        if not normalized:
+            raise ValueError("attribute value cannot be blank")
+        return normalized
+
 
 class ReviewedEvidence(StrictMetadataModel):
     source: EvidenceSource
@@ -241,7 +249,7 @@ def suggest_transaction_metadata(
 
     matching_rules = sorted(
         (rule for rule in merchant_rules if _rule_matches(rule, merchant_key)),
-        key=lambda rule: (int(rule.get("priority", 100)), str(rule.get("id", ""))),
+        key=lambda rule: (-int(rule.get("priority", 100)), str(rule.get("id", ""))),
     )
     if matching_rules:
         category = _category_by_id(categories, str(matching_rules[0]["category_id"]))

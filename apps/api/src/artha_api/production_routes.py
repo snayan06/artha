@@ -47,7 +47,14 @@ from .schemas import (
     normalize_required_description,
 )
 from .supabase_rest import SupabaseRestClient, rest_client_for_request
-from .transaction_metadata import ReviewedMetadata, SuggestedTag, suggest_transaction_metadata
+from .transaction_metadata import (
+    SAFE_TAG_PHRASES,
+    ReviewedMetadata,
+    SuggestedTag,
+    normalize_key,
+    normalize_label,
+    suggest_transaction_metadata,
+)
 
 router = APIRouter()
 
@@ -132,13 +139,13 @@ def capture_clarification_response(
         explanation = "Add a short description to continue. Nothing has been saved."
     elif missing_field == "occurred_on":
         question = "When did this happen?"
-        explanation = "Choose the transaction date to continue. Nothing has been saved."
+        explanation = "Open the form below and enter the date. Nothing has been saved."
     elif missing_field == "category_id":
         question = "Which category fits this transaction?"
-        explanation = "Choose a category to continue. Nothing has been saved."
+        explanation = "Open the form below and choose a category. Nothing has been saved."
     else:
         question = "Who was this shared with?"
-        explanation = "Choose the people involved to continue. Nothing has been saved."
+        explanation = "Open the form below and select the people involved. Nothing has been saved."
 
     response = CaptureClarificationResponse(
         source_text=source_text,
@@ -220,6 +227,16 @@ class ProductionDraft(BaseModel):
     def normalize_description(cls, description: str) -> str:
         return normalize_required_description(description)
 
+    @field_validator("platform", "subcategory")
+    @classmethod
+    def normalize_optional_metadata_label(cls, value: str | None, info: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = normalize_label(value)
+        if not normalized:
+            raise ValueError(f"{info.field_name} cannot be blank")
+        return normalized
+
     @model_validator(mode="after")
     def split_total_matches(self) -> ProductionDraft:
         if self.personal_share_paise + sum(item.amount_paise for item in self.splits) != (
@@ -255,6 +272,38 @@ class ProductionDraft(BaseModel):
         ]
         if any(review_status != "reviewed" for review_status in review_statuses):
             raise ValueError("metadata must be reviewed before confirmation")
+        provenance_sources = [
+            *(item.source for item in (self.metadata.evidence.values() if self.metadata else [])),
+            *(item.source for item in (self.metadata.attributes if self.metadata else [])),
+            *(item.source for item in self.tags),
+        ]
+        if any(source != "user_corrected" for source in provenance_sources):
+            raise ValueError(
+                "reviewed metadata provenance must be user-corrected at confirmation"
+            )
+        if self.metadata is not None:
+            if "platform" in self.metadata.evidence and self.platform is None:
+                raise ValueError("platform evidence requires a platform")
+            if "subcategory" in self.metadata.evidence and self.subcategory is None:
+                raise ValueError("subcategory evidence requires a subcategory")
+        tag_names = [tag.normalized_name for tag in self.tags]
+        if len(tag_names) != len(set(tag_names)):
+            raise ValueError("transaction tags must be unique")
+        allowed_tag_names = {normalize_key(name) for name in SAFE_TAG_PHRASES}
+        if any(tag.normalized_name not in allowed_tag_names for tag in self.tags):
+            raise ValueError("transaction tag is not in the server allow-list")
+        reserved = {
+            normalize_key(value)
+            for value in (
+                self.description,
+                self.category or "",
+                self.platform or "",
+                self.subcategory or "",
+            )
+            if value
+        }
+        if any(tag.normalized_name in reserved for tag in self.tags):
+            raise ValueError("tag duplicates a transaction field")
         return self
 
 
@@ -496,7 +545,7 @@ async def merchant_rule_rows(
                 "id,match_type,merchant_pattern,category_id,account_id,"
                 "priority,is_active"
             ),
-            "order": "priority.asc,id.asc",
+            "order": "priority.desc,id.asc",
         },
     )
     return list(rows or [])

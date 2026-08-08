@@ -1,6 +1,6 @@
 # Real product and demo separation design
 
-Status: approved for implementation  
+Status: approved for implementation
 Date: 9 August 2026
 
 ## Product decision

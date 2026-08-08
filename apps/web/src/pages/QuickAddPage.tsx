@@ -325,7 +325,22 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
               {!showsMetadataReview && <DraftField label="Description" value={draft.merchant} required maxLength={240} onChange={(value) => editDraft({ ...draft, merchant: value })} />}
               {draft.kind === 'transfer'
                 ? <ReadOnlyField label="Category" value="Transfer" />
-                : <CategoryField categories={categoryOptions} selected={selectedCategory} onChange={(category) => editDraft({ ...draft, category: category.name })} />}
+                : <CategoryField categories={categoryOptions} selected={selectedCategory} onChange={(category) => editDraft({
+                    ...draft,
+                    category: category.name,
+                    categorySuggestion: undefined,
+                    metadata: draft.metadata ? {
+                      ...draft.metadata,
+                      evidence: {
+                        ...draft.metadata.evidence,
+                        category: {
+                          source: 'user_corrected',
+                          confidence: 1,
+                          reviewStatus: 'needs_review'
+                        }
+                      }
+                    } : draft.metadata
+                  })} />}
               <AccountField label={draft.kind === 'transfer' ? 'Transfer from' : draft.kind === 'credit' ? 'Received in' : 'Paid from'} ariaLabel={draft.kind === 'transfer' ? 'Transfer from account' : draft.kind === 'credit' ? 'Received in account' : 'Paid from account'} accounts={accounts} selectedId={draft.sourceAccountId} onChange={(account) => editDraft({ ...draft, account: account.name, sourceAccountId: account.id })} />
               {draft.kind === 'transfer' && <AccountField label="Transfer to" ariaLabel="Transfer to account" accounts={accounts} selectedId={draft.destinationAccountId} onChange={(account) => editDraft({ ...draft, destinationAccount: account.name, destinationAccountId: account.id })} />}
               <DateField value={draft.occurredAt} onChange={(value) => editDraft({ ...draft, occurredAt: value })} />

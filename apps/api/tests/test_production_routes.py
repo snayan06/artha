@@ -611,20 +611,20 @@ async def test_production_confirmation_persists_only_reviewed_metadata() -> None
         metadata=ReviewedMetadata(
             evidence={
                 "merchant": ReviewedEvidence(
-                    source="user_explicit", confidence=0.99, review_status="reviewed"
+                    source="user_corrected", confidence=0.99, review_status="reviewed"
                 ),
                 "platform": ReviewedEvidence(
-                    source="user_explicit", confidence=0.99, review_status="reviewed"
+                    source="user_corrected", confidence=0.99, review_status="reviewed"
                 ),
                 "category": ReviewedEvidence(
-                    source="safe_catalog", confidence=1, review_status="reviewed"
+                    source="user_corrected", confidence=1, review_status="reviewed"
                 ),
             },
             attributes=[
                 ReviewedAttribute(
                     key="order_channel",
                     value="Delivery",
-                    source="safe_catalog",
+                    source="user_corrected",
                     confidence=1,
                     review_status="reviewed",
                 )
@@ -634,7 +634,7 @@ async def test_production_confirmation_persists_only_reviewed_metadata() -> None
             SuggestedTag(
                 name="Date Night",
                 normalized_name="date night",
-                source="user_explicit",
+                source="user_corrected",
                 confidence=0.98,
                 review_status="reviewed",
             )
@@ -658,17 +658,17 @@ async def test_production_confirmation_persists_only_reviewed_metadata() -> None
         "subcategory": "Fast Food",
         "evidence": {
             "merchant": {
-                "source": "user_explicit",
+                "source": "user_corrected",
                 "confidence": 0.99,
                 "review_status": "reviewed",
             },
             "platform": {
-                "source": "user_explicit",
+                "source": "user_corrected",
                 "confidence": 0.99,
                 "review_status": "reviewed",
             },
             "category": {
-                "source": "safe_catalog",
+                "source": "user_corrected",
                 "confidence": 1.0,
                 "review_status": "reviewed",
             },
@@ -677,7 +677,7 @@ async def test_production_confirmation_persists_only_reviewed_metadata() -> None
             {
                 "key": "order_channel",
                 "value": "Delivery",
-                "source": "safe_catalog",
+                "source": "user_corrected",
                 "confidence": 1.0,
                 "review_status": "reviewed",
             }
@@ -686,7 +686,7 @@ async def test_production_confirmation_persists_only_reviewed_metadata() -> None
             {
                 "name": "Date Night",
                 "normalized_name": "date night",
-                "source": "user_explicit",
+                "source": "user_corrected",
                 "confidence": 0.98,
                 "review_status": "reviewed",
             }
@@ -710,6 +710,57 @@ def test_production_confirmation_rejects_unreviewed_or_transfer_metadata() -> No
                     )
                 }
             ),
+            personal_share_paise=10_000,
+            source_account_id=ACCOUNT_ID,
+        )
+
+
+def test_production_confirmation_rejects_untrusted_or_redundant_metadata() -> None:
+    with pytest.raises(ValidationError, match="reviewed metadata provenance"):
+        ProductionDraft(
+            kind="expense",
+            amount_paise=10_000,
+            description="Dinner",
+            category="Food & Dining",
+            metadata=ReviewedMetadata(
+                evidence={
+                    "category": ReviewedEvidence(
+                        source="safe_catalog",
+                        confidence=1,
+                        review_status="reviewed",
+                    )
+                }
+            ),
+            personal_share_paise=10_000,
+            source_account_id=ACCOUNT_ID,
+        )
+
+    with pytest.raises(ValidationError, match="tag duplicates a transaction field"):
+        ProductionDraft(
+            kind="expense",
+            amount_paise=10_000,
+            description="Date Night",
+            category="Food & Dining",
+            tags=[
+                SuggestedTag(
+                    name="Date Night",
+                    normalized_name="date night",
+                    source="user_corrected",
+                    confidence=1,
+                    review_status="reviewed",
+                )
+            ],
+            personal_share_paise=10_000,
+            source_account_id=ACCOUNT_ID,
+        )
+
+    with pytest.raises(ValidationError, match="platform cannot be blank"):
+        ProductionDraft(
+            kind="expense",
+            amount_paise=10_000,
+            description="Dinner",
+            category="Food & Dining",
+            platform="   ",
             personal_share_paise=10_000,
             source_account_id=ACCOUNT_ID,
         )
@@ -1125,6 +1176,28 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
         "warnings": [],
         "parser_source": "gemini:test-model",
     }
+
+
+def test_category_clarification_points_to_the_form_without_fake_choices() -> None:
+    result = production_routes.capture_clarification_response(
+        CaptureClarification(
+            outcome="clarify",
+            question="untrusted model wording",
+            missing=["category_id"],
+            amount_paise=54_000,
+            kind="expense",
+            description="Zomato",
+        ),
+        source_text="Paid 540 at Zomato from HDFC UPI",
+        accounts=[],
+        parser_source="gemini:test-model",
+    )
+
+    assert result["missing_field"] == "category_id"
+    assert result["choices"] == []
+    assert result["explanation"] == (
+        "Open the form below and choose a category. Nothing has been saved."
+    )
 
 
 async def test_parse_draft_enriches_reviewable_transaction_metadata(

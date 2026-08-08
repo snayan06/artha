@@ -126,10 +126,10 @@ describe('FastAPI adapter', () => {
       subcategory: 'Delivery',
       metadata: {
         version: 1,
-        evidence: { platform: { source: 'safe_catalog', confidence: 1, review_status: 'reviewed' } },
-        attributes: [{ key: 'order_channel', value: 'Delivery', source: 'safe_catalog', confidence: 1, review_status: 'reviewed' }]
+        evidence: { platform: { source: 'user_corrected', confidence: 1, review_status: 'reviewed' } },
+        attributes: [{ key: 'order_channel', value: 'Delivery', source: 'user_corrected', confidence: 1, review_status: 'reviewed' }]
       },
-      tags: [{ name: 'Work Meal', normalized_name: 'work meal', source: 'user_explicit', confidence: 0.95, review_status: 'reviewed' }],
+      tags: [{ name: 'Work Meal', normalized_name: 'work meal', source: 'user_corrected', confidence: 0.95, review_status: 'reviewed' }],
       splits: [{ member_id: 7, amount_paise: 92000 }]
     })
     expect((confirmInit.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy()

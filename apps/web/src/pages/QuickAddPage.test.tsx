@@ -193,6 +193,10 @@ describe('QuickAddPage', () => {
     expect(screen.getByRole('heading', { name: 'Optional tags' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Date Night' })).toBeChecked()
     expect(onConfirm).not.toHaveBeenCalled()
+
+    await user.selectOptions(screen.getByLabelText('Category'), 'Other')
+    expect(screen.queryByRole('heading', { name: 'Suggested category' })).not.toBeInTheDocument()
+    expect(screen.queryByText("Burger King is in Artha's food merchant catalog.")).not.toBeInTheDocument()
   })
 
   it('offers a form-first entry with an explicit date picker', async () => {

@@ -499,14 +499,14 @@ function toApiDraft(draft: TransactionDraft): JsonObject {
   const reviewedMetadata = draft.metadata ? {
     version: 1,
     evidence: Object.fromEntries(Object.entries(draft.metadata.evidence).map(([field, evidence]) => [field, {
-      source: evidence?.source,
+      source: 'user_corrected',
       confidence: evidence?.confidence,
       review_status: 'reviewed'
     }])),
     attributes: draft.metadata.attributes.map((attribute) => ({
       key: attribute.key,
       value: attribute.value,
-      source: attribute.source,
+      source: 'user_corrected',
       confidence: attribute.confidence,
       review_status: 'reviewed'
     }))
@@ -529,7 +529,7 @@ function toApiDraft(draft: TransactionDraft): JsonObject {
     tags: draft.kind === 'debit' ? (draft.tags ?? []).filter((tag) => tag.selected).map((tag) => ({
       name: tag.name,
       normalized_name: tag.normalizedName,
-      source: tag.source,
+      source: 'user_corrected',
       confidence: tag.confidence,
       review_status: 'reviewed'
     })) : []

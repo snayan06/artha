@@ -75,8 +75,8 @@ the assistant shows an honest error when its model is unavailable.
 ### Fast capture and correct accounting
 
 - Natural-language INR capture with a review-before-write workflow.
-- One-question continuation with grounded account/category choices when an
-  otherwise valid sentence is incomplete.
+- One-question continuation with grounded account choices and a safe full-form
+  recovery when another required detail is missing.
 - Reviewed merchant, platform, subcategory, meal/order context and optional
   explicit tags stored as bounded versioned transaction metadata.
 - Indian amount shorthand and account-to-account transfer capture such as
@@ -240,7 +240,7 @@ Current local release-candidate evidence:
 | Gate | Result |
 | --- | --- |
 | Web | 19 test files, 184 tests passed |
-| API | 245 tests passed |
+| API | 249 tests passed |
 | AI contracts | 60 capture, 30 auto-tag and 24 assistant cases valid |
 | Hosted Gemini on sample data | Prior deployed baseline: 50/50 capture, 30/30 auto-tag, 24/24 assistant; the new 60-case hosted rerun is pending |
 | Production UI | All six primary pages fit at 320 px, 390 px and 1440 px; light/dark controls and mobile/desktop dark UI verified |

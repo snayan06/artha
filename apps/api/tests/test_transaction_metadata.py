@@ -103,6 +103,41 @@ def test_personal_merchant_rule_wins_over_catalog_and_model() -> None:
     assert result.category_reason == "Your Burger King rule suggests Travel."
 
 
+def test_highest_priority_personal_merchant_rule_wins() -> None:
+    result = suggest_transaction_metadata(
+        source_text="Paid 680 at Burger King",
+        merchant="Burger King",
+        platform=None,
+        model_category_id=None,
+        model_category_name=None,
+        model_subcategory=None,
+        model_attributes=[],
+        model_tags=[],
+        categories=[FOOD_CATEGORY, TRAVEL_CATEGORY],
+        merchant_rules=[
+            {
+                "id": "lower-priority",
+                "match_type": "exact",
+                "merchant_pattern": "burger king",
+                "category_id": "food-id",
+                "priority": 10,
+                "is_active": True,
+            },
+            {
+                "id": "higher-priority",
+                "match_type": "exact",
+                "merchant_pattern": "burger king",
+                "category_id": "travel-id",
+                "priority": 100,
+                "is_active": True,
+            },
+        ],
+    )
+
+    assert result.category_id == "travel-id"
+    assert result.category_name == "Travel"
+
+
 def test_metadata_rejects_inferred_or_redundant_tags_and_arbitrary_attributes() -> None:
     result = suggest_transaction_metadata(
         source_text="Paid 680 for dinner at Burger King via Zomato",
@@ -157,6 +192,17 @@ def test_reviewed_metadata_rejects_duplicate_attribute_keys() -> None:
                     review_status="reviewed",
                 ),
             ]
+        )
+
+
+def test_reviewed_attribute_rejects_whitespace_only_values() -> None:
+    with pytest.raises(ValueError, match="attribute value cannot be blank"):
+        ReviewedAttribute(
+            key="order_channel",
+            value="   ",
+            source="user_corrected",
+            confidence=1,
+            review_status="reviewed",
         )
 
 

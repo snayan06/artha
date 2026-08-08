@@ -70,7 +70,12 @@ For `Paid ₹540 at Zomato` without an account, the UI can render:
 > How did you pay?<br>
 > Choose one so Artha updates the correct balance. Nothing has been saved.
 
-The emoji is decorative and accompanied by text. Account choices come only from authenticated active accounts. Category, destination-account, date, and member choices follow the same allow-list rule. Choosing an option appends a plain-language answer to the exact source message and re-runs interpretation; it does not mutate or save a partial transaction.
+The emoji is decorative and accompanied by text. Account and destination-account
+choices come only from authenticated active accounts. For category, date, or
+member details, the card explains that the full form must be opened instead of
+claiming to offer choices that are not present. Choosing an available option
+appends a plain-language answer to the exact source message and re-runs
+interpretation; it does not mutate or save a partial transaction.
 
 The card uses `role="status"` with a polite live region. Operational failures remain `role="alert"` and visually distinct from normal clarification.
 
@@ -119,7 +124,12 @@ Every core or optional reviewed field represented in the capture response has:
 - `review_status`: `needs_review` or `reviewed` in the draft; all persisted evidence is `reviewed` because it is written only by explicit confirmation;
 - a bounded, server-owned explanation where the UI needs one.
 
-The model may emit only `user_explicit` or `model_suggested`. Server orchestration is the only source of `household_rule` and `safe_catalog`; the browser is the only source of `user_corrected`. Confirmation strips raw source text, converts remaining evidence to `reviewed`, validates it again, and passes the bounded metadata object to the atomic RPC.
+The model may emit only `user_explicit` or `model_suggested`. Server orchestration
+is the only source of `household_rule` and `safe_catalog` in the unsaved review.
+At confirmation the browser converts every accepted metadata item to
+`user_corrected`; FastAPI rejects any reviewed payload that still claims model,
+catalog, or rule provenance. It also strips raw source text, validates the
+bounded metadata again, and passes it to the atomic RPC.
 
 ### Category suggestions and precedence
 
@@ -136,18 +146,25 @@ Personal rules always win. A catalog or model result cannot create a category. C
 
 The current release accepts only a small server-owned set of explicit tag phrases and stores the selected reviewed tags in the confirmed transaction's versioned metadata. Household-created tags, aliases, lifecycle management, and indexed relational links remain a separate database release with their own RLS and recovery acceptance.
 
-Safe built-in tag suggestions are limited to explicit, high-signal phrases such as “date night”, “work meal”, “on vacation”, or “treat”. Existing household names and aliases can match explicit phrases. Suggestions appear separately from Category and can be accepted, corrected, removed, or ignored. Confirmation remains enabled with zero tags.
+Safe built-in tag suggestions are limited to explicit, high-signal phrases such
+as “date night”, “work meal”, “on vacation”, or “treat”. Suggestions appear
+separately from Category and can be accepted, removed, or ignored. Confirmation
+remains enabled with zero tags. Household tag names and aliases remain deferred.
 
 The server rejects tags equivalent to the category, subcategory, merchant, platform, account, a weekday/date/weekend marker, or shared/split state. This prevents redundant taxonomy even if the browser is bypassed.
 
 ## API and persistence flow
 
-1. FastAPI loads active accounts, direction-valid categories, personal merchant rules, and active household tags/aliases.
+1. FastAPI loads active accounts, direction-valid categories and personal merchant rules.
 2. Gemini returns a strict draft or clarification with partial evidence. The prompt explicitly separates merchant from platform and forbids invented location/cuisine/restaurant facts.
 3. FastAPI validates all IDs and evidence, applies personal-rule then safe-catalog precedence, creates server-owned suggestion reasons, and emits the unsaved response.
-4. React renders distinct Category, Transaction details, Context, and Optional tags sections. Editing a field changes its evidence to `user_corrected` and `reviewed`.
+4. React renders distinct Category, Transaction details, Context, and Optional
+   tags sections. Editing a field clears stale suggestion copy and changes its
+   evidence to `user_corrected`.
 5. Explicit confirmation sends core fields, bounded metadata, and reviewed tag selections. It never sends `sourceText`.
-6. FastAPI revalidates category direction, account/member/tag ownership, metadata size/keys, reserved-tag rules, and confirmed review status.
+6. FastAPI revalidates category direction, account/member ownership, metadata
+   size/keys, confirmation provenance, server tag allow-list, reserved-tag rules,
+   normalized values and confirmed review status.
 7. The existing `confirm_transaction` RPC writes the core transaction and reviewed versioned metadata atomically.
 
 Transfers keep category `Transfer`, have no tags or food metadata, and continue through the dedicated transfer RPC. Income can use the common evidence contract but cannot carry expense-only catalog hints.
@@ -187,7 +204,8 @@ Raw prompt retention remains a separate privacy decision. This release stores re
 - Household rule > safe catalog > model precedence with direction-valid categories only.
 - Safe merchant/platform and tag catalogs, alias normalization, redundant-tag rejection, and exact confirmed metadata shape.
 - Existing assistant canonical bundle equality remains unchanged; metadata analytics are a planned follow-up.
-- Fictional eval cases for platform versus merchant, explicit attributes, weak evidence, clarification, tag suggestions, and prohibited inferred facts.
+- Sanitized sample eval cases for platform versus merchant, explicit attributes,
+  weak evidence, clarification, tag suggestions, and prohibited inferred facts.
 
 ### Persistence and recovery
 

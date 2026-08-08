@@ -1,7 +1,7 @@
 # Message UX and structured metadata release evidence
 
-Date: 9 August 2026  
-Branch: `codex/message-ux`  
+Date: 9 August 2026
+Branch: `codex/message-ux`
 Status: local release candidate; publication and final-domain acceptance pending
 
 ## Product scope
@@ -10,8 +10,9 @@ Status: local release candidate; publication and final-domain acceptance pending
   newline and IME composition Enter is ignored.
 - Quick Add never confirms from the keyboard. Every financial write still needs
   the explicit confirmation action.
-- Incomplete safe capture returns one server-owned question with grounded
-  account/category choices and preserves the original text.
+- Incomplete safe capture returns one server-owned question, grounded account
+  choices where available, and safe full-form recovery while preserving the
+  original text.
 - Review separates the primary category from merchant, platform, subcategory,
   bounded context and optional explicit tags.
 - Household merchant rules take precedence over the safe catalog, which takes
@@ -27,7 +28,7 @@ Status: local release candidate; publication and final-domain acceptance pending
 Fresh `make check` before the documentation pass:
 
 - Web: 19 files, 184 tests passed.
-- API: 245 tests passed.
+- API: 249 tests passed.
 - ESLint, TypeScript, Ruff and strict mypy passed.
 - Production PWA build passed.
 - Eight migrations, seed and four SQL contract files parsed.
@@ -40,6 +41,12 @@ Focused feature evidence:
 - API assistant, production routes and metadata: 122 checks passed.
 - Metadata capture evaluation: 10 evaluation-runner tests passed and 60 cases
   validated.
+
+The linked Vercel API project confirms that a production Gemini key is present,
+but Vercel marks it sensitive and does not export the raw value through either
+`env pull` or `env run`. The new hosted 60-case rerun therefore remains pending;
+Gemini must be accepted through the deployed API after merge without copying the
+production secret into a local plaintext file.
 
 ## Persistence and privacy
 
