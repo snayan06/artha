@@ -1,6 +1,7 @@
 import { ArrowLeft, Check, ChevronRight, Info, RotateCcw, ShieldCheck, Sparkles, UsersRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Card } from '../components/ui'
+import { UnifiedEntryComposer } from '../components/UnifiedEntryComposer'
 import { CaptureDraftUnavailableError, getCaptureContext, parseDraft } from '../lib/api'
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import { localDateOffset } from '../lib/date'
@@ -206,16 +207,26 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
       <button onClick={leaveDraft} className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-xl py-2 pr-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back</button>
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" aria-hidden="true" /> Quick add</div>
-        <h1 className="font-display mt-2 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Tell us what happened.</h1>
-        <p className="mt-2 text-sm text-[#718078] tone-muted">Write naturally. You’ll review every detail before it is saved.</p>
+        <h1 className="font-display mt-2 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">What would you like to do?</h1>
+        <p className="mt-2 text-sm text-[#718078] tone-muted">Add a transaction or ask Artha about your ledger. Write naturally.</p>
       </div>
 
       <div role="note" aria-label="Fictional-pilot AI notice" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><strong>Fictional pilot.</strong> Submitted text is sent through the Artha server to the configured Gemini model. Do not enter real family-finance data. <a href="/settings" className="font-semibold underline underline-offset-2">Settings</a> has details.</div>
 
       <Card className="p-4 sm:p-5">
-        <label htmlFor="capture" className="text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</label>
-        <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => { invalidatePendingParse(); setCapture(event.target.value) }} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
-        <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={() => startManualEntry()}>Enter details manually</Button></div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</p>
+        <UnifiedEntryComposer
+          id="capture"
+          accessibleLabel="Your message — add a transaction or ask Artha"
+          value={capture}
+          onChange={(value) => { invalidatePendingParse(); setCapture(value) }}
+          onCapture={(message) => makeDraft(message)}
+          onAskLedger={(initialQuestion) => navigate('/assistant', { initialQuestion, handoffId: crypto.randomUUID() })}
+          placeholder={members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name} · or ask for an analysis` : 'Paid 1,840 for groceries yesterday · or ask for an analysis'}
+          variant="full"
+          secondaryAction={<Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={() => startManualEntry()}>Enter details manually</Button>}
+        />
+        {parsing && <p role="status" aria-live="polite" className="mt-3 text-xs text-[#718078] tone-muted">Building your review draft…</p>}
         {!draft && (
           <div className="mt-5 border-t border-line pt-4">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#8a958f] tone-subtle">Try an example</p>

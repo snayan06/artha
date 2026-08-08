@@ -22,6 +22,7 @@ describe('QuickAddPage', () => {
 
   beforeEach(() => {
     vi.spyOn(api, 'getCaptureContext').mockResolvedValue(context)
+    vi.spyOn(api, 'routeIntent').mockResolvedValue({ intent: 'capture_transaction' })
   })
 
   afterEach(() => {
@@ -38,6 +39,21 @@ describe('QuickAddPage', () => {
     expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
   })
 
+  it('routes a ledger question straight to Ask Artha without creating a draft', async () => {
+    vi.mocked(api.routeIntent).mockResolvedValue({ intent: 'ask_ledger' })
+    const parse = vi.spyOn(api, 'parseDraft')
+    const user = userEvent.setup()
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    const question = 'Compare my food spending across the last three months'
+    await user.type(screen.getByLabelText(/add a transaction or ask artha/i), question)
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    expect(parse).not.toHaveBeenCalled()
+    expect(window.location.pathname).toBe('/assistant')
+    expect(window.history.state).toEqual(expect.objectContaining({ initialQuestion: question }))
+  })
+
   it('keeps a parsed entry unsaved until explicit confirmation', async () => {
     const user = userEvent.setup()
     const confirmed: Transaction = {
@@ -49,7 +65,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[{ id: '7', name: 'Sam' }]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), 'Paid 850 for dinner, half with Sam')
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByText(/nothing has been saved yet/i)).toBeInTheDocument()
     expect(onConfirm).not.toHaveBeenCalled()
@@ -76,7 +92,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), 'Paid 900 for an old draft')
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
     await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
     await user.type(screen.getByLabelText('Amount in rupees'), '250')
     await user.type(screen.getByLabelText('Description'), 'Latest manual correction')
@@ -180,7 +196,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), sourceText)
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/automatic interpretation is temporarily unavailable/i)
     expect(screen.getByRole('alert')).toHaveTextContent(/your text is still here/i)
@@ -218,7 +234,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), sourceText)
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
     await screen.findByRole('alert')
     await user.type(screen.getByLabelText('Amount in rupees'), '250')
     await user.type(screen.getByLabelText('Description'), 'Coffee')
@@ -263,7 +279,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), sourceText)
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
     await waitFor(() => expect(parseSpy).toHaveBeenCalledWith(sourceText, []))
 
     await act(async () => {
@@ -362,7 +378,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), 'transfer 5000 from ICICI')
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByRole('option', { name: 'Select an account' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Transfer to account' })).toHaveValue('')
@@ -423,7 +439,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), sourceText)
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
     await screen.findByRole('alert')
     await user.click(screen.getByRole('radio', { name: label }))
     await user.type(screen.getByLabelText('Amount in rupees'), '125')
@@ -504,7 +520,7 @@ describe('QuickAddPage', () => {
     render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
 
     await user.type(screen.getByLabelText(/your message/i), 'Paid 250 for coffee')
-    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
 
     const category = await screen.findByRole('combobox', { name: 'Category' })
     expect(category).toHaveValue('')

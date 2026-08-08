@@ -1,13 +1,19 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { demoDashboard } from '../data/demo'
+import * as api from '../lib/api'
 import { RouterProvider } from '../lib/router'
 import { HomePage } from './HomePage'
 
 describe('HomePage quick capture', () => {
+  beforeEach(() => {
+    vi.spyOn(api, 'routeIntent').mockResolvedValue({ intent: 'capture_transaction' })
+  })
+
   afterEach(() => {
     cleanup()
+    vi.restoreAllMocks()
     window.history.replaceState(null, '', '/')
   })
 
@@ -20,11 +26,29 @@ describe('HomePage quick capture', () => {
     )
 
     const capture = 'Paid 1840 for groceries from HDFC UPI, split equally with Sam'
-    await user.type(screen.getByLabelText(/describe a transaction/i), capture)
-    await user.click(screen.getByRole('button', { name: /make draft/i }))
+    await user.type(screen.getByLabelText(/add a transaction or ask artha/i), capture)
+    await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(window.location.pathname).toBe('/add')
     expect(window.history.state).toEqual({ capture })
+  })
+
+  it('hands a ledger question directly to Ask Artha', async () => {
+    vi.mocked(api.routeIntent).mockResolvedValue({ intent: 'ask_ledger' })
+    const user = userEvent.setup()
+    render(
+      <RouterProvider>
+        <HomePage dashboard={demoDashboard} demoMode profile={{ displayName: 'You', householdName: 'My household', members: [] }} />
+      </RouterProvider>,
+    )
+
+    const question = 'Show my spending trend for the last three months'
+    await user.type(screen.getByLabelText(/add a transaction or ask artha/i), question)
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    expect(window.location.pathname).toBe('/assistant')
+    expect(window.history.state).toEqual(expect.objectContaining({ initialQuestion: question }))
+    expect(window.history.state.handoffId).toEqual(expect.any(String))
   })
 
   it('provides chart values without relying on color or hover', () => {

@@ -55,6 +55,17 @@ describe('UnifiedEntryComposer', () => {
     expect(onAskLedger).not.toHaveBeenCalled()
   })
 
+  it('normalizes only for routing and preserves the exact message for the workflow', async () => {
+    vi.mocked(routeIntent).mockResolvedValue({ intent: 'capture_transaction' })
+    const user = userEvent.setup()
+    const { onCapture } = renderComposer({ initialValue: '  Paid 250 for coffee  ' })
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(routeIntent).toHaveBeenCalledWith('Paid 250 for coffee')
+    expect(onCapture).toHaveBeenCalledWith('  Paid 250 for coffee  ')
+  })
+
   it('routes a ledger question to the assistant callback', async () => {
     vi.mocked(routeIntent).mockResolvedValue({ intent: 'ask_ledger' })
     const user = userEvent.setup()

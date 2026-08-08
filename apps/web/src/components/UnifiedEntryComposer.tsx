@@ -10,6 +10,7 @@ interface UnifiedEntryComposerProps {
   onCapture: (message: string) => void | Promise<void>
   onAskLedger: (message: string) => void | Promise<void>
   placeholder: string
+  accessibleLabel?: string
   variant?: 'compact' | 'full'
   secondaryAction?: ReactNode
 }
@@ -23,6 +24,7 @@ export function UnifiedEntryComposer({
   onCapture,
   onAskLedger,
   placeholder,
+  accessibleLabel = 'Add a transaction or ask Artha',
   variant = 'compact',
   secondaryAction
 }: UnifiedEntryComposerProps) {
@@ -36,23 +38,21 @@ export function UnifiedEntryComposer({
   }
 
   function chooseCapture() {
-    const message = normalizedMessage()
-    if (!message) return
+    if (!normalizedMessage()) return
     generation.current += 1
     inFlight.current = false
     setRouting(false)
     setRecovery(null)
-    void onCapture(message)
+    void onCapture(value)
   }
 
   function chooseAssistant() {
-    const message = normalizedMessage()
-    if (!message) return
+    if (!normalizedMessage()) return
     generation.current += 1
     inFlight.current = false
     setRouting(false)
     setRecovery(null)
-    void onAskLedger(message)
+    void onAskLedger(value)
   }
 
   async function submit() {
@@ -103,7 +103,7 @@ export function UnifiedEntryComposer({
 
   return (
     <form onSubmit={submitForm}>
-      <label className="sr-only" htmlFor={id}>Add a transaction or ask Artha</label>
+      <label className="sr-only" htmlFor={id}>{accessibleLabel}</label>
       <div className={variant === 'full' ? 'space-y-3' : 'flex flex-col gap-3 sm:flex-row'}>
         {variant === 'full' ? (
           <textarea
