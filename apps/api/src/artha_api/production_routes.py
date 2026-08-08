@@ -40,6 +40,7 @@ from .schemas import (
     CaptureContextResponse,
     MemberCreate,
     ParseRequest,
+    normalize_required_description,
 )
 from .supabase_rest import SupabaseRestClient, rest_client_for_request
 
@@ -96,6 +97,11 @@ class ProductionDraft(BaseModel):
     destination_account_id: UUID | None = None
     occurred_at: datetime | None = None
     notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, description: str) -> str:
+        return normalize_required_description(description)
 
     @model_validator(mode="after")
     def split_total_matches(self) -> ProductionDraft:

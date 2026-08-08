@@ -228,6 +228,58 @@ async def test_confirm_requires_an_exact_grounded_category(
     assert valid.json()["category"] == "Groceries"
 
 
+async def test_confirm_rejects_blank_descriptions_without_writing_and_trims_valid_text(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    source = account_id(bootstrapped, "HDFC UPI")
+    destination = account_id(bootstrapped, "Cash")
+    before = (await client.get("/api/v1/transactions")).json()
+    cases = [
+        {"kind": "expense", "category": "Other"},
+        {"kind": "income", "category": "Salary"},
+        {
+            "kind": "transfer",
+            "category": "Crafted transfer category",
+            "destination_account_id": destination,
+        },
+    ]
+
+    for index, fields in enumerate(cases):
+        response = await client.post(
+            "/api/v1/transactions/confirm",
+            headers={"Idempotency-Key": f"blank-description-{index}"},
+            json={
+                **fields,
+                "amount_paise": 1_000,
+                "description": " \t  ",
+                "personal_share_paise": 1_000,
+                "splits": [],
+                "source_account_id": source,
+            },
+        )
+        assert response.status_code == 422
+
+    assert (await client.get("/api/v1/transactions")).json() == before
+
+    valid = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "trimmed-description"},
+        json={
+            "kind": "expense",
+            "amount_paise": 1_000,
+            "description": "  Family groceries  ",
+            "category": "Groceries",
+            "personal_share_paise": 1_000,
+            "splits": [],
+            "source_account_id": source,
+        },
+    )
+
+    assert valid.status_code == 201
+    assert valid.json()["description"] == "Family groceries"
+    assert len((await client.get("/api/v1/transactions")).json()) == len(before) + 1
+
+
 async def test_transfer_changes_accounts_but_not_spend_or_total(
     client: AsyncClient, bootstrapped: dict[str, Any]
 ) -> None:

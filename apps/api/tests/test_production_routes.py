@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
 from artha_api import production_routes
@@ -17,7 +18,7 @@ from artha_api.assistant import (
     TagSuggestionRequest,
     TagSuggestionResponse,
 )
-from artha_api.auth import AuthContext
+from artha_api.auth import AuthContext, get_auth_context
 from artha_api.production_routes import (
     ProductionDraft,
     ProductionSplit,
@@ -221,6 +222,7 @@ class FakeProductionClient:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
         self.activity_payload: dict[str, Any] | None = None
+        self.rpc_names: list[str] = []
         self.categories = (
             categories
             if categories is not None
@@ -235,6 +237,7 @@ class FakeProductionClient:
         )
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
+        self.rpc_names.append(name)
         if name == "get_current_household":
             return HOUSEHOLD_ID
         if name == "confirm_transaction":
@@ -655,6 +658,65 @@ async def test_production_confirmation_accepts_exact_normalized_category() -> No
 
     assert fake.confirm_payload is not None
     assert fake.confirm_payload["p_category_id"] == CATEGORY_ID
+
+
+async def test_production_confirmation_rejects_blank_descriptions_before_any_rpc() -> None:
+    fake = FakeProductionClient()
+    app = FastAPI()
+    app.include_router(production_routes.router)
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id=USER_ID)
+    app.dependency_overrides[production_routes.production_client] = lambda: fake
+    cases = [
+        {"kind": "expense", "category": "Groceries"},
+        {"kind": "income", "category": "Salary"},
+        {
+            "kind": "transfer",
+            "category": "Crafted transfer category",
+            "destination_account_id": DESTINATION_ACCOUNT_ID,
+        },
+    ]
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        for index, fields in enumerate(cases):
+            response = await client.post(
+                "/api/v1/transactions/confirm",
+                headers={"Idempotency-Key": f"blank-description-{index}"},
+                json={
+                    **fields,
+                    "amount_paise": 10_000,
+                    "description": " \n  ",
+                    "personal_share_paise": 10_000,
+                    "splits": [],
+                    "source_account_id": ACCOUNT_ID,
+                },
+            )
+            assert response.status_code == 422
+
+    assert fake.rpc_names == []
+    assert fake.confirm_payload is None
+    assert fake.transfer_payload is None
+
+
+async def test_production_confirmation_trims_a_valid_description() -> None:
+    fake = FakeProductionClient()
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=10_000,
+        description="  Family groceries  ",
+        category="Groceries",
+        personal_share_paise=10_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    assert draft.description == "Family groceries"
+    await confirm_transaction(
+        draft,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "trimmed-description",
+    )
+    assert fake.confirm_payload is not None
+    assert fake.confirm_payload["p_merchant"] == "Family groceries"
 
 
 async def test_profile_hydrates_server_owned_household_and_participants() -> None:
