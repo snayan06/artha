@@ -243,16 +243,18 @@ make check
 
 This runs web linting, TypeScript checks, Vitest, the production PWA build,
 Ruff, strict mypy, pytest, every SQL syntax contract, and keyless validators for
-60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases, plus the hosted-model runners.
+60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases. Hosted-model
+runners are separate, opt-in release gates because they require a private API key.
 
 Current local release-candidate evidence:
 
 | Gate | Result |
 | --- | --- |
 | Web | 20 test files, 206 tests passed |
-| API | 274 tests passed |
+| API | 275 tests passed |
 | AI contracts | 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases valid |
 | Hosted Gemini on sample data | Baseline capture run: 50/60 exact cases, 94.3% structured fields, 100% provider availability; affected metadata cases were hardened with canonical labels and explicit-source guardrails, pending the combined full rerun |
+| Hosted intent routing | 49/49 available, 48/49 exact (98.0%), 100% safety accuracy and zero false captures on `gemini-3.5-flash-lite` |
 | Production UI | All six primary pages fit at 320 px, 390 px and 1440 px; light/dark controls and mobile/desktop dark UI verified |
 | Production flows | Magic-link new/returning login, session persistence, onboarding, expense, income, transfer, split, filters, assistant and encrypted export passed |
 

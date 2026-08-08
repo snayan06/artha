@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from google.genai._gaos.lib import compat_errors as interaction_errors
 from pydantic import ValidationError
 
 from artha_api.assistant import (
@@ -24,6 +25,7 @@ from artha_api.feature_evals import (
     IntentRouterEvalCase,
     TagEvalCase,
     _failure_kind,
+    _retry_after,
     build_decision,
     load_assistant_suite,
     load_intent_router_suite,
@@ -120,6 +122,20 @@ def test_router_eval_unwraps_sanitized_provider_failures() -> None:
     wrapper.__cause__ = cause
 
     assert _failure_kind(wrapper) == "timeout"
+
+
+def test_router_eval_classifies_interactions_errors_and_honors_retry_after() -> None:
+    request = httpx.Request("POST", "https://gemini.invalid/interactions")
+    timeout = interaction_errors.APITimeoutError(request)
+    limited = interaction_errors.RateLimitError(
+        "quota",
+        response=httpx.Response(429, request=request, headers={"Retry-After": "17"}),
+        body={"error": "must not escape"},
+    )
+
+    assert _failure_kind(timeout) == "timeout"
+    assert _failure_kind(limited) == "rate_limited"
+    assert _retry_after(limited, 1) == 17.0
 
 
 @pytest.mark.asyncio

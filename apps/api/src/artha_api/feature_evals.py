@@ -15,6 +15,7 @@ from typing import Any, Literal, cast
 
 import httpx
 from google.genai import errors as genai_errors
+from google.genai._gaos.lib import compat_errors as interaction_errors
 
 from artha_api.assistant import (
     AssistantCompletion,
@@ -373,10 +374,16 @@ def _underlying_error(error: Exception) -> Exception:
 
 def _failure_kind(error: Exception) -> str:
     error = _underlying_error(error)
-    if isinstance(error, genai_errors.APIError):
-        if error.code == 429:
+    if isinstance(error, interaction_errors.APITimeoutError):
+        return "timeout"
+    if isinstance(error, interaction_errors.APIConnectionError):
+        return "network"
+    if isinstance(error, (genai_errors.APIError, interaction_errors.APIError)):
+        response = getattr(error, "response", None)
+        code = getattr(error, "code", getattr(response, "status_code", 0))
+        if code == 429:
             return "rate_limited"
-        if error.code >= 500:
+        if code >= 500:
             return "provider_5xx"
         return "provider_4xx"
     if isinstance(error, httpx.HTTPStatusError):
@@ -394,7 +401,10 @@ def _failure_kind(error: Exception) -> str:
 
 def _retry_after(error: Exception, attempt: int) -> float:
     error = _underlying_error(error)
-    if isinstance(error, (httpx.HTTPStatusError, genai_errors.APIError)):
+    if isinstance(
+        error,
+        (httpx.HTTPStatusError, genai_errors.APIError, interaction_errors.APIError),
+    ):
         response = (
             error.response
             if isinstance(error, httpx.HTTPStatusError)

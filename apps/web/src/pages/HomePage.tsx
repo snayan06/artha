@@ -75,7 +75,7 @@ export function HomePage({ dashboard, demoMode, profile }: { dashboard: Dashboar
           onAskLedger={(initialQuestion) => navigate('/assistant', { initialQuestion, handoffId: crypto.randomUUID() })}
           placeholder={profile.members[0] ? `Paid 850 for dinner with ${profile.members[0].name} · or ask about this month` : 'Paid 850 for dinner · or ask about this month'}
         />
-        <p role="note" aria-label="AI-assisted routing" className="mt-2.5 text-[11px] text-[#8b958f] tone-subtle">✨ AI helps choose between transaction review and Ask Artha. It never saves a transaction automatically.</p>
+        <p role="note" aria-label="AI-assisted routing" className="mt-2.5 text-[11px] text-[#8b958f] tone-subtle">✨ Artha sends this text to your configured AI provider to choose transaction review or Ask Artha. It never saves a transaction automatically.</p>
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-[.92fr_1.08fr]">
