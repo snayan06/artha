@@ -541,7 +541,7 @@
       "locked": false
     },
     {
-      "id": "ops-gemini",
+      "id": "ops-llm",
       "type": "ellipse",
       "x": 970,
       "y": 318,
@@ -566,7 +566,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "ops-gemini-label"
+          "id": "ops-llm-label"
         }
       ],
       "updated": 1786220601331,
@@ -1504,13 +1504,13 @@
       "updated": 1786220601331,
       "link": null,
       "locked": false,
-      "text": "No service-role key • no Gemini key • no raw financial telemetry",
+      "text": "* Current provider: Gemini • no raw financial telemetry",
       "fontSize": 16,
       "fontFamily": 5,
       "textAlign": "left",
       "verticalAlign": "middle",
       "containerId": null,
-      "originalText": "No service-role key • no Gemini key • no raw financial telemetry",
+      "originalText": "* Current provider: Gemini • no raw financial telemetry",
       "autoResize": true,
       "lineHeight": 1.25
     },
@@ -1663,7 +1663,7 @@
       "lineHeight": 1.25
     },
     {
-      "id": "ops-gemini-label",
+      "id": "ops-llm-label",
       "type": "text",
       "x": 1031.2427207731757,
       "y": 338.551515190165,
@@ -1689,13 +1689,13 @@
       "updated": 1786220601332,
       "link": null,
       "locked": false,
-      "text": "Gemini API\nvia FastAPI only",
+      "text": "LLM service*\nvia FastAPI only",
       "fontSize": 17,
       "fontFamily": 5,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "ops-gemini",
-      "originalText": "Gemini API\nvia FastAPI only",
+      "containerId": "ops-llm",
+      "originalText": "LLM service*\nvia FastAPI only",
       "autoResize": true,
       "lineHeight": 1.25
     },
@@ -1726,13 +1726,13 @@
       "updated": 1786220601332,
       "link": null,
       "locked": false,
-      "text": "SERVER-ONLY\nGemini key\nservice credentials",
+      "text": "SERVER-ONLY\nProvider key\nservice credentials",
       "fontSize": 15,
       "fontFamily": 5,
       "textAlign": "center",
       "verticalAlign": "middle",
       "containerId": "ops-secrets",
-      "originalText": "SERVER-ONLY\nGemini key\nservice credentials",
+      "originalText": "SERVER-ONLY\nProvider key\nservice credentials",
       "autoResize": true,
       "lineHeight": 1.25
     },

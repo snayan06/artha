@@ -15,8 +15,8 @@ the same scene.
 | Capture and metadata | Grounded interpretation, clarification, structured suggestions and confirmation | [Excalidraw](diagrams/artha-capture-metadata.excalidraw) | [SVG](diagrams/artha-capture-metadata.svg) |
 | Ledger and shared money | Transaction semantics, atomic writes, splits and derived balances | [Excalidraw](diagrams/artha-ledger-shared-money.excalidraw) | [SVG](diagrams/artha-ledger-shared-money.svg) |
 | Identity and household isolation | Login, verified request context, membership, RLS and tenant isolation | [Excalidraw](diagrams/artha-identity-household-isolation.excalidraw) | [SVG](diagrams/artha-identity-household-isolation.svg) |
-| Ask Artha | Canonical facts, Gemini intent selection, exact validation and safe generative UI | [Excalidraw](diagrams/artha-ask-artha.excalidraw) | [SVG](diagrams/artha-ask-artha.svg) |
-| Deployment and recovery | Vercel/Supabase/Gemini topology, CI, telemetry and encrypted recovery | [Excalidraw](diagrams/artha-deployment-recovery.excalidraw) | [SVG](diagrams/artha-deployment-recovery.svg) |
+| Ask Artha | Canonical facts, LLM intent selection, exact validation and safe generative UI | [Excalidraw](diagrams/artha-ask-artha.excalidraw) | [SVG](diagrams/artha-ask-artha.svg) |
+| Deployment and recovery | Vercel/Supabase/LLM topology, current Gemini provider, CI, telemetry and encrypted recovery | [Excalidraw](diagrams/artha-deployment-recovery.excalidraw) | [SVG](diagrams/artha-deployment-recovery.svg) |
 
 ## Supporting architecture documents
 

@@ -21,6 +21,8 @@ Artha now has one AI entry experience across Home and Quick Add:
   user's exact text for retry.
 - Merchant, platform, category, subcategory, context and tags use
   case-insensitive matching and one canonical stored display label.
+- Maintained architecture views use a provider-neutral **LLM service** boundary;
+  the deployment view separately identifies Gemini as the current provider.
 
 PR [#23](https://github.com/snayan06/artha/pull/23) and PR
 [#24](https://github.com/snayan06/artha/pull/24) are merged. PR #24's intent

@@ -1,20 +1,20 @@
 # Artha — System architecture and deployment
 
-Status: V1 production runtime; message/metadata release candidate documented
+Status: V1 production runtime
 Date: 9 August 2026
 
 ## Architecture decision
 
-Artha is an installable React PWA backed by FastAPI and Supabase Postgres. In
-production, Gemini interprets natural-language capture and assistant questions.
-Application and database code retain authority over identity, allowed entities,
-money, splits and writes.
+Artha is an installable React PWA backed by FastAPI and Supabase Postgres. A
+provider-neutral LLM boundary interprets natural-language capture and assistant
+questions. The current production provider is Gemini; application and database
+code retain authority over identity, allowed entities, money, splits and writes.
 
 The key product boundary is review before save. Quick Add creates an unsaved,
 strictly validated draft; only explicit confirmation reaches the ledger. If
-Gemini is unavailable or cannot return a valid interpretation, Artha preserves
-the user's exact text and opens the manual form. Production does not substitute
-a language parser or manufacture a likely draft.
+the configured LLM is unavailable or cannot return a valid interpretation,
+Artha preserves the user's exact text and opens the manual form. Production
+does not substitute a language parser or manufacture a likely draft.
 
 The Home and Quick Add composer first calls a bounded intent router. The router
 receives only the submitted text and returns one of `capture_transaction`,
@@ -31,7 +31,7 @@ ledger context, call tools, calculate money or write data.
 | Authentication | Supabase Auth password and magic link | Private identity and short-lived access tokens |
 | Production database | Supabase Postgres with RLS | Ledger truth, relational integrity, atomic RPCs and household isolation |
 | Local database | SQLite + aiosqlite | Keyless local demo and development |
-| Production AI | Gemini 3.5 Flash-Lite via Google's official SDK | Structured capture interpretation, category suggestions and assistant selection |
+| Production AI | Provider-neutral LLM boundary; currently Gemini 3.5 Flash-Lite via Google's official SDK | Structured capture interpretation, category suggestions and assistant selection |
 | Hosting | Separate Vercel projects for the PWA and FastAPI | Current production deployment |
 | CI | GitHub Actions | Lint, types, tests and migration checks |
 
@@ -45,7 +45,7 @@ recovery path.
 React PWA / Vercel
    │ Supabase access token
    ▼
-FastAPI / Vercel ───── server-side only ─────► Gemini
+FastAPI / Vercel ───── server-side only ─────► LLM service*
    │
    ├── intent router ──────────► capture | Ask Artha | clarify | unsupported
    ├── capture orchestration ─► validated unsaved draft ─► review ─► confirm
@@ -54,11 +54,13 @@ FastAPI / Vercel ───── server-side only ─────► Gemini
    │
    ▼
 Supabase Postgres / RLS
+
+* Current production provider: Gemini
 ```
 
 The browser signs in through Supabase and sends its short-lived access token to
 FastAPI. FastAPI verifies the token and uses the authenticated database context
-so RLS remains effective. Gemini credentials and calls stay server-side. A
+so RLS remains effective. LLM credentials and calls stay server-side. A
 service-role key is not used in normal user request paths.
 
 ## Quick Add trust flow
@@ -73,7 +75,7 @@ the user chooses transaction or ledger question.
    `POST /api/v1/drafts/parse`.
 2. FastAPI loads grounded household context: current date/timezone and allowed
    account, member and category identifiers.
-3. Gemini interprets the text into the strict capture schema.
+3. The configured LLM interprets the text into the strict capture schema.
 4. Application code rejects malformed values, invented IDs, invalid dates,
    floating-point money and inconsistent splits.
 5. A valid result becomes an unsaved draft in the review UI. The user reviews
@@ -87,13 +89,13 @@ If step 3 or 4 fails, the exact source text is retained and the manual form
 opens. No deterministic language-parser guess is promoted as production
 recovery, and nothing is saved.
 
-Production Quick Add asks Gemini to select from existing household categories,
-then applies active household merchant rules before the server-owned safe catalog
-and any grounded model suggestion.
+Production Quick Add asks the configured LLM to select from existing household
+categories, then applies active household merchant rules before the server-owned
+safe catalog and any grounded model suggestion.
 The standalone production tag-suggestion endpoint accepts only description,
 amount and direction; FastAPI loads up to 200 active, direction-eligible
-categories from the authenticated household and supplies that allow-list to
-Gemini. The V1 web app does not call this standalone endpoint because Quick Add
+categories from the authenticated household and supplies that allow-list to the
+LLM. The V1 web app does not call this standalone endpoint because Quick Add
 already returns its reviewed category suggestion inside the capture result.
 
 Only reviewed bounded metadata is persisted inside the existing RLS-protected
@@ -111,15 +113,16 @@ current-month spending and income, up to 20 member balances, 5 top categories,
 
 From that snapshot, server code builds the exact canonical widget bundle for
 each supported intent: `summary`, `spending`, `income`, `cashflow`, `shared`,
-`transactions`, `clarification` and `unsupported`. Gemini selects one intent and
+`transactions`, `clarification` and `unsupported`. The LLM selects one intent and
 must copy that intent's approved narrative and widget array exactly. FastAPI
 rejects any changed title, label, value, row, point, order or cardinality; React
 then renders repository-owned metric, chart, table or clarification components.
 
-Gemini cannot calculate authoritative financial values, add arbitrary numeric
-prose, alter the ledger or render HTML/JavaScript. When Gemini is unavailable or
-its output is invalid, the API returns a sanitized `503` and the UI shows an
-honest error; it does not fall back to fabricated cards or an assistant answer.
+The LLM cannot calculate authoritative financial values, add arbitrary numeric
+prose, alter the ledger or render HTML/JavaScript. When the configured LLM is
+unavailable or its output is invalid, the API returns a sanitized `503` and the
+UI shows an honest error; it does not fall back to fabricated cards or an
+assistant answer.
 The UI may show truthful progress messages about loading ledger facts and
 preparing validated widgets; it never exposes private model chain-of-thought.
 
@@ -164,8 +167,8 @@ Important V1 routes include:
 - API: separate Vercel Hobby project rooted at `apps/api`.
 - Auth and ledger: the `artha-production` Supabase project with Postgres and
   RLS.
-- AI: Gemini called by FastAPI through the official Google SDK; the browser
-  never receives the provider key.
+- AI: provider-neutral server boundary, currently backed by Gemini through the
+  official Google SDK; the browser never receives the provider key.
 - Source and CI: public GitHub repository and GitHub Actions.
 
 Manual entry, dashboards and confirmed ledger history remain available when the
