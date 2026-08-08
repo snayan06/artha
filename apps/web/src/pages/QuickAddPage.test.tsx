@@ -194,9 +194,13 @@ describe('QuickAddPage', () => {
     expect(screen.getByRole('checkbox', { name: 'Date Night' })).toBeChecked()
     expect(onConfirm).not.toHaveBeenCalled()
 
-    await user.selectOptions(screen.getByLabelText('Category'), 'Other')
+    await user.clear(screen.getByLabelText('Merchant'))
+    await user.type(screen.getByLabelText('Merchant'), 'Local Cafe')
     expect(screen.queryByRole('heading', { name: 'Suggested category' })).not.toBeInTheDocument()
     expect(screen.queryByText("Burger King is in Artha's food merchant catalog.")).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Category')).toHaveValue('')
+
+    await user.selectOptions(screen.getByLabelText('Category'), 'Other')
 
     await user.clear(screen.getByLabelText('Platform'))
     await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))

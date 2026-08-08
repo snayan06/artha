@@ -19,14 +19,20 @@ export function TransactionMetadataReview({
   ) => {
     const normalized = value.trim() ? value : undefined
     const evidence = { ...draft.metadata?.evidence }
+    const invalidatesCategorySuggestion = Boolean(draft.categorySuggestion)
+      && (field === 'merchant' || field === 'platform')
     if (field !== 'merchant' && normalized === undefined) delete evidence[field]
     else evidence[field] = correctedEvidence
+    if (invalidatesCategorySuggestion) delete evidence.category
     const attributes = field === 'platform' && normalized === undefined
       ? (draft.metadata?.attributes ?? []).filter((attribute) => attribute.key !== 'order_channel')
       : (draft.metadata?.attributes ?? [])
     onChange({
       ...draft,
       [field]: field === 'merchant' ? value : normalized,
+      category: invalidatesCategorySuggestion ? '' : draft.category,
+      categorySuggestion: invalidatesCategorySuggestion ? undefined : draft.categorySuggestion,
+      confidence: invalidatesCategorySuggestion ? 'review' : draft.confidence,
       metadata: draft.metadata
         ? {
             ...draft.metadata,
