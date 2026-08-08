@@ -81,6 +81,34 @@ LOCAL_CAPTURE_CATEGORIES = (
 )
 
 
+def normalize_category_name(value: str) -> str:
+    return " ".join(value.split()).casefold()
+
+
+def ground_local_category(payload: TransactionDraft) -> TransactionDraft:
+    if payload.kind is TransactionKind.TRANSFER:
+        return payload.model_copy(update={"category": "Transfer"})
+    if payload.kind not in {TransactionKind.EXPENSE, TransactionKind.INCOME}:
+        return payload
+    expected_kind = "expense" if payload.kind is TransactionKind.EXPENSE else "income"
+    normalized = normalize_category_name(payload.category or "")
+    category = next(
+        (
+            item
+            for item in LOCAL_CAPTURE_CATEGORIES
+            if normalize_category_name(item.name) == normalized
+            and item.kind in {expected_kind, "both"}
+        ),
+        None,
+    )
+    if category is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "category is not available for this transaction type",
+        )
+    return payload.model_copy(update={"category": category.name})
+
+
 async def account_to_read(session: AsyncSession, account: Account) -> AccountRead:
     movement = await session.scalar(
         select(func.coalesce(func.sum(LedgerEntry.delta_paise), 0))
@@ -178,7 +206,10 @@ async def capture_context(
             )
             for account in accounts
         ],
-        categories=list(LOCAL_CAPTURE_CATEGORIES),
+        categories=sorted(
+            LOCAL_CAPTURE_CATEGORIES,
+            key=lambda category: (category.name.casefold(), str(category.id)),
+        ),
     )
 
 
@@ -541,6 +572,7 @@ async def confirm_transaction(
     auth: AuthDependency,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
 ) -> TransactionRead:
+    payload = ground_local_category(payload)
     request_hash = hashlib.sha256(payload.model_dump_json().encode()).hexdigest()
     record = await session.scalar(
         select(IdempotencyRecord).where(

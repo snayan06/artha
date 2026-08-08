@@ -21,6 +21,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   const [contextStatus, setContextStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [contextError, setContextError] = useState('')
   const contextRef = useRef<CaptureContext | null>(null)
+  const parseGeneration = useRef(0)
   const confirmationAttempt = useRef<{ fingerprint: string; key: string } | null>(null)
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null)
   const manualRecoveryFocusPending = useRef(false)
@@ -51,13 +52,16 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
   async function makeDraft(text = capture) {
     if (!text.trim()) return
+    const generation = ++parseGeneration.current
     setParsing(true)
     setError('')
     try {
       const response = await parseDraft(text, members)
+      if (generation !== parseGeneration.current) return
       setDraft(groundDraft(response.data, contextRef.current))
       setUsedFallback(response.demo)
     } catch (caught) {
+      if (generation !== parseGeneration.current) return
       if (caught instanceof CaptureDraftUnavailableError) {
         manualRecoveryFocusPending.current = true
         startManualEntry(caught.sourceText)
@@ -66,7 +70,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
         setError(userFacingFailure(caught, 'We could not read that. Try including an amount and what it was for.'))
       }
     } finally {
-      setParsing(false)
+      if (generation === parseGeneration.current) setParsing(false)
     }
   }
 
@@ -89,6 +93,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   }
 
   function restart() {
+    invalidatePendingParse()
     setCapture('')
     setDraft(null)
     setSuccess(null)
@@ -97,6 +102,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   }
 
   function startManualEntry(sourceText = '') {
+    invalidatePendingParse()
     const loadedContext = contextRef.current
     const firstAccount = loadedContext?.accounts[0]
     const firstCategory = categoriesForKind(loadedContext, 'debit')[0]
@@ -123,6 +129,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   }
 
   function changeKind(kind: TransactionKind) {
+    invalidatePendingParse()
     setDraft((current) => {
       if (!current) return current
       const loadedContext = contextRef.current
@@ -157,6 +164,16 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
   function leaveDraft() {
     if ((capture.trim() || draft) && !window.confirm('Discard this unsaved transaction draft?')) return
     back()
+  }
+
+  function invalidatePendingParse() {
+    parseGeneration.current += 1
+    setParsing(false)
+  }
+
+  function editDraft(nextDraft: TransactionDraft) {
+    invalidatePendingParse()
+    setDraft(nextDraft)
   }
 
   if (success) {
@@ -197,7 +214,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
       <Card className="p-4 sm:p-5">
         <label htmlFor="capture" className="text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</label>
-        <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => setCapture(event.target.value)} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
+        <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => { invalidatePendingParse(); setCapture(event.target.value) }} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />
         <div className="mt-3 grid gap-2 sm:flex"><Button className="w-full sm:w-auto" disabled={!capture.trim()} loading={parsing} onClick={() => void makeDraft()}>Create review draft <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button><Button variant="secondary" className="w-full sm:w-auto" onClick={() => startManualEntry()}>Enter details manually</Button></div>
         {!draft && (
           <div className="mt-5 border-t border-line pt-4">
@@ -229,7 +246,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-moss-700">{draft.kind === 'transfer' ? 'Money transferred' : draft.kind === 'credit' ? 'Money received' : 'Money spent'}</p>
               <div className="mt-2 flex items-center justify-center text-4xl font-bold tracking-[-0.05em]">
                 <span className="mr-1 text-2xl text-moss-700">₹</span>
-                <input name="amount-rupees" aria-label="Amount in rupees" type="number" inputMode="decimal" autoComplete="off" min="0" step="0.01" value={draft.amountPaise ? draft.amountPaise / 100 : ''} onChange={(event) => { const amountPaise = rupeesToPaise(Number(event.target.value) || 0); setDraft({ ...draft, amountPaise, memberSplits: equalSplits(amountPaise, draft.memberSplits.map((split) => split.memberId), members) }) }} className="min-h-11 w-40 border-0 bg-transparent text-center outline-none focus-visible:ring-2 focus-visible:ring-moss-400" />
+                <input name="amount-rupees" aria-label="Amount in rupees" type="number" inputMode="decimal" autoComplete="off" min="0" step="0.01" value={draft.amountPaise ? draft.amountPaise / 100 : ''} onChange={(event) => { const amountPaise = rupeesToPaise(Number(event.target.value) || 0); editDraft({ ...draft, amountPaise, memberSplits: equalSplits(amountPaise, draft.memberSplits.map((split) => split.memberId), members) }) }} className="min-h-11 w-40 border-0 bg-transparent text-center outline-none focus-visible:ring-2 focus-visible:ring-moss-400" />
               </div>
             </div>
 
@@ -240,19 +257,19 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
                   {([['Expense', 'debit'], ['Income', 'credit'], ['Transfer', 'transfer']] as const).map(([label, kind]) => <label key={kind} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-3 text-sm font-semibold transition ${draft.kind === kind ? 'border-moss-700 bg-moss-100 text-moss-900' : 'border-line bg-white text-[#68756e] tone-muted'}`}><input className="sr-only" type="radio" name="transaction-type" value={kind} checked={draft.kind === kind} onChange={() => changeKind(kind)} />{label}</label>)}
                 </div>
               </fieldset>
-              <DraftField label="Description" value={draft.merchant} onChange={(value) => setDraft({ ...draft, merchant: value })} />
+              <DraftField label="Description" value={draft.merchant} required maxLength={240} onChange={(value) => editDraft({ ...draft, merchant: value })} />
               {draft.kind === 'transfer'
                 ? <ReadOnlyField label="Category" value="Transfer" />
-                : <CategoryField categories={categoryOptions} selected={selectedCategory} onChange={(category) => setDraft({ ...draft, category: category.name })} />}
-              <AccountField label={draft.kind === 'transfer' ? 'Transfer from' : draft.kind === 'credit' ? 'Received in' : 'Paid from'} ariaLabel={draft.kind === 'transfer' ? 'Transfer from account' : draft.kind === 'credit' ? 'Received in account' : 'Paid from account'} accounts={accounts} selectedId={draft.sourceAccountId} onChange={(account) => setDraft({ ...draft, account: account.name, sourceAccountId: account.id })} />
-              {draft.kind === 'transfer' && <AccountField label="Transfer to" ariaLabel="Transfer to account" accounts={accounts} selectedId={draft.destinationAccountId} onChange={(account) => setDraft({ ...draft, destinationAccount: account.name, destinationAccountId: account.id })} />}
-              <DateField value={draft.occurredAt} onChange={(value) => setDraft({ ...draft, occurredAt: value })} />
+                : <CategoryField categories={categoryOptions} selected={selectedCategory} onChange={(category) => editDraft({ ...draft, category: category.name })} />}
+              <AccountField label={draft.kind === 'transfer' ? 'Transfer from' : draft.kind === 'credit' ? 'Received in' : 'Paid from'} ariaLabel={draft.kind === 'transfer' ? 'Transfer from account' : draft.kind === 'credit' ? 'Received in account' : 'Paid from account'} accounts={accounts} selectedId={draft.sourceAccountId} onChange={(account) => editDraft({ ...draft, account: account.name, sourceAccountId: account.id })} />
+              {draft.kind === 'transfer' && <AccountField label="Transfer to" ariaLabel="Transfer to account" accounts={accounts} selectedId={draft.destinationAccountId} onChange={(account) => editDraft({ ...draft, destinationAccount: account.name, destinationAccountId: account.id })} />}
+              <DateField value={draft.occurredAt} onChange={(value) => editDraft({ ...draft, occurredAt: value })} />
               {draft.kind === 'transfer' && (!draft.destinationAccountId || sameEntityId(draft.destinationAccountId, draft.sourceAccountId)) && <p className="mb-4 text-xs text-amber-800 sm:col-span-2">Choose a destination account that is different from the source.</p>}
             </div>
 
             {draft.kind === 'debit' && members.length > 0 && <div className="mx-5 mb-5 rounded-2xl border border-moss-200 bg-moss-50 p-4">
               <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-moss-800"><UsersRound className="h-4 w-4" aria-hidden="true" /></span><span><span className="block text-sm font-semibold">Share this expense</span><span className="mt-0.5 block text-xs text-[#748079] tone-muted">Choose anyone involved. Shares are equal in V1.</span></span></div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">{members.map((member) => { const checked = draft.memberSplits.some((split) => split.memberId === member.id); return <label key={member.id} className="flex min-h-11 cursor-pointer items-center justify-between rounded-xl border border-moss-200 bg-white px-3 text-sm font-semibold"><span className="truncate">{member.name}</span><input type="checkbox" aria-label={`Share with ${member.name}`} checked={checked} onChange={(event) => { const selected = event.target.checked ? [...draft.memberSplits.map((split) => split.memberId), member.id] : draft.memberSplits.map((split) => split.memberId).filter((id) => id !== member.id); setDraft({ ...draft, memberSplits: equalSplits(draft.amountPaise, selected, members) }) }} className="h-5 w-5 accent-moss-800" /></label> })}</div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">{members.map((member) => { const checked = draft.memberSplits.some((split) => split.memberId === member.id); return <label key={member.id} className="flex min-h-11 cursor-pointer items-center justify-between rounded-xl border border-moss-200 bg-white px-3 text-sm font-semibold"><span className="truncate">{member.name}</span><input type="checkbox" aria-label={`Share with ${member.name}`} checked={checked} onChange={(event) => { const selected = event.target.checked ? [...draft.memberSplits.map((split) => split.memberId), member.id] : draft.memberSplits.map((split) => split.memberId).filter((id) => id !== member.id); editDraft({ ...draft, memberSplits: equalSplits(draft.amountPaise, selected, members) }) }} className="h-5 w-5 accent-moss-800" /></label> })}</div>
               {draft.memberSplits.length > 0 && (
                 <div className="mt-4 grid grid-cols-3 gap-2 border-t border-moss-200 pt-4 text-center text-xs">
                   <div><p className="text-[#7a867f] tone-muted">Account moves</p><p className="mt-1 font-bold">−{formatMoney(draft.amountPaise)}</p></div>
@@ -264,7 +281,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
 
             <div className="border-t border-line bg-[#fbfcfa] p-5 dark:bg-night-raised">
               <div className="mb-4 flex items-start gap-2 text-xs text-[#6f7b75] tone-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-moss-700" aria-hidden="true" /><p><strong className="text-ink">Nothing has been saved yet.</strong> Confirm only after these details look right.{usedFallback && ' Parsed safely on this device while the API is unavailable.'}</p></div>
-              {confirmationBlocker && <p className="mb-3 text-xs text-amber-800">{confirmationBlocker}</p>}
+              {confirmationBlocker && <p role="status" aria-live="polite" className="mb-3 text-xs text-amber-800">{confirmationBlocker}</p>}
               <Button onClick={() => void confirm()} loading={saving} disabled={confirmationDisabled} className="w-full" icon={<Check className="h-4 w-4" aria-hidden="true" />}>Confirm and add transaction</Button>
             </div>
           </Card>
@@ -345,7 +362,8 @@ function canConfirmDraft(
   contextStatus: 'loading' | 'ready' | 'error'
 ): boolean {
   if (contextStatus !== 'ready' || !context) return false
-  if (draft.amountPaise <= 0 || !draft.merchant.trim()) return false
+  if (draft.amountPaise <= 0 || !draft.merchant.trim() || draft.merchant.length > 240) return false
+  if (!isValidTransactionDate(draft.occurredAt)) return false
   if (!accountForId(context, draft.sourceAccountId)) return false
   if (draft.kind === 'transfer') {
     return draft.category === 'Transfer'
@@ -366,6 +384,8 @@ function confirmationBlockerFor(
   if (contextStatus === 'error' || !context) return 'Confirmation is disabled until accounts and categories are available.'
   if (draft.amountPaise <= 0) return 'Enter an amount greater than zero.'
   if (!draft.merchant.trim()) return 'Enter a description.'
+  if (draft.merchant.length > 240) return 'Description must be 240 characters or fewer.'
+  if (!isValidTransactionDate(draft.occurredAt)) return 'Enter a valid transaction date.'
   if (!accountForId(context, draft.sourceAccountId)) return 'Choose an active source account.'
   if (draft.kind === 'transfer') {
     if (!accountForId(context, draft.destinationAccountId) || sameEntityId(draft.sourceAccountId, draft.destinationAccountId)) {
@@ -379,11 +399,21 @@ function confirmationBlockerFor(
   return ''
 }
 
-function DraftField({ label, value, type = 'text', onChange }: { label: string; value: string; type?: string; onChange: (value: string) => void }) {
+function isValidTransactionDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+function DraftField({ label, value, type = 'text', required = false, maxLength, onChange }: { label: string; value: string; type?: string; required?: boolean; maxLength?: number; onChange: (value: string) => void }) {
   return (
     <label className="mb-4 block">
       <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#87928c] tone-subtle">{label}</span>
-      <input name={`draft-${label.toLowerCase().replaceAll(' ', '-')}`} autoComplete="off" type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100" />
+      <input name={`draft-${label.toLowerCase().replaceAll(' ', '-')}`} autoComplete="off" type={type} required={required} maxLength={maxLength} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100" />
     </label>
   )
 }
@@ -422,7 +452,7 @@ function DateField({ value, onChange }: { value: string; onChange: (value: strin
   const yesterday = localDateOffset(-1)
   return (
     <div className="mb-4">
-      <label className="block"><span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#87928c] tone-subtle">Date</span><input name="transaction-date" aria-label="Transaction date" autoComplete="off" type="date" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100" /></label>
+      <label className="block"><span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#87928c] tone-subtle">Date</span><input name="transaction-date" aria-label="Transaction date" autoComplete="off" type="date" required value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm font-semibold outline-none focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100" /></label>
       <div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => onChange(today)} aria-pressed={value === today} className={`min-h-11 rounded-xl border px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 ${value === today ? 'border-moss-700 bg-moss-100 text-moss-900' : 'border-line bg-white text-[#68756e] tone-muted hover:bg-moss-50'}`}>Today</button><button type="button" onClick={() => onChange(yesterday)} aria-pressed={value === yesterday} className={`min-h-11 rounded-xl border px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 ${value === yesterday ? 'border-moss-700 bg-moss-100 text-moss-900' : 'border-line bg-white text-[#68756e] tone-muted hover:bg-moss-50'}`}>Yesterday</button></div>
     </div>
   )

@@ -69,6 +69,103 @@ describe('QuickAddPage', () => {
     expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
   })
 
+  it('does not let a delayed parse overwrite later manual edits', async () => {
+    const user = userEvent.setup()
+    let resolveParse!: (value: Awaited<ReturnType<typeof api.parseDraft>>) => void
+    vi.spyOn(api, 'parseDraft').mockReturnValue(new Promise((resolve) => { resolveParse = resolve }))
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), 'Paid 900 for an old draft')
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Latest manual correction')
+
+    await act(async () => resolveParse({
+      demo: false,
+      data: {
+        kind: 'debit', amountPaise: 90_000, merchant: 'Stale parsed draft', category: 'Food & Dining',
+        account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(0), note: '',
+        memberSplits: [], confidence: 'high', sourceText: 'Paid 900 for an old draft'
+      }
+    }))
+
+    expect(screen.getByLabelText('Amount in rupees')).toHaveValue(250)
+    expect(screen.getByLabelText('Description')).toHaveValue('Latest manual correction')
+  })
+
+  it('keeps the latest parse when two requests resolve out of order', async () => {
+    const user = userEvent.setup()
+    const pending: Array<(value: Awaited<ReturnType<typeof api.parseDraft>>) => void> = []
+    vi.spyOn(api, 'parseDraft').mockImplementation(() => new Promise((resolve) => { pending.push(resolve) }))
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    const examples = screen.getAllByRole('button', { name: /Paid|Received|Spent/ })
+    await user.click(examples[0])
+    await user.click(examples[1])
+    await waitFor(() => expect(pending).toHaveLength(2))
+
+    await act(async () => pending[1]({
+      demo: false,
+      data: {
+        kind: 'credit', amountPaise: 4_500_000, merchant: 'Latest salary', category: 'Salary',
+        account: 'ICICI Bank', sourceAccountId: 'demo-icici-bank', occurredAt: localDateOffset(0), note: '',
+        memberSplits: [], confidence: 'high', sourceText: 'latest'
+      }
+    }))
+    expect(screen.getByLabelText('Description')).toHaveValue('Latest salary')
+
+    await act(async () => pending[0]({
+      demo: false,
+      data: {
+        kind: 'debit', amountPaise: 85_000, merchant: 'Stale dinner', category: 'Food & Dining',
+        account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(-1), note: '',
+        memberSplits: [], confidence: 'high', sourceText: 'stale'
+      }
+    }))
+
+    expect(screen.getByLabelText('Description')).toHaveValue('Latest salary')
+    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked()
+  })
+
+  it('blocks confirmation when the date is empty or invalid', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Coffee')
+
+    const date = screen.getByLabelText('Transaction date')
+    expect(date).toBeRequired()
+    fireEvent.change(date, { target: { value: '' } })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/enter a valid transaction date/i)
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    expect(confirmButton).toBeDisabled()
+    await user.click(confirmButton)
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('blocks confirmation when the description exceeds 240 characters', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+
+    const description = screen.getByLabelText('Description')
+    expect(description).toBeRequired()
+    expect(description).toHaveAttribute('maxLength', '240')
+    fireEvent.change(description, { target: { value: 'x'.repeat(241) } })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/description must be 240 characters or fewer/i)
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    expect(confirmButton).toBeDisabled()
+    await user.click(confirmButton)
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
   it('preserves the sentence and opens manual entry when AI capture is unavailable', async () => {
     const user = userEvent.setup()
     const sourceText = '  self transfer 25k ICICI -> HDFC  '

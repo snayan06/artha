@@ -187,6 +187,47 @@ async def test_confirm_is_idempotent_and_rejects_key_reuse(
     assert len(transactions.json()) == 3
 
 
+async def test_confirm_requires_an_exact_grounded_category(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    account = account_id(bootstrapped, "HDFC UPI")
+    base = {
+        "kind": "expense",
+        "amount_paise": 1_000,
+        "description": "Crafted category",
+        "personal_share_paise": 1_000,
+        "splits": [],
+        "source_account_id": account,
+    }
+
+    invented = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "Invented"},
+        headers={"Idempotency-Key": "category-invented"},
+    )
+    wildcard = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "Gro%"},
+        headers={"Idempotency-Key": "category-wildcard"},
+    )
+    wrong_direction = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "Salary"},
+        headers={"Idempotency-Key": "category-direction"},
+    )
+    valid = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "  gRoCeRiEs  "},
+        headers={"Idempotency-Key": "category-normalized"},
+    )
+
+    assert invented.status_code == 422
+    assert wildcard.status_code == 422
+    assert wrong_direction.status_code == 422
+    assert valid.status_code == 201
+    assert valid.json()["category"] == "Groceries"
+
+
 async def test_transfer_changes_accounts_but_not_spend_or_total(
     client: AsyncClient, bootstrapped: dict[str, Any]
 ) -> None:
@@ -198,7 +239,7 @@ async def test_transfer_changes_accounts_but_not_spend_or_total(
             "kind": "transfer",
             "amount_paise": 10_000,
             "description": "ATM withdrawal",
-            "category": None,
+            "category": "Crafted unsafe transfer category",
             "paid_by_member_id": None,
             "settlement_member_id": None,
             "personal_share_paise": 10_000,
@@ -210,6 +251,7 @@ async def test_transfer_changes_accounts_but_not_spend_or_total(
     after = (await client.get("/api/v1/dashboard")).json()
 
     assert response.status_code == 201
+    assert response.json()["category"] == "Transfer"
     assert response.json()["account_delta_paise"] == 0
     assert after["total_balance_paise"] == before["total_balance_paise"]
     assert after["spend_paise"] == before["spend_paise"]
@@ -638,6 +680,7 @@ async def test_onboarding_and_multi_member_balances(client: AsyncClient) -> None
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Household supplies",
+            "category": "Other",
             "paid_by_member_id": None,
             "settlement_member_id": None,
             "personal_share_paise": 400,
@@ -655,6 +698,7 @@ async def test_onboarding_and_multi_member_balances(client: AsyncClient) -> None
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Dinner",
+            "category": "Food & Dining",
             "paid_by_member_id": leo_id,
             "settlement_member_id": None,
             "personal_share_paise": 500,
@@ -777,6 +821,7 @@ async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Duplicate split",
+            "category": "Other",
             "personal_share_paise": 400,
             "splits": [
                 {"member_id": member, "amount_paise": 300},
@@ -792,6 +837,7 @@ async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Unknown account",
+            "category": "Other",
             "personal_share_paise": 1_000,
             "splits": [],
             "source_account_id": 999_999,
@@ -804,6 +850,7 @@ async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Unknown member",
+            "category": "Other",
             "personal_share_paise": 500,
             "splits": [{"member_id": 999_999, "amount_paise": 500}],
             "source_account_id": account,

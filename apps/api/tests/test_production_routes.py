@@ -120,8 +120,8 @@ async def test_production_capture_context_is_household_scoped_and_grounded() -> 
         "accounts": [{"id": ACCOUNT_ID, "name": "Known Bank", "kind": "bank"}],
         "categories": [
             {"id": "expense", "name": "Food", "kind": "expense"},
-            {"id": "income", "name": "Salary", "kind": "income"},
             {"id": "both", "name": "Other", "kind": "both"},
+            {"id": "income", "name": "Salary", "kind": "income"},
         ],
     }
     assert client.params_by_path["accounts"] == expect_capture_scope(
@@ -130,7 +130,7 @@ async def test_production_capture_context_is_household_scoped_and_grounded() -> 
         order="created_at.asc,id.asc",
     )
     assert client.params_by_path["categories"] == expect_capture_scope(
-        "id,name,category_type"
+        "id,name,category_type,is_archived", order="name.asc,id.asc"
     )
 
 
@@ -217,10 +217,22 @@ async def test_production_assistant_routes_return_503_when_provider_is_disabled(
 
 
 class FakeProductionClient:
-    def __init__(self) -> None:
+    def __init__(self, *, categories: list[dict[str, Any]] | None = None) -> None:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
         self.activity_payload: dict[str, Any] | None = None
+        self.categories = (
+            categories
+            if categories is not None
+            else [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": False,
+                }
+            ]
+        )
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
         if name == "get_current_household":
@@ -296,7 +308,7 @@ class FakeProductionClient:
                 },
             ]
         if path == "categories":
-            return [{"id": CATEGORY_ID, "name": "Groceries", "category_type": "expense"}]
+            return self.categories
         if path == "accounts":
             return [{
                 "id": ACCOUNT_ID,
@@ -404,7 +416,8 @@ async def test_production_tag_suggestion_uses_only_eligible_household_categories
     assert client.category_params == {
         "household_id": f"eq.{HOUSEHOLD_ID}",
         "is_archived": "eq.false",
-        "select": "id,name,category_type",
+        "select": "id,name,category_type,is_archived",
+        "order": "name.asc,id.asc",
     }
     assert len(captured) == 1
     assert isinstance(captured[0], TagSuggestionRequest)
@@ -544,6 +557,104 @@ async def test_production_confirmation_adds_owner_share_to_atomic_rpc() -> None:
     ]
     assert result["personal_share_paise"] == 6_000
     assert result["splits"] == [{"member_id": MEMBER_ID, "amount_paise": 4_000}]
+
+
+@pytest.mark.parametrize(
+    ("category", "rows"),
+    [
+        (
+            "Invented",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": False,
+                }
+            ],
+        ),
+        (
+            "Gro%",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": False,
+                }
+            ],
+        ),
+        (
+            "Groceries",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": True,
+                }
+            ],
+        ),
+        (
+            "Salary",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Salary",
+                    "category_type": "income",
+                    "is_archived": False,
+                }
+            ],
+        ),
+    ],
+    ids=["invented", "wildcard", "archived", "wrong-direction"],
+)
+async def test_production_confirmation_rejects_ungrounded_categories(
+    category: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    fake = FakeProductionClient(categories=rows)
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=10_000,
+        description="Crafted category",
+        category=category,
+        personal_share_paise=10_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await confirm_transaction(
+            draft,
+            cast(SupabaseRestClient, fake),
+            AuthContext(user_id=USER_ID),
+            f"category-{category}",
+        )
+
+    assert error.value.status_code == 422
+    assert fake.confirm_payload is None
+
+
+async def test_production_confirmation_accepts_exact_normalized_category() -> None:
+    fake = FakeProductionClient()
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=10_000,
+        description="Grounded category",
+        category="  gRoCeRiEs  ",
+        personal_share_paise=10_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    await confirm_transaction(
+        draft,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "category-normalized",
+    )
+
+    assert fake.confirm_payload is not None
+    assert fake.confirm_payload["p_category_id"] == CATEGORY_ID
 
 
 async def test_profile_hydrates_server_owned_household_and_participants() -> None:
