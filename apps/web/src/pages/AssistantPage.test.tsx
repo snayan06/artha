@@ -12,12 +12,6 @@ describe('AssistantPage generated UI', () => {
     vi.clearAllMocks()
   })
 
-  it('disables browser scroll anchoring while assistant content changes', () => {
-    const { container } = render(<AssistantPage />)
-
-    expect(container.firstElementChild).toHaveClass('disable-scroll-anchor')
-  })
-
   it('renders generated chart data as an accessible table', async () => {
     vi.mocked(chatAssistant).mockResolvedValue({
       message: 'Here is your spending overview.',
@@ -73,6 +67,8 @@ describe('AssistantPage generated UI', () => {
   })
 
   it('restores the exact question after an unavailable response and permits retry without a fake exchange', async () => {
+    const scrollTo = vi.fn()
+    vi.stubGlobal('scrollTo', scrollTo)
     vi.mocked(chatAssistant)
       .mockRejectedValueOnce(new Error('API request failed (503)'))
       .mockResolvedValueOnce({
@@ -95,6 +91,7 @@ describe('AssistantPage generated UI', () => {
     expect(screen.queryByText(question, { selector: 'section p' })).not.toBeInTheDocument()
     expect(screen.queryByText('Available balance')).not.toBeInTheDocument()
     expect(screen.queryByText('AI response')).not.toBeInTheDocument()
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
 
     await user.click(screen.getByRole('button', { name: 'Send question' }))
 
