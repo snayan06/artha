@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chatAssistant } from '../lib/api'
@@ -180,7 +180,26 @@ describe('AssistantPage generated UI', () => {
     await user.type(input, 'Show my balance')
     await user.click(screen.getByRole('button', { name: 'Send question' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Reviewing your ledger…')
+    expect(await screen.findByRole('status')).toHaveTextContent('Reading your latest ledger summary…')
     expect(input).toBeDisabled()
+  })
+
+  it('shows honest progress messages without exposing model reasoning', () => {
+    vi.useFakeTimers()
+    vi.mocked(chatAssistant).mockReturnValue(new Promise(() => undefined))
+    render(<AssistantPage />)
+    const input = screen.getByLabelText('Ask Artha')
+
+    fireEvent.change(input, { target: { value: 'Where did I spend the most?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send question' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('Reading your latest ledger summary…')
+    act(() => vi.advanceTimersByTime(650))
+    expect(screen.getByRole('status')).toHaveTextContent('Choosing the safest view for your question…')
+    act(() => vi.advanceTimersByTime(650))
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing verified numbers and charts…')
+    expect(screen.getByRole('status')).not.toHaveTextContent(/thinking|reasoning|chain of thought/i)
+
+    vi.useRealTimers()
   })
 })

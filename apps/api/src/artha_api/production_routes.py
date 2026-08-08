@@ -47,6 +47,7 @@ from .schemas import (
     normalize_required_description,
 )
 from .supabase_rest import SupabaseRestClient, rest_client_for_request
+from .transaction_metadata import ReviewedMetadata, SuggestedTag, suggest_transaction_metadata
 
 router = APIRouter()
 
@@ -209,6 +210,10 @@ class ProductionDraft(BaseModel):
     destination_account_id: UUID | None = None
     occurred_at: datetime | None = None
     notes: str | None = Field(default=None, max_length=1000)
+    platform: str | None = Field(default=None, min_length=1, max_length=100)
+    subcategory: str | None = Field(default=None, min_length=1, max_length=80)
+    metadata: ReviewedMetadata | None = None
+    tags: list[SuggestedTag] = Field(default_factory=list, max_length=8)
 
     @field_validator("description")
     @classmethod
@@ -230,10 +235,26 @@ class ProductionDraft(BaseModel):
                 raise ValueError("transfer accounts must be different")
             if self.splits or self.paid_by_member_id is not None:
                 raise ValueError("transfer cannot contain household splits")
+            if self.platform or self.subcategory or self.metadata or self.tags:
+                raise ValueError("transfer cannot contain metadata or tags")
         elif self.destination_account_id is not None:
             raise ValueError("destination account is only valid for a transfer")
+        if self.kind == "income" and (
+            self.platform or self.subcategory or self.metadata or self.tags
+        ):
+            raise ValueError("income cannot contain expense metadata or tags")
         if self.kind != "transfer" and self.category is None:
             raise ValueError("expense and income require a category")
+        review_statuses = [
+            *(item.review_status for item in (self.metadata.attributes if self.metadata else [])),
+            *(
+                item.review_status
+                for item in (self.metadata.evidence.values() if self.metadata else [])
+            ),
+            *(item.review_status for item in self.tags),
+        ]
+        if any(review_status != "reviewed" for review_status in review_statuses):
+            raise ValueError("metadata must be reviewed before confirmation")
         return self
 
 
@@ -462,6 +483,25 @@ async def categories_by_id(
     return {str(row["id"]): row for row in rows}
 
 
+async def merchant_rule_rows(
+    client: SupabaseRestClient, household_id: str
+) -> list[dict[str, Any]]:
+    rows = await client.request(
+        "GET",
+        "merchant_rules",
+        params={
+            "household_id": f"eq.{household_id}",
+            "is_active": "eq.true",
+            "select": (
+                "id,match_type,merchant_pattern,category_id,account_id,"
+                "priority,is_active"
+            ),
+            "order": "priority.asc,id.asc",
+        },
+    )
+    return list(rows or [])
+
+
 def normalize_category_name(value: str) -> str:
     return " ".join(value.split()).casefold()
 
@@ -673,7 +713,25 @@ async def confirm_transaction(
             "p_idempotency_key": idempotency_key,
             "p_merchant": payload.description,
             "p_note": payload.notes,
-            "p_metadata": {"source": "artha-api"},
+            "p_metadata": {
+                "source": "artha-api",
+                **(
+                    {
+                        "version": 1,
+                        "platform": payload.platform,
+                        "subcategory": payload.subcategory,
+                        "evidence": payload.metadata.model_dump(mode="json")[
+                            "evidence"
+                        ],
+                        "attributes": payload.metadata.model_dump(mode="json")[
+                            "attributes"
+                        ],
+                        "tags": [tag.model_dump(mode="json") for tag in payload.tags],
+                    }
+                    if payload.metadata is not None
+                    else {}
+                ),
+            },
         },
     )
     result["transaction_splits"] = splits
@@ -937,14 +995,95 @@ async def parse_draft(
         personal_share = result.amount_paise
         splits = []
     account_names = {str(account["id"]): str(account["name"]) for account in accounts}
+    category_name = result.category_name
+    platform: str | None = None
+    subcategory: str | None = None
+    category_suggestion: dict[str, Any] | None = None
+    metadata: dict[str, Any] = {"version": 1, "evidence": {}, "attributes": []}
+    tag_suggestions: list[dict[str, Any]] = []
+    if result.kind == "expense":
+        suggestion = suggest_transaction_metadata(
+            source_text=payload.text,
+            merchant=result.description,
+            platform=result.platform,
+            model_category_id=result.category_id,
+            model_category_name=result.category_name,
+            model_subcategory=result.subcategory,
+            model_attributes=result.attributes,
+            model_tags=result.tags,
+            categories=categories,
+            merchant_rules=await merchant_rule_rows(client, household_id),
+        )
+        category_name = suggestion.category_name
+        platform = suggestion.platform
+        subcategory = suggestion.subcategory
+        evidence_by_field = {
+            evidence.field: {
+                "source": evidence.source,
+                "confidence": evidence.confidence,
+                "review_status": "needs_review",
+            }
+            for evidence in result.field_evidence
+        }
+        metadata["evidence"] = {
+            "merchant": evidence_by_field.get(
+                "merchant",
+                {
+                    "source": "model_suggested",
+                    "confidence": result.confidence,
+                    "review_status": "needs_review",
+                },
+            ),
+        }
+        if platform:
+            metadata["evidence"]["platform"] = evidence_by_field.get(
+                "platform",
+                {
+                    "source": "model_suggested",
+                    "confidence": result.confidence,
+                    "review_status": "needs_review",
+                },
+            )
+        if suggestion.category_source is not None:
+            category_evidence = {
+                "source": suggestion.category_source,
+                "confidence": suggestion.category_confidence,
+                "review_status": "needs_review",
+            }
+            metadata["evidence"]["category"] = category_evidence
+            category_suggestion = {
+                "source": suggestion.category_source,
+                "confidence": suggestion.category_confidence,
+                "reason": suggestion.category_reason,
+            }
+        if subcategory:
+            metadata["evidence"]["subcategory"] = evidence_by_field.get(
+                "subcategory",
+                {
+                    "source": "safe_catalog",
+                    "confidence": 1.0,
+                    "review_status": "needs_review",
+                },
+            )
+        metadata["attributes"] = [
+            attribute.model_dump(mode="json") for attribute in suggestion.attributes
+        ]
+        tag_suggestions = [
+            tag.model_dump(mode="json") for tag in suggestion.tags
+        ]
     return {
         "outcome": "draft",
         "draft": {
             "kind": result.kind,
             "amount_paise": result.amount_paise,
             "description": result.description,
-            "category": result.category_name
+            "category": category_name
             or ("Transfer" if result.kind == "transfer" else "Other"),
+            "subcategory": subcategory,
+            "platform": platform,
+            "category_suggestion": category_suggestion,
+            "metadata": metadata,
+            "tag_suggestions": tag_suggestions,
             "paid_by_member_id": None,
             "personal_share_paise": personal_share,
             "splits": splits,

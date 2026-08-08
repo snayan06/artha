@@ -144,6 +144,57 @@ describe('QuickAddPage', () => {
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
+  it('separates suggested category, transaction details, context and optional tags', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'parseDraft').mockResolvedValue({
+      demo: false,
+      data: {
+        kind: 'debit', amountPaise: 68_000, merchant: 'Burger King', category: 'Food & Dining',
+        account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(0),
+        note: '', memberSplits: [], confidence: 'high',
+        sourceText: 'Paid 680 for dinner at Burger King via Zomato from HDFC UPI, date night',
+        platform: 'Zomato', subcategory: 'Fast Food',
+        categorySuggestion: {
+          source: 'safe_catalog', confidence: 1,
+          reason: "Burger King is in Artha's food merchant catalog."
+        },
+        metadata: {
+          version: 1,
+          evidence: {
+            merchant: { source: 'user_explicit', confidence: 0.99, reviewStatus: 'needs_review' },
+            platform: { source: 'user_explicit', confidence: 0.99, reviewStatus: 'needs_review' },
+            category: { source: 'safe_catalog', confidence: 1, reviewStatus: 'needs_review' }
+          },
+          attributes: [
+            { key: 'meal_occasion', value: 'Dinner', source: 'user_explicit', confidence: 0.99, reviewStatus: 'needs_review' },
+            { key: 'order_channel', value: 'Delivery', source: 'safe_catalog', confidence: 1, reviewStatus: 'needs_review' }
+          ]
+        },
+        tags: [
+          { name: 'Date Night', normalizedName: 'date night', source: 'user_explicit', confidence: 0.98, reviewStatus: 'needs_review', selected: true }
+        ]
+      }
+    } as never)
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), 'Paid 680 for dinner at Burger King via Zomato from HDFC UPI, date night')
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Suggested category' })).toBeInTheDocument()
+    expect(screen.getByText("Burger King is in Artha's food merchant catalog.")).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Transaction details' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Merchant')).toHaveValue('Burger King')
+    expect(screen.getByLabelText('Platform')).toHaveValue('Zomato')
+    expect(screen.getByLabelText('Subcategory')).toHaveValue('Fast Food')
+    expect(screen.getByRole('heading', { name: 'Context' })).toBeInTheDocument()
+    expect(screen.getByText('Dinner')).toBeInTheDocument()
+    expect(screen.getByText('Delivery')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Optional tags' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Date Night' })).toBeChecked()
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
   it('offers a form-first entry with an explicit date picker', async () => {
     const user = userEvent.setup()
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)

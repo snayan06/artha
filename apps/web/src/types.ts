@@ -92,6 +92,43 @@ export interface TransactionDraft {
   confidence: 'high' | 'review'
   warnings?: string[]
   sourceText: string
+  platform?: string
+  subcategory?: string
+  categorySuggestion?: TransactionCategorySuggestion
+  metadata?: TransactionMetadata
+  tags?: TransactionTag[]
+}
+
+export type MetadataSource = 'user_explicit' | 'household_rule' | 'safe_catalog' | 'model_suggested' | 'user_corrected'
+export type MetadataReviewStatus = 'needs_review' | 'reviewed'
+
+export interface MetadataEvidence {
+  source: MetadataSource
+  confidence: number
+  reviewStatus: MetadataReviewStatus
+}
+
+export interface TransactionAttribute extends MetadataEvidence {
+  key: 'meal_occasion' | 'order_channel'
+  value: string
+}
+
+export interface TransactionTag extends MetadataEvidence {
+  name: string
+  normalizedName: string
+  selected: boolean
+}
+
+export interface TransactionCategorySuggestion {
+  source: MetadataSource
+  confidence: number
+  reason: string
+}
+
+export interface TransactionMetadata {
+  version: 1
+  evidence: Partial<Record<'amount' | 'merchant' | 'platform' | 'category' | 'subcategory' | 'occurred_on', MetadataEvidence>>
+  attributes: TransactionAttribute[]
 }
 
 export interface CaptureChoice {

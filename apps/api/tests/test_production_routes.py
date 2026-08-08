@@ -12,6 +12,7 @@ from artha_api.assistant import (
     AssistantChatRequest,
     AssistantStatus,
     CaptureClarification,
+    CaptureDraftInterpretation,
     CaptureInterpretationResponse,
     LlmProvider,
     LocalFinancialAssistant,
@@ -35,6 +36,15 @@ from artha_api.production_routes import (
 )
 from artha_api.schemas import ParseRequest
 from artha_api.supabase_rest import SupabaseRestClient
+from artha_api.transaction_metadata import (
+    ModelAttribute,
+    ModelFieldEvidence,
+    ModelTag,
+    ReviewedAttribute,
+    ReviewedEvidence,
+    ReviewedMetadata,
+    SuggestedTag,
+)
 
 HOUSEHOLD_ID = "00000000-0000-0000-0000-000000000100"
 OWNER_ID = "00000000-0000-0000-0000-000000000101"
@@ -231,6 +241,7 @@ class FakeProductionClient:
         *,
         categories: list[dict[str, Any]] | None = None,
         accounts: list[dict[str, Any]] | None = None,
+        merchant_rules: list[dict[str, Any]] | None = None,
     ) -> None:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
@@ -249,6 +260,7 @@ class FakeProductionClient:
             ]
         )
         self.accounts = accounts
+        self.merchant_rules = merchant_rules or []
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
         self.rpc_names.append(name)
@@ -339,6 +351,8 @@ class FakeProductionClient:
                 "is_archived": False,
                 "created_at": "2026-08-04T00:00:00+00:00",
             }]
+        if path == "merchant_rules":
+            return self.merchant_rules
         if path == "households":
             return [{"id": HOUSEHOLD_ID, "name": "Test household"}]
         raise AssertionError(f"unexpected path: {path}")
@@ -574,6 +588,143 @@ async def test_production_confirmation_adds_owner_share_to_atomic_rpc() -> None:
     ]
     assert result["personal_share_paise"] == 6_000
     assert result["splits"] == [{"member_id": MEMBER_ID, "amount_paise": 4_000}]
+
+
+async def test_production_confirmation_persists_only_reviewed_metadata() -> None:
+    fake = FakeProductionClient(
+        categories=[
+            {
+                "id": CATEGORY_ID,
+                "name": "Food & Dining",
+                "category_type": "expense",
+                "is_archived": False,
+            }
+        ]
+    )
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=68_000,
+        description="Burger King",
+        category="Food & Dining",
+        platform="Zomato",
+        subcategory="Fast Food",
+        metadata=ReviewedMetadata(
+            evidence={
+                "merchant": ReviewedEvidence(
+                    source="user_explicit", confidence=0.99, review_status="reviewed"
+                ),
+                "platform": ReviewedEvidence(
+                    source="user_explicit", confidence=0.99, review_status="reviewed"
+                ),
+                "category": ReviewedEvidence(
+                    source="safe_catalog", confidence=1, review_status="reviewed"
+                ),
+            },
+            attributes=[
+                ReviewedAttribute(
+                    key="order_channel",
+                    value="Delivery",
+                    source="safe_catalog",
+                    confidence=1,
+                    review_status="reviewed",
+                )
+            ],
+        ),
+        tags=[
+            SuggestedTag(
+                name="Date Night",
+                normalized_name="date night",
+                source="user_explicit",
+                confidence=0.98,
+                review_status="reviewed",
+            )
+        ],
+        personal_share_paise=68_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    await confirm_transaction(
+        draft,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "reviewed-metadata",
+    )
+
+    assert fake.confirm_payload is not None
+    assert fake.confirm_payload["p_metadata"] == {
+        "source": "artha-api",
+        "version": 1,
+        "platform": "Zomato",
+        "subcategory": "Fast Food",
+        "evidence": {
+            "merchant": {
+                "source": "user_explicit",
+                "confidence": 0.99,
+                "review_status": "reviewed",
+            },
+            "platform": {
+                "source": "user_explicit",
+                "confidence": 0.99,
+                "review_status": "reviewed",
+            },
+            "category": {
+                "source": "safe_catalog",
+                "confidence": 1.0,
+                "review_status": "reviewed",
+            },
+        },
+        "attributes": [
+            {
+                "key": "order_channel",
+                "value": "Delivery",
+                "source": "safe_catalog",
+                "confidence": 1.0,
+                "review_status": "reviewed",
+            }
+        ],
+        "tags": [
+            {
+                "name": "Date Night",
+                "normalized_name": "date night",
+                "source": "user_explicit",
+                "confidence": 0.98,
+                "review_status": "reviewed",
+            }
+        ],
+    }
+
+
+def test_production_confirmation_rejects_unreviewed_or_transfer_metadata() -> None:
+    with pytest.raises(ValidationError, match="reviewed before confirmation"):
+        ProductionDraft(
+            kind="expense",
+            amount_paise=10_000,
+            description="Dinner",
+            category="Food & Dining",
+            metadata=ReviewedMetadata(
+                evidence={
+                    "merchant": ReviewedEvidence(
+                        source="model_suggested",
+                        confidence=0.8,
+                        review_status="needs_review",
+                    )
+                }
+            ),
+            personal_share_paise=10_000,
+            source_account_id=ACCOUNT_ID,
+        )
+
+    with pytest.raises(ValidationError, match="transfer cannot contain metadata"):
+        ProductionDraft(
+            kind="transfer",
+            amount_paise=10_000,
+            description="Self transfer",
+            category="Transfer",
+            platform="Zomato",
+            personal_share_paise=10_000,
+            source_account_id=ACCOUNT_ID,
+            destination_account_id=DESTINATION_ACCOUNT_ID,
+        )
 
 
 @pytest.mark.parametrize(
@@ -974,6 +1125,163 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
         "warnings": [],
         "parser_source": "gemini:test-model",
     }
+
+
+async def test_parse_draft_enriches_reviewable_transaction_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def interpret(
+        _self: LocalFinancialAssistant,
+        _message: str,
+        _context: object,
+    ) -> CaptureInterpretationResponse:
+        return CaptureInterpretationResponse(
+            provider=LlmProvider.GEMINI,
+            model="test-model",
+            result=CaptureDraftInterpretation(
+                outcome="draft",
+                kind="expense",
+                amount_paise=68_000,
+                description="Burger King",
+                platform="Zomato",
+                subcategory=None,
+                attributes=[
+                    ModelAttribute(
+                        key="meal_occasion",
+                        value="Dinner",
+                        source="user_explicit",
+                        confidence=0.99,
+                    )
+                ],
+                tags=[
+                    ModelTag(
+                        name="Date Night",
+                        source="user_explicit",
+                        confidence=0.98,
+                    )
+                ],
+                field_evidence=[
+                    ModelFieldEvidence(
+                        field="merchant",
+                        source="user_explicit",
+                        confidence=0.99,
+                    ),
+                    ModelFieldEvidence(
+                        field="platform",
+                        source="user_explicit",
+                        confidence=0.99,
+                    ),
+                ],
+                category_id=None,
+                category_name=None,
+                source_account_id=ACCOUNT_ID,
+                destination_account_id=None,
+                member_ids=[],
+                split_equally=False,
+                occurred_on="2026-08-08",
+                confidence=0.96,
+                warnings=[],
+            ),
+        )
+
+    monkeypatch.setattr(LocalFinancialAssistant, "interpret_capture", interpret)
+    categories = [
+        {
+            "id": CATEGORY_ID,
+            "name": "Food & Dining",
+            "category_type": "expense",
+            "is_archived": False,
+        }
+    ]
+
+    result = await parse_draft(
+        ParseRequest(
+            text=(
+                "Paid 680 for dinner at Burger King via Zomato from Known Bank, "
+                "date night"
+            ),
+            timezone="Asia/Kolkata",
+        ),
+        cast(
+            SupabaseRestClient,
+            FakeProductionClient(categories=categories, merchant_rules=[]),
+        ),
+        AuthContext(user_id=USER_ID),
+    )
+
+    draft = result["draft"]
+    assert {
+        key: draft[key]
+        for key in (
+            "description",
+            "category",
+            "platform",
+            "subcategory",
+            "category_suggestion",
+            "metadata",
+            "tag_suggestions",
+        )
+    } == {
+            "description": "Burger King",
+            "category": "Food & Dining",
+            "platform": "Zomato",
+            "subcategory": "Fast Food",
+            "category_suggestion": {
+                "source": "safe_catalog",
+                "confidence": 1.0,
+                "reason": "Burger King is in Artha's food merchant catalog.",
+            },
+            "metadata": {
+                "version": 1,
+                "evidence": {
+                    "merchant": {
+                        "source": "user_explicit",
+                        "confidence": 0.99,
+                        "review_status": "needs_review",
+                    },
+                    "platform": {
+                        "source": "user_explicit",
+                        "confidence": 0.99,
+                        "review_status": "needs_review",
+                    },
+                    "category": {
+                        "source": "safe_catalog",
+                        "confidence": 1.0,
+                        "review_status": "needs_review",
+                    },
+                    "subcategory": {
+                        "source": "safe_catalog",
+                        "confidence": 1.0,
+                        "review_status": "needs_review",
+                    },
+                },
+                "attributes": [
+                    {
+                        "key": "meal_occasion",
+                        "value": "Dinner",
+                        "source": "user_explicit",
+                        "confidence": 0.99,
+                        "review_status": "needs_review",
+                    },
+                    {
+                        "key": "order_channel",
+                        "value": "Delivery",
+                        "source": "safe_catalog",
+                        "confidence": 1.0,
+                        "review_status": "needs_review",
+                    },
+                ],
+            },
+            "tag_suggestions": [
+                {
+                    "name": "Date Night",
+                    "normalized_name": "date night",
+                    "source": "user_explicit",
+                    "confidence": 0.98,
+                    "review_status": "needs_review",
+                }
+            ],
+        }
 
 
 async def test_parse_draft_returns_sanitized_503_when_ai_is_unavailable(

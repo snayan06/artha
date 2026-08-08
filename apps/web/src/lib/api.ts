@@ -286,6 +286,116 @@ function mapTransaction(raw: JsonObject, accountNames: Map<string, string> = new
   }
 }
 
+const METADATA_SOURCES = new Set([
+  'user_explicit', 'household_rule', 'safe_catalog', 'model_suggested', 'user_corrected'
+])
+const METADATA_EVIDENCE_FIELDS = new Set([
+  'amount', 'merchant', 'platform', 'category', 'subcategory', 'occurred_on'
+])
+
+function mapMetadataEvidence(raw: unknown): NonNullable<TransactionDraft['metadata']>['evidence'][string & keyof NonNullable<TransactionDraft['metadata']>['evidence']] | null {
+  if (
+    !isJsonObject(raw)
+    || !hasExactKeys(raw, ['source', 'confidence', 'review_status'], ['source', 'confidence', 'review_status'])
+    || typeof raw.source !== 'string'
+    || !METADATA_SOURCES.has(raw.source)
+    || typeof raw.confidence !== 'number'
+    || raw.confidence < 0
+    || raw.confidence > 1
+    || (raw.review_status !== 'needs_review' && raw.review_status !== 'reviewed')
+  ) return null
+  return {
+    source: raw.source as 'user_explicit',
+    confidence: raw.confidence,
+    reviewStatus: raw.review_status
+  }
+}
+
+function mapDraftMetadata(raw: JsonObject): Pick<TransactionDraft, 'platform' | 'subcategory' | 'categorySuggestion' | 'metadata' | 'tags'> {
+  const platform = raw.platform === null || raw.platform === undefined ? undefined : safeText(raw.platform, '', 100) || undefined
+  const subcategory = raw.subcategory === null || raw.subcategory === undefined ? undefined : safeText(raw.subcategory, '', 80) || undefined
+
+  let categorySuggestion: TransactionDraft['categorySuggestion']
+  if (raw.category_suggestion !== null && raw.category_suggestion !== undefined) {
+    const suggestion = raw.category_suggestion
+    if (
+      !isJsonObject(suggestion)
+      || !hasExactKeys(suggestion, ['source', 'confidence', 'reason'], ['source', 'confidence', 'reason'])
+      || typeof suggestion.source !== 'string'
+      || !METADATA_SOURCES.has(suggestion.source)
+      || typeof suggestion.confidence !== 'number'
+      || suggestion.confidence < 0
+      || suggestion.confidence > 1
+      || !isBoundedText(suggestion.reason, 160)
+    ) throw new Error('Capture metadata suggestion was invalid')
+    categorySuggestion = {
+      source: suggestion.source as 'safe_catalog',
+      confidence: suggestion.confidence,
+      reason: suggestion.reason
+    }
+  }
+
+  let metadata: TransactionDraft['metadata']
+  if (raw.metadata !== null && raw.metadata !== undefined) {
+    if (
+      !isJsonObject(raw.metadata)
+      || !hasExactKeys(raw.metadata, ['version', 'evidence', 'attributes'], ['version', 'evidence', 'attributes'])
+      || raw.metadata.version !== 1
+      || !isJsonObject(raw.metadata.evidence)
+      || !Array.isArray(raw.metadata.attributes)
+      || raw.metadata.attributes.length > 8
+    ) throw new Error('Capture metadata was invalid')
+    const evidence: NonNullable<TransactionDraft['metadata']>['evidence'] = {}
+    for (const [field, value] of Object.entries(raw.metadata.evidence)) {
+      if (!METADATA_EVIDENCE_FIELDS.has(field) || !isJsonObject(value)) {
+        throw new Error('Capture metadata evidence was invalid')
+      }
+      const mapped = mapMetadataEvidence({
+        source: value.source,
+        confidence: value.confidence,
+        review_status: value.review_status
+      })
+      if (!mapped) throw new Error('Capture metadata evidence was invalid')
+      evidence[field as keyof typeof evidence] = mapped
+    }
+    const attributes = raw.metadata.attributes.map((value) => {
+      if (
+        !isJsonObject(value)
+        || !hasExactKeys(value, ['key', 'value', 'source', 'confidence', 'review_status'], ['key', 'value', 'source', 'confidence', 'review_status'])
+        || (value.key !== 'meal_occasion' && value.key !== 'order_channel')
+        || !isBoundedText(value.value, 80)
+      ) throw new Error('Capture metadata attribute was invalid')
+      const mapped = mapMetadataEvidence({
+        source: value.source,
+        confidence: value.confidence,
+        review_status: value.review_status
+      })
+      if (!mapped) throw new Error('Capture metadata attribute was invalid')
+      return { key: value.key as 'meal_occasion' | 'order_channel', value: value.value, ...mapped }
+    })
+    metadata = { version: 1, evidence, attributes }
+  }
+
+  const rawTags = raw.tag_suggestions ?? []
+  if (!Array.isArray(rawTags) || rawTags.length > 8) throw new Error('Capture tags were invalid')
+  const tags = rawTags.map((value) => {
+    if (
+      !isJsonObject(value)
+      || !hasExactKeys(value, ['name', 'normalized_name', 'source', 'confidence', 'review_status'], ['name', 'normalized_name', 'source', 'confidence', 'review_status'])
+      || !isBoundedText(value.name, 60)
+      || !isBoundedText(value.normalized_name, 60)
+    ) throw new Error('Capture tag was invalid')
+    const mapped = mapMetadataEvidence({
+      source: value.source,
+      confidence: value.confidence,
+      review_status: value.review_status
+    })
+    if (!mapped) throw new Error('Capture tag was invalid')
+    return { name: value.name, normalizedName: value.normalized_name, selected: true, ...mapped }
+  })
+  return { platform, subcategory, categorySuggestion, metadata, tags }
+}
+
 function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string>, confidence?: unknown, warnings?: unknown): TransactionDraft {
   const amountPaise = numberValue(raw.amount_paise ?? raw.amountPaise)
   const apiKind = stringValue(raw.kind, 'expense')
@@ -306,7 +416,8 @@ function mapDraft(raw: JsonObject, text: string, memberNames: Map<string, string
     memberSplits: mapSplits(raw.splits, memberNames),
     confidence: warningList.length === 0 && (confidence === 'high' || (typeof confidence === 'number' && confidence >= 0.8)) ? 'high' : 'review',
     warnings: warningList,
-    sourceText: text
+    sourceText: text,
+    ...mapDraftMetadata(raw)
   }
 }
 
@@ -385,6 +496,21 @@ export function isCaptureClarification(result: CaptureResult): result is Capture
 
 function toApiDraft(draft: TransactionDraft): JsonObject {
   const memberTotalPaise = draft.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0)
+  const reviewedMetadata = draft.metadata ? {
+    version: 1,
+    evidence: Object.fromEntries(Object.entries(draft.metadata.evidence).map(([field, evidence]) => [field, {
+      source: evidence?.source,
+      confidence: evidence?.confidence,
+      review_status: 'reviewed'
+    }])),
+    attributes: draft.metadata.attributes.map((attribute) => ({
+      key: attribute.key,
+      value: attribute.value,
+      source: attribute.source,
+      confidence: attribute.confidence,
+      review_status: 'reviewed'
+    }))
+  } : undefined
   return {
     kind: draft.kind === 'transfer' ? 'transfer' : draft.kind === 'credit' ? 'income' : 'expense',
     amount_paise: draft.amountPaise,
@@ -396,7 +522,17 @@ function toApiDraft(draft: TransactionDraft): JsonObject {
     occurred_at: `${draft.occurredAt}T12:00:00Z`,
     notes: draft.note || null,
     source_account_id: draft.sourceAccountId,
-    destination_account_id: draft.destinationAccountId ?? null
+    destination_account_id: draft.destinationAccountId ?? null,
+    platform: draft.kind === 'debit' ? draft.platform ?? null : null,
+    subcategory: draft.kind === 'debit' ? draft.subcategory ?? null : null,
+    metadata: draft.kind === 'debit' ? reviewedMetadata ?? null : null,
+    tags: draft.kind === 'debit' ? (draft.tags ?? []).filter((tag) => tag.selected).map((tag) => ({
+      name: tag.name,
+      normalized_name: tag.normalizedName,
+      source: tag.source,
+      confidence: tag.confidence,
+      review_status: 'reviewed'
+    })) : []
   }
 }
 

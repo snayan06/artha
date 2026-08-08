@@ -21,6 +21,8 @@ from pydantic import (
     model_validator,
 )
 
+from .transaction_metadata import ModelAttribute, ModelFieldEvidence, ModelTag
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -505,6 +507,11 @@ class CaptureDraftInterpretation(StrictModel):
     kind: Literal["expense", "income", "transfer"]
     amount_paise: int = Field(gt=0)
     description: str = Field(min_length=1, max_length=160)
+    platform: str | None = Field(default=None, max_length=100)
+    subcategory: str | None = Field(default=None, max_length=80)
+    attributes: list[ModelAttribute] = Field(default_factory=list, max_length=8)
+    tags: list[ModelTag] = Field(default_factory=list, max_length=8)
+    field_evidence: list[ModelFieldEvidence] = Field(default_factory=list, max_length=12)
     category_id: str | None = Field(default=None, max_length=80)
     category_name: str | None = Field(default=None, max_length=80)
     source_account_id: str = Field(min_length=1, max_length=80)
@@ -532,6 +539,16 @@ class CaptureDraftInterpretation(StrictModel):
             raise ValueError("destination account is only valid for transfers")
         if self.member_ids and not self.split_equally:
             raise ValueError("selected members require an explicit equal split")
+        evidence_fields = [item.field for item in self.field_evidence]
+        if len(evidence_fields) != len(set(evidence_fields)):
+            raise ValueError("capture field evidence must be unique")
+        if self.kind == "transfer" and (
+            self.platform is not None
+            or self.subcategory is not None
+            or self.attributes
+            or self.tags
+        ):
+            raise ValueError("transfers cannot contain expense metadata or tags")
         return self
 
 
@@ -697,6 +714,12 @@ ambiguous when both day-first and month-first readings are valid, so ask for an 
 A named date such as 2 Aug is unambiguous; resolve it in context.today's year unless the utterance
 states another year. A payment to a person from one owned account is an expense, not a self
 transfer, and does not require destination_account_id; use Other when no purpose is stated.
+Keep the reviewed merchant or counterparty in description. Keep a delivery or marketplace
+intermediary in platform instead of replacing the merchant: Burger King via Zomato means
+description="Burger King" and platform="Zomato". Do not infer cuisine, location, restaurant
+branch, companions, or arbitrary attributes. attributes may use only meal_occasion or
+order_channel. tags require an explicit phrase such as date night, work meal, on vacation, or
+treat. Model-created evidence sources may only be user_explicit or model_suggested.
 The response root is an object with a result property. Inside result, include every field required
 by the selected outcome schema. For draft fields that do not apply, use null, an empty list, or
 false exactly as allowed by the schema; clarification and rejection must include warnings even

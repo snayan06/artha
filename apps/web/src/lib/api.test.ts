@@ -76,7 +76,15 @@ describe('FastAPI adapter', () => {
         draft: {
           kind: 'expense', amount_paise: 184000, description: 'Groceries', category: 'Groceries',
           paid_by_member_id: null, personal_share_paise: 92000, splits: [{ member_id: 7, amount_paise: 92000 }],
-          source_account_id: 42, occurred_at: '2026-08-04T12:00:00Z'
+          source_account_id: 42, occurred_at: '2026-08-04T12:00:00Z', platform: 'Zomato',
+          subcategory: 'Delivery',
+          category_suggestion: { source: 'safe_catalog', confidence: 1, reason: 'Known platform.' },
+          metadata: {
+            version: 1,
+            evidence: { platform: { source: 'safe_catalog', confidence: 1, review_status: 'needs_review' } },
+            attributes: [{ key: 'order_channel', value: 'Delivery', source: 'safe_catalog', confidence: 1, review_status: 'needs_review' }]
+          },
+          tag_suggestions: [{ name: 'Work Meal', normalized_name: 'work meal', source: 'user_explicit', confidence: 0.95, review_status: 'needs_review' }]
         }, confidence: 0.97, warnings: []
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify([
@@ -97,10 +105,33 @@ describe('FastAPI adapter', () => {
     if (isCaptureClarification(parsed.data)) throw new Error('expected a review draft')
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual(expect.objectContaining({ timezone: expect.any(String) }))
     expect(parsed.data.sourceAccountId).toBe(42)
+    expect(parsed.data).toMatchObject({
+      platform: 'Zomato',
+      subcategory: 'Delivery',
+      categorySuggestion: { source: 'safe_catalog', confidence: 1, reason: 'Known platform.' },
+      metadata: {
+        version: 1,
+        evidence: { platform: { source: 'safe_catalog', confidence: 1, reviewStatus: 'needs_review' } },
+        attributes: [{ key: 'order_channel', value: 'Delivery', source: 'safe_catalog', confidence: 1, reviewStatus: 'needs_review' }]
+      },
+      tags: [{ name: 'Work Meal', normalizedName: 'work meal', selected: true }]
+    })
     const confirmed = await confirmDraft(parsed.data)
 
     const confirmInit = fetchMock.mock.calls[3]?.[1] as RequestInit
-    expect(JSON.parse(String(confirmInit.body))).toMatchObject({ source_account_id: 42, paid_by_member_id: null, splits: [{ member_id: 7, amount_paise: 92000 }] })
+    expect(JSON.parse(String(confirmInit.body))).toMatchObject({
+      source_account_id: 42,
+      paid_by_member_id: null,
+      platform: 'Zomato',
+      subcategory: 'Delivery',
+      metadata: {
+        version: 1,
+        evidence: { platform: { source: 'safe_catalog', confidence: 1, review_status: 'reviewed' } },
+        attributes: [{ key: 'order_channel', value: 'Delivery', source: 'safe_catalog', confidence: 1, review_status: 'reviewed' }]
+      },
+      tags: [{ name: 'Work Meal', normalized_name: 'work meal', source: 'user_explicit', confidence: 0.95, review_status: 'reviewed' }],
+      splits: [{ member_id: 7, amount_paise: 92000 }]
+    })
     expect((confirmInit.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy()
     expect(confirmed.account).toBe('HDFC UPI')
     expect(parsed.data.memberSplits).toEqual([{ memberId: '7', memberName: 'Sam', amountPaise: 92000 }])

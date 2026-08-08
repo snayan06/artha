@@ -1,5 +1,5 @@
 import { Bot, ChartNoAxesCombined, LockKeyhole, Send, Sparkles } from 'lucide-react'
-import { useLayoutEffect, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useState, type FormEvent } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Button, Card } from '../components/ui'
 import { chatAssistant } from '../lib/api'
@@ -12,12 +12,29 @@ interface Exchange {
 }
 
 const suggestions = ['Where did I spend the most this month?', 'Show my monthly spending trend', 'What is my available balance?']
+const progressMessages = [
+  'Reading your latest ledger summary…',
+  'Choosing the safest view for your question…',
+  'Preparing verified numbers and charts…'
+]
 
 export function AssistantPage() {
   const [message, setMessage] = useState('')
   const [history, setHistory] = useState<Exchange[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [progressIndex, setProgressIndex] = useState(0)
+
+  useEffect(() => {
+    if (!loading) {
+      setProgressIndex(0)
+      return
+    }
+    const timer = window.setInterval(() => {
+      setProgressIndex((current) => Math.min(current + 1, progressMessages.length - 1))
+    }, 650)
+    return () => window.clearInterval(timer)
+  }, [loading])
 
   useLayoutEffect(() => {
     if (error) window.scrollTo({ top: 0, behavior: 'auto' })
@@ -60,7 +77,7 @@ export function AssistantPage() {
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
           {history.length === 0 && <EmptyState onPick={setMessage} />}
           {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} />)}
-          {loading && <div role="status" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> Reviewing your ledger…</div>}
+          {loading && <div role="status" aria-live="polite" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> {progressMessages[progressIndex]}</div>}
         </div>
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
           <label htmlFor="assistant-message" className="sr-only">Ask Artha</label>
