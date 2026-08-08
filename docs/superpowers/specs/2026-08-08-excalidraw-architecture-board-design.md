@@ -1,7 +1,7 @@
 # Excalidraw architecture board design
 
 **Date:** 2026-08-08
-**Status:** proposed for review
+**Status:** implemented
 
 ## Objective
 
