@@ -21,17 +21,20 @@ export function TransactionMetadataReview({
     const evidence = { ...draft.metadata?.evidence }
     const invalidatesCategorySuggestion = Boolean(draft.categorySuggestion)
       && (field === 'merchant' || field === 'platform')
+    const clearsDerivedSubcategory = field === 'merchant'
+      && Boolean(draft.subcategory)
+      && draft.metadata?.evidence.subcategory?.source !== 'user_corrected'
     if (field !== 'merchant' && normalized === undefined) delete evidence[field]
     else evidence[field] = correctedEvidence
     if (invalidatesCategorySuggestion) delete evidence.category
-    if (field === 'merchant' && invalidatesCategorySuggestion) delete evidence.subcategory
+    if (clearsDerivedSubcategory) delete evidence.subcategory
     const attributes = field === 'platform'
       ? (draft.metadata?.attributes ?? []).filter((attribute) => attribute.key !== 'order_channel')
       : (draft.metadata?.attributes ?? [])
     onChange({
       ...draft,
       [field]: field === 'merchant' ? value : normalized,
-      subcategory: field === 'merchant' && invalidatesCategorySuggestion
+      subcategory: clearsDerivedSubcategory
         ? undefined
         : (field === 'subcategory' ? normalized : draft.subcategory),
       category: invalidatesCategorySuggestion ? '' : draft.category,
