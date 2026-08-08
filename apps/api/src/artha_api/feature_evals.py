@@ -361,7 +361,17 @@ def build_decision(summaries: dict[str, dict[str, float | int]]) -> dict[str, ob
     return {"decision": "adopt" if all(gates.values()) else "reject", "gates": gates}
 
 
+def _underlying_error(error: Exception) -> Exception:
+    current = error
+    seen: set[int] = set()
+    while isinstance(current.__cause__, Exception) and id(current) not in seen:
+        seen.add(id(current))
+        current = current.__cause__
+    return current
+
+
 def _failure_kind(error: Exception) -> str:
+    error = _underlying_error(error)
     if isinstance(error, genai_errors.APIError):
         if error.code == 429:
             return "rate_limited"
@@ -382,6 +392,7 @@ def _failure_kind(error: Exception) -> str:
 
 
 def _retry_after(error: Exception, attempt: int) -> float:
+    error = _underlying_error(error)
     if isinstance(error, (httpx.HTTPStatusError, genai_errors.APIError)):
         response = (
             error.response
@@ -614,7 +625,9 @@ async def run_intent_router_suite(
     scores: list[IntentRouterScore] = []
     for case in cases:
         started = time.perf_counter()
-        result, _, failure = await _attempt(partial(assistant.route_intent, case.message))
+        result, _, failure = await _attempt(
+            partial(assistant.route_intent, case.message), max_attempts=5
+        )
         latency = round((time.perf_counter() - started) * 1000)
         if result is None:
             scores.append(

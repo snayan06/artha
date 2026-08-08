@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -12,6 +13,7 @@ from artha_api.assistant import (
     AssistantCompletion,
     AssistantIntent,
     AssistantSettings,
+    AssistantUnavailableError,
     LlmProvider,
     LocalFinancialAssistant,
     MetricWidget,
@@ -21,6 +23,7 @@ from artha_api.feature_evals import (
     AssistantEvalCase,
     IntentRouterEvalCase,
     TagEvalCase,
+    _failure_kind,
     build_decision,
     load_assistant_suite,
     load_intent_router_suite,
@@ -94,6 +97,14 @@ def test_router_scoring_flags_a_ledger_question_sent_to_capture() -> None:
 
     assert score.passed is False
     assert score.false_capture is True
+
+
+def test_router_eval_unwraps_sanitized_provider_failures() -> None:
+    cause = httpx.TimeoutException("timed out")
+    wrapper = AssistantUnavailableError("AI routing is unavailable")
+    wrapper.__cause__ = cause
+
+    assert _failure_kind(wrapper) == "timeout"
 
 
 @pytest.mark.asyncio
