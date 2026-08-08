@@ -37,6 +37,7 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [Recovery and isolation acceptance](qa/2026-08-06-encrypted-recovery.md)
 - [Consolidated Gemini, recovery and telemetry release](qa/2026-08-07-consolidated-gemini-recovery-release.md)
 - [Authenticated production acceptance](qa/2026-08-07-authenticated-production-acceptance.md)
+- [Capture-hardening production acceptance](qa/2026-08-08-capture-hardening-production-acceptance.md)
 - [Account activity filter](ui/v1-account-activity-filter.md)
 - [Atomic transfer contract](architecture/v1-atomic-transfer.md)
 - [LLM usage and safety map](architecture/v1-llm-usage-map.md)

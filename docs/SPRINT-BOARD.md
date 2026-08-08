@@ -22,8 +22,8 @@ Sprint 1 dependency.
 | Area | Status | What this means |
 | --- | --- | --- |
 | AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
-| V1 capture hardening | Locally verified, not deployed | Manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice pass 170 web + 223 API + 50/30/24 AI contracts; publication and final-domain manual acceptance remain |
-| Public repository and CI | Done for AI-primary release | Main CI `31268322011` and CodeQL `31268322023` passed for `69e44a8`; the hardening follow-up still needs its own publication checks |
+| V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
+| Public repository and CI | Done for current release | Main CI `31271421128` and CodeQL `31271421107` passed for `c4ae0dc` |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
 | Server-owned onboarding/profile | Done for one fictional identity | Profile, household and participants returned from the server without repeating onboarding |
@@ -36,7 +36,7 @@ Sprint 1 dependency.
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
-| Production acceptance | In progress | Authenticated happy path and responsive sweep passed; two-owner isolation and encrypted restore remain |
+| Production acceptance | In progress | Current V1 fictional happy path and responsive sweep passed; two-owner isolation, fresh-household encrypted restore and real provider-unavailable recovery remain |
 
 ## Senior product audit — net-new additions
 

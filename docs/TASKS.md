@@ -10,14 +10,14 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** V1 and AI-primary are live at merge `69e44a8`; the newer
-capture-hardening follow-up is locally green but not published. Do not enter
-real financial data until every remaining P0 security, recovery and privacy
-item below is complete.
+**Current stage:** V1, AI-primary and capture hardening are live at merge
+`c4ae0dc`. Final-domain fictional QA passed, but do not enter real financial
+data until every remaining P0 security, recovery and privacy item below is
+complete.
 
 - [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
-- [x] Obtain fresh green `main` CI run `31268322011` and CodeQL run
-  `31268322023` for AI-primary merge `69e44a8`.
+- [x] Obtain fresh green `main` CI run `31271421128` and CodeQL run
+  `31271421107` for capture-hardening merge `c4ae0dc`.
 - [x] React PWA, FastAPI API, database migrations, RLS policies and automated test suites are implemented.
 - [x] Personal Vercel account created under the intended owner.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
@@ -33,9 +33,9 @@ item below is complete.
 - [ ] Approve the real-data privacy configuration and re-run all fresh hosted
   fictional gates for the hardening follow-up.
 
-**Next action:** publish the capture-hardening follow-up and manually accept
-Expense, Income, Transfer and provider-unavailable recovery on the final domain;
-then prove two-owner isolation and restore the encrypted fictional backup.
+**Next action:** prove two-owner isolation, restore the encrypted fictional
+backup into a fresh household and exercise real provider-unavailable recovery
+without losing the submitted text.
 
 ## Current execution queue
 
@@ -88,8 +88,9 @@ then prove two-owner isolation and restore the encrypted fictional backup.
 - [x] Manually verify authenticated production Gemini capture and read-only
   assistant behavior with fictional data during the prior deployed acceptance.
 - [ ] Re-run the hosted fictional Gemini gates for the hardening follow-up.
-- [ ] Publish the hardening follow-up and repeat final-domain manual Expense,
-  Income, Transfer and provider-unavailable acceptance.
+- [x] Publish the hardening follow-up and repeat final-domain manual Expense,
+  Income, Transfer and exact-text manual-recovery acceptance.
+- [ ] Exercise real provider-unavailable recovery on the final domain.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
 
 ### Net-new gaps from the senior product audit
