@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 9 August 2026, 02:33 IST
+Updated: 9 August 2026, 02:47 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -34,6 +34,7 @@ release guards.
 | Surface | Current state |
 | --- | --- |
 | Combined message, metadata and unified-entry release | Deployed from `e32b5b6`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, strict text-only intent routing, shared composer and one-time Ask Artha handoff are live |
+| Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
 | V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
 | Production `main` | Merge `e32b5b6`; release PRs [#23](https://github.com/snayan06/artha/pull/23) and [#24](https://github.com/snayan06/artha/pull/24) are merged with the earlier V1 releases |

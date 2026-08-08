@@ -30,18 +30,18 @@ equal-sized stages.
 
 The main flow runs loosely across the upper half:
 
-`write naturally` → `Gemini + household context` → `unsaved draft` → `you review + confirm` → `ledger truth`
+`write naturally` → `LLM + household context` → `unsaved draft` → `you review + confirm` → `ledger truth`
 
 The nodes vary in size and alignment. The review checkpoint is circled twice
 with a handwritten note: **AI understands. You decide.**
 
 Supporting thoughts are scattered around the main flow like working notes:
 
-- a yellow sticky beneath Gemini: `unsure? keep the exact text → manual form`;
+- a yellow sticky beneath the LLM: `unsure? keep the exact text → manual form`;
 - a small red note beside the write boundary: `NO CONFIRM = NO WRITE`;
-- a blue side trail for Ask Artha: `DB facts → Gemini chooses intent → safe React card`, ending in `read only`;
-- a developer stack sketch near the bottom: `React PWA` → `FastAPI` → `Supabase + RLS`, with Gemini connected only to FastAPI;
-- a crossed-out attempted Gemini-to-ledger arrow labelled `never direct`;
+- a blue side trail for Ask Artha: `DB facts → LLM chooses intent → safe React card`, ending in `read only`;
+- a developer stack sketch near the bottom: `React PWA` → `FastAPI` → `Supabase + RLS`, with the LLM connected only to FastAPI;
+- a crossed-out attempted LLM-to-ledger arrow labelled `never direct`;
 - tiny margin notes such as `integer paise`, `allow-listed IDs`, `RLS`, and `idempotent` positioned beside the component that owns each rule.
 
 ## Visual direction

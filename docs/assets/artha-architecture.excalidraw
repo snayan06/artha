@@ -515,7 +515,7 @@
       "locked": false
     },
     {
-      "id": "overall-gemini",
+      "id": "overall-llm",
       "type": "ellipse",
       "x": 566,
       "y": 254,
@@ -540,7 +540,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "overall-gemini-label"
+          "id": "overall-llm-label"
         }
       ],
       "updated": 1786220600589,
@@ -1271,13 +1271,13 @@
       "updated": 1786220600589,
       "link": null,
       "locked": false,
-      "text": "Person decides writes • FastAPI owns rules • Postgres + RLS own ledger truth • Gemini has no ledger credentials",
+      "text": "Person decides writes • FastAPI owns rules • Postgres + RLS own ledger truth • LLM has no ledger credentials",
       "fontSize": 16,
       "fontFamily": 5,
       "textAlign": "left",
       "verticalAlign": "middle",
       "containerId": null,
-      "originalText": "Person decides writes • FastAPI owns rules • Postgres + RLS own ledger truth • Gemini has no ledger credentials",
+      "originalText": "Person decides writes • FastAPI owns rules • Postgres + RLS own ledger truth • LLM has no ledger credentials",
       "autoResize": true,
       "lineHeight": 1.25
     },
@@ -1473,7 +1473,7 @@
       "lineHeight": 1.25
     },
     {
-      "id": "overall-gemini-label",
+      "id": "overall-llm-label",
       "type": "text",
       "x": 602.9893661314721,
       "y": 286.15202025355336,
@@ -1499,13 +1499,13 @@
       "updated": 1786220600591,
       "link": null,
       "locked": false,
-      "text": "Gemini proposes\na structured draft",
+      "text": "LLM proposes\na structured draft",
       "fontSize": 19,
       "fontFamily": 5,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "overall-gemini",
-      "originalText": "Gemini proposes\na structured draft",
+      "containerId": "overall-llm",
+      "originalText": "LLM proposes\na structured draft",
       "autoResize": true,
       "lineHeight": 1.25
     },
@@ -1721,13 +1721,13 @@
       "updated": 1786220600591,
       "link": null,
       "locked": false,
-      "text": "Gemini selects\nintent\nfrom those bundles",
+      "text": "LLM selects\nintent\nfrom those bundles",
       "fontSize": 19,
       "fontFamily": 5,
       "textAlign": "center",
       "verticalAlign": "middle",
       "containerId": "overall-intent",
-      "originalText": "Gemini selects intent\nfrom those bundles",
+      "originalText": "LLM selects intent\nfrom those bundles",
       "autoResize": true,
       "lineHeight": 1.25
     },

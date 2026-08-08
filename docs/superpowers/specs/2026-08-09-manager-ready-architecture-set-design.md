@@ -22,10 +22,11 @@ The pack contains one product overview and five focused component views:
    settlements, derived balances and atomic persistence.
 4. **Identity and household isolation** — Supabase Auth, verified request
    context, membership, RLS and cross-household protection.
-5. **Ask Artha** — bounded database facts, Gemini intent selection, exact
+5. **Ask Artha** — bounded database facts, LLM intent selection, exact
    server validation and repository-owned read-only widgets.
-6. **Deployment, quality and recovery** — the Vercel/Supabase/Gemini topology,
-   CI gates, privacy-filtered telemetry and client-side encrypted recovery.
+6. **Deployment, quality and recovery** — the Vercel/Supabase/LLM topology,
+   current production provider, CI gates, privacy-filtered telemetry and
+   client-side encrypted recovery.
 
 Each view ships as an editable `.excalidraw` source and an SVG exported from the
 same native scene. The README embeds only the product overview; the architecture
@@ -47,8 +48,10 @@ artifact index links the complete pack.
 ## Content rules
 
 - Show implemented production behavior, not aspirational agent capabilities.
-- Gemini connects only through FastAPI and never receives database credentials
-  or writes to the ledger.
+- The configured LLM connects only through FastAPI and never receives database
+  credentials or writes to the ledger. A small deployment note may identify
+  Gemini as the current production provider without coupling the architecture
+  boundary to that vendor.
 - Natural-language capture creates an unsaved draft. Only reviewed confirmation
   reaches an idempotent atomic write.
 - Financial values are integer paise; transfers and settlements are not spend.

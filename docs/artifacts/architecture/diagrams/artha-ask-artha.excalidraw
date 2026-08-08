@@ -506,7 +506,7 @@
       "locked": false
     },
     {
-      "id": "assistant-gemini",
+      "id": "assistant-llm",
       "type": "ellipse",
       "x": 888,
       "y": 258,
@@ -531,7 +531,7 @@
       "boundElements": [
         {
           "type": "text",
-          "id": "assistant-gemini-label"
+          "id": "assistant-llm-label"
         }
       ],
       "updated": 1786220601281,
@@ -1197,7 +1197,7 @@
       "lineHeight": 1.25
     },
     {
-      "id": "assistant-gemini-label",
+      "id": "assistant-llm-label",
       "type": "text",
       "x": 944.1804595708758,
       "y": 288.49516600406093,
@@ -1223,13 +1223,13 @@
       "updated": 1786220601282,
       "link": null,
       "locked": false,
-      "text": "Gemini selects intent\nand copies the exact\napproved bundle",
+      "text": "LLM selects intent\nand copies the exact\napproved bundle",
       "fontSize": 18,
       "fontFamily": 5,
       "textAlign": "center",
       "verticalAlign": "middle",
-      "containerId": "assistant-gemini",
-      "originalText": "Gemini selects intent\nand copies the exact\napproved bundle",
+      "containerId": "assistant-llm",
+      "originalText": "LLM selects intent\nand copies the exact\napproved bundle",
       "autoResize": true,
       "lineHeight": 1.25
     },
