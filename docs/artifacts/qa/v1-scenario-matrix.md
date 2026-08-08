@@ -1,6 +1,6 @@
 # Artha V1 QA scenario matrix
 
-Date: 4 August 2026  
+Updated: 8 August 2026
 Scope: local V1 source, fictional demo data, and production acceptance backlog
 
 ## How to read this matrix
@@ -42,9 +42,9 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | CAP-09 | `31 Dec` entered on 2 January | Most recent past occurrence is used (previous year) | Automated |
 | CAP-10 | Ambiguous numeric or impossible date | Parser rejects it and requests an unambiguous date | Automated |
 | CAP-11 | Invalid IANA timezone | API returns validation error, not a silently shifted date | Automated |
-| CAP-12 | Transient API outage in demo mode | Local parser creates an unsaved review draft | Automated |
-| CAP-13 | API validation error | Error is shown; browser fallback does not fake a valid draft | Automated |
-| CAP-14 | Merchant rule matches | Deterministic household rule wins before heuristic/LLM | Automated |
+| CAP-12 | Production capture provider or API is unavailable | Exact source text is preserved, an unsaved manual review form opens, and no language-parser guess is substituted | Automated; final-domain acceptance pending |
+| CAP-13 | API validation error | Error is shown and no draft is fabricated or saved | Automated |
+| CAP-14 | Merchant rule matches in the local/demo repository | The stored household rule is used without changing the production web capture contract | Automated; production learning is planned |
 | CAP-15 | Learned merchant rule | It affects future drafts only and does not rewrite history | Automated |
 
 ## Confirmation and ledger invariants
@@ -91,7 +91,7 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | SEC-03 | Disallowed symmetric JWT or service-role token | API rejects without trusting it | Automated |
 | SEC-04 | JWKS key rotation | Unknown key triggers a controlled JWKS refresh | Automated |
 | SEC-05 | JWKS provider outage | API returns service unavailable, never unauthenticated demo data | Automated |
-| SEC-06 | Assistant provider disabled | Read-only deterministic widgets remain available | Automated |
+| SEC-06 | Assistant provider disabled | API returns a sanitized unavailable response; the UI retains the exact question and renders no fabricated widgets | Automated |
 | SEC-07 | Model returns extra fields/HTML/SQL-like payload | Payload is rejected or stripped; no HTML is rendered | Automated |
 | SEC-08 | Model invents a category | Suggestion is rejected outside the allow-list | Automated |
 | SEC-09 | Assistant question | Transaction rows are unchanged before/after | Automated |
@@ -108,7 +108,7 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | UX-04 | 390 px viewport | Primary mobile layout fits without horizontal overflow | Manual local |
 | UX-05 | Desktop viewport | Content width, charts, and navigation remain readable | Manual local |
 | UX-06 | Light, dark, and system themes | Controls remain visible and preference persists | Automated/manual local |
-| UX-07 | API unavailable | Review states explain fallback/error; no silent save occurs | Automated |
+| UX-07 | Capture API unavailable | Exact text is retained, manual review explains the error, and no silent save occurs | Automated; authenticated final-domain acceptance pending |
 | UX-08 | PWA production build | Manifest, service worker, and precache are generated | Automated build |
 | OPS-01 | Web/API restart from renamed folder | Root `.env` is loaded and both documented URLs become healthy | Automated configuration plus local smoke |
 | OPS-02 | Final-domain login/refresh/sign-out | Session survives refresh and signs out cleanly | Production pending |
