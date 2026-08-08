@@ -34,4 +34,3 @@ async def route_intent(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "AI routing is temporarily unavailable; nothing was saved.",
         ) from error
-

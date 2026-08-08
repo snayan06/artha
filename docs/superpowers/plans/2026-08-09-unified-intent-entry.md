@@ -455,4 +455,3 @@ The PR body must include product behavior, trust boundaries, test evidence,
 hosted-model/live gates still pending and screenshots for both destination
 paths. Do not merge or deploy until CI, hosted fictional routing evaluation and
 final-domain smoke tests pass.
-

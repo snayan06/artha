@@ -348,4 +348,3 @@ At 390 px mobile and 1440 px desktop, in light and dark mode:
 - No router path can write, calculate ledger truth or expose provider reasoning.
 - All automated, responsive, accessibility, hosted-model and live smoke gates
   pass before merge or deployment.
-
