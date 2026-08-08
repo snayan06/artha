@@ -538,8 +538,36 @@ class CaptureDraftInterpretation(StrictModel):
 class CaptureClarification(StrictModel):
     outcome: Literal["clarify"]
     question: str = Field(min_length=1, max_length=240)
-    missing: list[str] = Field(default_factory=list, max_length=8)
+    missing: list[
+        Literal[
+            "amount_paise",
+            "kind",
+            "description",
+            "source_account_id",
+            "destination_account_id",
+            "category_id",
+            "member_ids",
+            "occurred_on",
+        ]
+    ] = Field(min_length=1, max_length=8)
+    amount_paise: int | None = Field(default=None, gt=0)
+    kind: Literal["expense", "income", "transfer"] | None = None
+    description: str | None = Field(default=None, min_length=1, max_length=160)
+    category_id: str | None = Field(default=None, max_length=80)
+    category_name: str | None = Field(default=None, max_length=80)
+    source_account_id: str | None = Field(default=None, max_length=80)
+    destination_account_id: str | None = Field(default=None, max_length=80)
+    member_ids: list[str] = Field(default_factory=list, max_length=20)
+    occurred_on: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     warnings: list[str] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def validate_partial_capture(self) -> CaptureClarification:
+        if (self.category_id is None) != (self.category_name is None):
+            raise ValueError("category ID and name must both be present or absent")
+        if len(self.member_ids) != len(set(self.member_ids)):
+            raise ValueError("member IDs must be unique")
+        return self
 
 
 class CaptureRejection(StrictModel):
@@ -673,8 +701,10 @@ The response root is an object with a result property. Inside result, include ev
 by the selected outcome schema. For draft fields that do not apply, use null, an empty list, or
 false exactly as allowed by the schema; clarification and rejection must include warnings even
 when the list is empty.
-In a clarification result, missing must contain exact schema field identifiers such as
-amount_paise, kind, source_account_id, destination_account_id, description, or occurred_on.
+In a clarification result, ask only one concise question, put every unresolved required field in
+missing using exact schema field identifiers, and include every safely understood partial field. Use
+null or empty lists for partial fields that are not supported. The application, not your prose,
+will create the final question and choices shown to the user.
 Use only exact account, member and category IDs from the provided allow-lists. Convert Indian
 amount shorthand precisely: 25k means 25,000 rupees or 2,500,000 paise; 1.5 lakh means
 150,000 rupees or 15,000,000 paise. A self transfer moves money between two accounts and is
@@ -1178,14 +1208,17 @@ class LocalFinancialAssistant:
     def _ground_capture_interpretation(
         result: CaptureInterpretation, context: CaptureContext
     ) -> None:
-        if not isinstance(result, CaptureDraftInterpretation):
+        if not isinstance(result, (CaptureDraftInterpretation, CaptureClarification)):
             return
         account_ids = {account.id for account in context.accounts}
         member_ids = {member.id for member in context.members}
         categories = {
             (category.id, category.name): category.kind for category in context.categories
         }
-        if result.source_account_id not in account_ids:
+        if (
+            result.source_account_id is not None
+            and result.source_account_id not in account_ids
+        ):
             raise ValueError("model selected an unknown source account")
         if (
             result.destination_account_id is not None

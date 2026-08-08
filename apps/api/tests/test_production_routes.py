@@ -226,7 +226,12 @@ async def test_production_assistant_routes_return_503_when_provider_is_disabled(
 
 
 class FakeProductionClient:
-    def __init__(self, *, categories: list[dict[str, Any]] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        categories: list[dict[str, Any]] | None = None,
+        accounts: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
         self.activity_payload: dict[str, Any] | None = None
@@ -243,6 +248,7 @@ class FakeProductionClient:
                 }
             ]
         )
+        self.accounts = accounts
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
         self.rpc_names.append(name)
@@ -321,7 +327,7 @@ class FakeProductionClient:
         if path == "categories":
             return self.categories
         if path == "accounts":
-            return [{
+            return self.accounts if self.accounts is not None else [{
                 "id": ACCOUNT_ID,
                 "name": "Known Bank",
                 "account_type": "bank",
@@ -812,15 +818,14 @@ async def test_sample_only_policy_allows_the_configured_demo_uuid(
 
     monkeypatch.setattr(LocalFinancialAssistant, "interpret_capture", clarify)
 
-    with pytest.raises(HTTPException) as error:
-        await parse_draft(
-            ParseRequest(text="Paid 500 for lunch", timezone="Asia/Kolkata"),
-            cast(SupabaseRestClient, FakeProductionClient()),
-            AuthContext(user_id=USER_ID),
-        )
+    result = await parse_draft(
+        ParseRequest(text="Paid 500 for lunch", timezone="Asia/Kolkata"),
+        cast(SupabaseRestClient, FakeProductionClient()),
+        AuthContext(user_id=USER_ID),
+    )
 
-    assert error.value.status_code == 422
-    assert error.value.detail == "Which account should this use?"
+    assert result["outcome"] == "clarification"
+    assert result["missing_field"] == "source_account_id"
 
 
 async def test_sample_only_policy_blocks_personal_chat_and_tag_before_model_call(
@@ -899,22 +904,76 @@ async def test_parse_draft_returns_model_clarification_without_inventing_a_draft
             model="test-model",
             result=CaptureClarification(
                 outcome="clarify",
-                question="Which account should this use?",
+                question="untrusted model wording",
                 missing=["source_account_id"],
+                amount_paise=54_000,
+                kind="expense",
+                description="Zomato",
             ),
         )
 
     monkeypatch.setattr(LocalFinancialAssistant, "interpret_capture", clarify)
 
-    with pytest.raises(HTTPException) as error:
-        await parse_draft(
-            ParseRequest(text="25k", timezone="Asia/Kolkata"),
-            cast(SupabaseRestClient, FakeProductionClient()),
-            AuthContext(user_id=USER_ID),
-        )
+    accounts = [
+        {
+            "id": ACCOUNT_ID,
+            "name": "HDFC UPI",
+            "account_type": "bank",
+            "currency": "INR",
+            "opening_balance_paise": 0,
+            "credit_limit_paise": None,
+            "statement_day": None,
+            "payment_due_day": None,
+            "is_archived": False,
+            "created_at": "2026-08-04T00:00:00+00:00",
+        },
+        {
+            "id": DESTINATION_ACCOUNT_ID,
+            "name": "SBI Cashback Card",
+            "account_type": "credit_card",
+            "currency": "INR",
+            "opening_balance_paise": 0,
+            "credit_limit_paise": 100_000,
+            "statement_day": 5,
+            "payment_due_day": 25,
+            "is_archived": False,
+            "created_at": "2026-08-04T00:00:01+00:00",
+        },
+    ]
+    result = await parse_draft(
+        ParseRequest(text="Paid 540 at Zomato", timezone="Asia/Kolkata"),
+        cast(SupabaseRestClient, FakeProductionClient(accounts=accounts)),
+        AuthContext(user_id=USER_ID),
+    )
 
-    assert error.value.status_code == 422
-    assert error.value.detail == "Which account should this use?"
+    assert result == {
+        "outcome": "clarification",
+        "source_text": "Paid 540 at Zomato",
+        "understood": {
+            "amount_paise": 54_000,
+            "kind": "expense",
+            "merchant": "Zomato",
+        },
+        "missing_field": "source_account_id",
+        "question": "How did you pay for Zomato?",
+        "explanation": (
+            "Choose one so Artha updates the correct balance. Nothing has been saved."
+        ),
+        "choices": [
+            {
+                "id": ACCOUNT_ID,
+                "label": "HDFC UPI",
+                "answer": "paid from HDFC UPI",
+            },
+            {
+                "id": DESTINATION_ACCOUNT_ID,
+                "label": "SBI Cashback Card",
+                "answer": "paid from SBI Cashback Card",
+            },
+        ],
+        "warnings": [],
+        "parser_source": "gemini:test-model",
+    }
 
 
 async def test_parse_draft_returns_sanitized_503_when_ai_is_unavailable(

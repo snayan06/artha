@@ -448,6 +448,9 @@ async def test_disabled_assistant_is_unavailable(
         "active_provider": None,
         "ollama_fallback_enabled": False,
         "detail": "disabled",
+        "data_policy": "sample_only",
+        "personal_data_enabled": False,
+        "is_demo": False,
     }
     with pytest.raises(
         AssistantUnavailableError, match="AI assistant is unavailable"

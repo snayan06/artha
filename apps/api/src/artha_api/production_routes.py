@@ -36,9 +36,12 @@ from .auth import AuthContext, AuthDependency
 from .recovery import RecoveryBundle
 from .schemas import (
     AccountCreate,
+    CaptureChoiceResponse,
+    CaptureClarificationResponse,
     CaptureContextAccount,
     CaptureContextCategory,
     CaptureContextResponse,
+    CaptureUnderstoodResponse,
     MemberCreate,
     ParseRequest,
     normalize_required_description,
@@ -56,6 +59,103 @@ async def production_client(
 
 
 ClientDependency = Annotated[SupabaseRestClient, Depends(production_client)]
+
+
+CAPTURE_MISSING_PRIORITY = (
+    "amount_paise",
+    "kind",
+    "description",
+    "source_account_id",
+    "destination_account_id",
+    "category_id",
+    "member_ids",
+    "occurred_on",
+)
+
+
+def capture_clarification_response(
+    result: CaptureClarification,
+    *,
+    source_text: str,
+    accounts: list[dict[str, Any]],
+    parser_source: str,
+) -> dict[str, Any]:
+    missing_field = next(
+        field for field in CAPTURE_MISSING_PRIORITY if field in result.missing
+    )
+    merchant = result.description
+    choices: list[CaptureChoiceResponse] = []
+    if missing_field in {"source_account_id", "destination_account_id"}:
+        for account in accounts:
+            account_id = str(account["id"])
+            if (
+                missing_field == "destination_account_id"
+                and result.source_account_id == account_id
+            ):
+                continue
+            label = safe_label(account["name"], "Account")
+            if missing_field == "destination_account_id":
+                answer = f"transferred to {label}"
+            elif result.kind == "income":
+                answer = f"received in {label}"
+            elif result.kind == "transfer":
+                answer = f"transferred from {label}"
+            else:
+                answer = f"paid from {label}"
+            choices.append(CaptureChoiceResponse(id=account_id, label=label, answer=answer))
+
+    if missing_field == "source_account_id":
+        if result.kind == "income":
+            question = "Which account received this money?"
+        elif result.kind == "transfer":
+            question = "Which account did the money move from?"
+        else:
+            question = f"How did you pay for {merchant}?" if merchant else "How did you pay?"
+        explanation = (
+            "Choose one so Artha updates the correct balance. Nothing has been saved."
+        )
+    elif missing_field == "destination_account_id":
+        question = "Which account did the money move to?"
+        explanation = (
+            "Choose the receiving account so both balances stay correct. "
+            "Nothing has been saved."
+        )
+    elif missing_field == "amount_paise":
+        question = "How much was this transaction?"
+        explanation = "Add the amount to continue. Nothing has been saved."
+    elif missing_field == "kind":
+        question = "Was this money spent, received, or transferred?"
+        explanation = "Choose the movement type to continue. Nothing has been saved."
+    elif missing_field == "description":
+        question = "What was this transaction for?"
+        explanation = "Add a short description to continue. Nothing has been saved."
+    elif missing_field == "occurred_on":
+        question = "When did this happen?"
+        explanation = "Choose the transaction date to continue. Nothing has been saved."
+    elif missing_field == "category_id":
+        question = "Which category fits this transaction?"
+        explanation = "Choose a category to continue. Nothing has been saved."
+    else:
+        question = "Who was this shared with?"
+        explanation = "Choose the people involved to continue. Nothing has been saved."
+
+    response = CaptureClarificationResponse(
+        source_text=source_text,
+        understood=CaptureUnderstoodResponse(
+            amount_paise=result.amount_paise,
+            kind=result.kind,
+            merchant=merchant,
+            category=result.category_name,
+            occurred_on=result.occurred_on,
+        ),
+        missing_field=cast(Any, missing_field),
+        question=question,
+        explanation=explanation,
+        choices=choices,
+        warnings=result.warnings,
+        parser_source=parser_source,
+    )
+    return response.model_dump(mode="json", exclude_none=True)
 
 
 def require_ai_access(auth: AuthContext) -> AiAccessPolicy:
@@ -798,7 +898,12 @@ async def parse_draft(
         )
     result = interpreted.result
     if isinstance(result, CaptureClarification):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, result.question)
+        return capture_clarification_response(
+            result,
+            source_text=payload.text,
+            accounts=accounts,
+            parser_source=f"{interpreted.provider}:{interpreted.model}",
+        )
     if isinstance(result, CaptureRejection):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason)
     assert isinstance(result, CaptureDraftInterpretation)
@@ -833,6 +938,7 @@ async def parse_draft(
         splits = []
     account_names = {str(account["id"]): str(account["name"]) for account in accounts}
     return {
+        "outcome": "draft",
         "draft": {
             "kind": result.kind,
             "amount_paise": result.amount_paise,
