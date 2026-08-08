@@ -279,7 +279,7 @@ export function LedgerLoadError({ issue, onRetry, onSignOut }: { issue: LedgerLo
           </button>
           {onSignOut && <button onClick={() => void onSignOut()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold transition hover:border-moss-300 hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 focus-visible:ring-offset-2 dark:bg-night-surface dark:hover:bg-night-raised"><LogOut className="h-4 w-4" aria-hidden="true" />{issue.signOutLabel}</button>}
         </div>
-        <p className="mt-5 text-xs leading-5 text-[#7b8881] tone-muted">If retry keeps failing, sign in again. Artha never substitutes fictional balances for a failed private ledger.</p>
+        <p className="mt-5 text-xs leading-5 text-[#7b8881] tone-muted">If retry keeps failing, sign in again. Artha never substitutes sample balances for a failed private ledger.</p>
       </div>
     </main>
   )

@@ -39,13 +39,13 @@ describe('first-run gate', () => {
     vi.clearAllMocks()
   })
 
-  it('does not bootstrap until the user explicitly chooses the fictional demo', async () => {
+  it('does not bootstrap until the user explicitly chooses the sample demo', async () => {
     const user = userEvent.setup()
     render(<RouterProvider><App /></RouterProvider>)
     expect(screen.getByRole('heading', { name: 'Where does your money live?' })).toBeInTheDocument()
     expect(api.bootstrapDemo).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Explore fictional demo' }))
+    await user.click(screen.getByRole('button', { name: 'Explore sample demo' }))
     await waitFor(() => expect(api.bootstrapDemo).toHaveBeenCalledTimes(1))
     expect(localStorage.getItem('artha.setup.complete')).toBe('true')
     expect(await screen.findByRole('heading', { name: 'Your money, made clear.' })).toBeInTheDocument()

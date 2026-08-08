@@ -34,11 +34,12 @@ describe('OnboardingPage', () => {
     ], { displayName: 'Ari', householdName: 'Shah family', members: [{ id: expect.stringMatching(/^draft-/), name: 'Sam' }], isDemo: false })
   })
 
-  it('offers an explicit fictional demo without saving setup accounts', async () => {
+  it('offers an explicit sample demo without production-warning language', async () => {
     const user = userEvent.setup()
     const onExploreDemo = vi.fn().mockResolvedValue(undefined)
     render(<OnboardingPage onSave={vi.fn()} onExploreDemo={onExploreDemo} />)
-    await user.click(screen.getByRole('button', { name: 'Explore fictional demo' }))
+    expect(screen.queryByText(/fictional|pilot/i)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Explore sample demo' }))
     await waitFor(() => expect(onExploreDemo).toHaveBeenCalledWith({ displayName: 'You', householdName: 'My household', members: [], isDemo: true }))
   })
 
