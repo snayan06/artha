@@ -1,6 +1,6 @@
 # Excalidraw architecture board design
 
-**Date:** 2026-08-08  
+**Date:** 2026-08-08
 **Status:** proposed for review
 
 ## Objective
@@ -32,7 +32,7 @@ with a handwritten note: **AI understands. You decide.**
 
 Supporting thoughts are scattered around the main flow like working notes:
 
-- a yellow sticky beneath Gemini: `unsure? keep the exact text → manual form`; 
+- a yellow sticky beneath Gemini: `unsure? keep the exact text → manual form`;
 - a small red note beside the write boundary: `NO CONFIRM = NO WRITE`;
 - a blue side trail for Ask Artha: `DB facts → Gemini chooses intent → safe React card`, ending in `read only`;
 - a developer stack sketch near the bottom: `React PWA` → `FastAPI` → `Supabase + RLS`, with Gemini connected only to FastAPI;

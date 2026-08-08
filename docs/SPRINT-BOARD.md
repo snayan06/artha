@@ -21,8 +21,9 @@ Sprint 1 dependency.
 
 | Area | Status | What this means |
 | --- | --- | --- |
-| AI-primary release candidate | Locally verified, not deployed | Production capture and assistant are model-only; failures are honest, the product story/architecture are updated, and the final local gate is 154 web + 209 API + 104 AI contracts |
-| Public repository and CI | Attention | Repository and workflows are configured, but GitHub did not create runs for the latest PRs/pushes; restore reliable triggering before the next code release |
+| AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
+| V1 capture hardening | Locally verified, not deployed | Manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice pass 170 web + 220 API + 50/30/24 AI contracts; publication and final-domain manual acceptance remain |
+| Public repository and CI | Done for AI-primary release | Main CI `31268322011` and CodeQL `31268322023` passed for `69e44a8`; the hardening follow-up still needs its own publication checks |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
 | Server-owned onboarding/profile | Done for one fictional identity | Profile, household and participants returned from the server without repeating onboarding |
@@ -47,21 +48,22 @@ only additions that were missing from the board.
 
 | ID | Status | Placement | Net-new task | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| PA-01 | Next | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
-| PA-02 | Planned | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
+| PA-01 | Done — implementation/automated | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
+| PA-02 | Done — implementation/automated | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
 | PA-03 | Planned | First Sprint 2 slice; real-data gate | Post-confirm **View transaction** recovery entry point | Reuses audited edit/soft-delete; balances recalculate atomically; retries are idempotent |
-| PA-04 | Planned | Fictional-pilot hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Fictional-only restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
-| PA-05 | Planned | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
+| PA-04 | Done — implementation/automated | Fictional-pilot hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Fictional-only restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
+| PA-05 | Done — implementation/automated | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
 | PA-06 | Planned | Before candidate publication | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
 | PA-07 | Planned | Sprint 2 product quality | Resumable onboarding, field errors and first-transaction guidance | Refresh preserves safe setup fields; each error identifies its field; empty states offer a next action |
 | PA-08 | Planned | Sprint 2 shared-money slice | Member-paid expense capture in the web | Owner account does not move; owner's payable and member balance update; settlement later clears without income/spend |
 | PA-09 | Planned | Sprint 2 measurement | Privacy-safe activation/capture/reliability events | No text, amounts, balances, emails, account/member names or assistant questions are emitted |
 | PA-10 | Later | After daily capture is proven | Optional missing-transaction reminder and weekly review | User-controlled cadence; no financial content in notifications; dismissal/snooze supported |
 
-PA-01 through PA-06 do not block deployment for continued fictional testing
-when engineering gates are green. They do block representing the product as
-ready for real family-finance data, together with the existing isolation,
-restore and log-redaction gates.
+PA-01, PA-02, PA-04 and PA-05 are complete only at the implementation and
+automated-test level on the unpublished hardening branch. After deployment,
+Expense, Income, Transfer and provider-unavailable recovery still require
+manual final-domain acceptance. Real family-finance data also remains blocked
+on privacy approval, isolation, restore and log-redaction evidence.
 
 ## Sprint 1 — trust and capture foundation
 
@@ -128,10 +130,15 @@ restore and log-redaction gates.
 - [x] Verify production Gemini capture plus read-only metric/chart assistant responses; retain the 30/30 hosted auto-tag gate as the current tagging evidence.
 - [x] Remove deterministic production language interpretation; preserve exact text and open manual review when model capture is unavailable.
 - [x] Constrain assistant output to an approved intent narrative and the exact server-owned widget bundle.
-- [x] Pass final local AI-primary gates: 154 web tests, 209 API tests, 8 migrations, 4 SQL contracts and 104 keyless AI cases.
+- [x] Publish AI-primary PR #20 as `69e44a8`; pass main CI `31268322011`, CodeQL
+  `31268322023` and both web/API Vercel deployments.
+- [x] Pass the current hardening branch gate: 170 web tests, 220 API tests, 8
+  migrations, 4 SQL contracts and 50 capture + 30 auto-tag + 24 assistant cases.
 - [x] Manually verify fictional capture success, zero/incomplete-transfer guards, assistant success/failure and no 320/390/1440 Quick Add/Assistant overflow in light/dark.
-- [ ] Re-run hosted fictional Gemini gates with the ignored server-side key for this candidate.
-- [ ] Repeat authenticated capture-unavailable recovery and assistant acceptance on the final deployed domain.
+- [ ] Re-run hosted fictional Gemini gates with the ignored server-side key for
+  the current hardening follow-up.
+- [ ] Publish the hardening follow-up, then manually verify Expense, Income,
+  Transfer and provider-unavailable recovery on the final domain.
 
 ## Sprint 2 — Accounts & family
 
@@ -232,6 +239,7 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 ## Release blockers before real financial data
 
 - [x] Final-domain new/returning login, fresh app load and sign-out/re-login pass.
+- [ ] Session survives a full browser process close and reopen.
 - [ ] Two independent owners cannot read or write each other's households.
 - [x] Multi-account/card onboarding, a transfer, a backdated expense and family splits pass end to end with fictional data.
 - [ ] Repeat setup with the owner's complete four-bank/multiple-card configuration.
@@ -239,6 +247,9 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 - [ ] Browser/API logs contain no tokens or financial payloads.
 - [x] Security headers are enabled and verified.
 - [ ] Encrypted export/restore reconstructs the ledger successfully.
+- [ ] Real family-finance text is approved only after a reviewed privacy configuration.
+- [ ] The capture-hardening follow-up passes final-domain Expense, Income,
+  Transfer and provider-unavailable acceptance after deployment.
 
 ## Actions needed from the user
 

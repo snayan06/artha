@@ -52,6 +52,9 @@ jobs:
       # pyproject.toml scopes strict mypy to the installed production package.
       - run: uv run mypy
       - run: uv run pytest
+      - run: python ../../scripts/check_capture_evals.py
+      - run: uv run python -m artha_api.capture_evals --mode validate
+      - run: uv run python -m artha_api.feature_evals --mode validate
 
   database:
     name: Supabase SQL checks
@@ -64,5 +67,6 @@ jobs:
       - run: python -m pip install "pglast>=7,<8"
       - run: python scripts/check_sql.py
 
-  # CI needs no application secrets: tests must use fakes/in-memory dependencies.
-  # Production Supabase credentials remain deployment-environment secrets.
+  # CI needs no application secrets: tests and AI contract validation use
+  # fakes/in-memory dependencies and never call a hosted model. Production
+  # Supabase and Gemini credentials remain deployment-environment secrets.
