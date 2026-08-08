@@ -2,7 +2,7 @@
 
 Date: 9 August 2026
 Branch: `codex/message-ux`
-Status: local release candidate; publication and final-domain acceptance pending
+Status: PR #23 open; merge held for companion feature and final-domain acceptance
 
 ## Product scope
 
@@ -28,7 +28,7 @@ Status: local release candidate; publication and final-domain acceptance pending
 Fresh `make check` before the documentation pass:
 
 - Web: 19 files, 184 tests passed.
-- API: 249 tests passed.
+- API: 252 tests passed.
 - ESLint, TypeScript, Ruff and strict mypy passed.
 - Production PWA build passed.
 - Eight migrations, seed and four SQL contract files parsed.
@@ -46,11 +46,14 @@ Focused feature evidence:
   confirmation metadata/tag validation, accurate clarification actions, and
   optional platform/subcategory clearing now have regression coverage.
 
-The linked Vercel API project confirms that a production Gemini key is present,
-but Vercel marks it sensitive and does not export the raw value through either
-`env pull` or `env run`. The new hosted 60-case rerun therefore remains pending;
-Gemini must be accepted through the deployed API after merge without copying the
-production secret into a local plaintext file.
+The replacement Gemini key is stored locally in the ignored root `.env` and as
+Sensitive Vercel Production and Preview variables; it is never written to this
+repository. A hosted run reached the configured Gemini Interactions model and
+then hit its 15-request free-tier quota. That run exposed and fixed the newer
+Interactions SDK error boundary: rate limits now become sanitized retryable
+capture diagnostics or the normal unavailable state, never a raw provider
+exception. The complete hosted benchmark and deployed acceptance remain release
+gates after the companion feature is ready.
 
 ## Persistence and privacy
 
@@ -87,9 +90,9 @@ acceptance after this branch is merged and deployed.
 
 Pending:
 
-1. Push the candidate branch and open the release PR.
-2. Review the complete branch diff; pass CI and CodeQL.
-3. Merge to `main`.
+1. Reconcile the companion feature into the open PR #23 release line.
+2. Review the combined diff; pass CI and CodeQL.
+3. Merge the combined candidate to `main`.
 4. Verify both Vercel deployments correspond to the merge SHA.
 5. Run authenticated final-domain demo-account and personal-account smoke tests.
 

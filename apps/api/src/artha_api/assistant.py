@@ -11,6 +11,7 @@ from typing import Annotated, Literal, Protocol, cast
 import httpx
 from google import genai
 from google.genai import errors as genai_errors
+from google.genai._gaos.lib import compat_errors as interaction_errors
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -83,6 +84,9 @@ class CaptureInterpretationError(Exception):
         self.retryable = retryable
         self.retry_after_seconds = retry_after_seconds
         super().__init__(kind.value)
+
+
+GEMINI_API_ERRORS = (genai_errors.APIError, interaction_errors.APIError)
 
 
 class AssistantUnavailableError(RuntimeError):
@@ -826,8 +830,8 @@ def _retry_after_seconds(value: str | None) -> float | None:
 
 
 def _capture_failure(error: Exception) -> CaptureInterpretationError:
-    if isinstance(error, genai_errors.APIError):
-        status = error.code
+    if isinstance(error, GEMINI_API_ERRORS):
+        status = getattr(error, "code", getattr(error, "status_code", None))
         response = getattr(error, "response", None)
         headers = getattr(response, "headers", {})
         if status == 429:
@@ -836,9 +840,13 @@ def _capture_failure(error: Exception) -> CaptureInterpretationError:
                 retryable=True,
                 retry_after_seconds=_retry_after_seconds(headers.get("Retry-After")),
             )
-        if status >= 500:
+        if isinstance(status, int) and status >= 500:
             return CaptureInterpretationError(
                 CaptureFailureKind.PROVIDER_5XX, retryable=True
+            )
+        if not isinstance(status, int):
+            return CaptureInterpretationError(
+                CaptureFailureKind.UNKNOWN, retryable=False
             )
         return CaptureInterpretationError(
             CaptureFailureKind.PROVIDER_4XX, retryable=False
@@ -947,7 +955,7 @@ class LocalFinancialAssistant:
             else:
                 await self._ollama_tags()
                 model = settings.ollama_model
-        except (httpx.HTTPError, genai_errors.APIError, ValueError):
+        except (httpx.HTTPError, *GEMINI_API_ERRORS, ValueError):
             return AssistantStatus(
                 configured=True,
                 provider=settings.provider,
@@ -993,7 +1001,7 @@ class LocalFinancialAssistant:
                     result = await self._ollama_completion(message, context)
             except (
                 httpx.HTTPError,
-                genai_errors.APIError,
+                *GEMINI_API_ERRORS,
                 KeyError,
                 TypeError,
                 ValueError,
@@ -1031,7 +1039,7 @@ class LocalFinancialAssistant:
                 result = self._ground_tag_suggestion(result, payload.allowed_categories)
             except (
                 httpx.HTTPError,
-                genai_errors.APIError,
+                *GEMINI_API_ERRORS,
                 KeyError,
                 TypeError,
                 ValueError,
@@ -1084,7 +1092,7 @@ class LocalFinancialAssistant:
                 self._ground_capture_interpretation(result, context)
             except (
                 httpx.HTTPError,
-                genai_errors.APIError,
+                *GEMINI_API_ERRORS,
                 KeyError,
                 TypeError,
                 ValueError,
