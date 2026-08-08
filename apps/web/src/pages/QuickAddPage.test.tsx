@@ -1,16 +1,41 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../lib/api'
 import { RouterProvider } from '../lib/router'
-import type { LedgerAccount, Transaction } from '../types'
+import type { CaptureContext, Transaction, TransactionDraft } from '../types'
 import { localDateOffset } from '../lib/date'
 import { QuickAddPage } from './QuickAddPage'
 
 describe('QuickAddPage', () => {
+  const context: CaptureContext = {
+    accounts: [
+      { id: 'demo-hdfc-upi', name: 'HDFC UPI', kind: 'bank' },
+      { id: 'demo-icici-bank', name: 'ICICI Bank', kind: 'bank' }
+    ],
+    categories: [
+      { id: 'food', name: 'Food & Dining', kind: 'expense' },
+      { id: 'salary', name: 'Salary', kind: 'income' },
+      { id: 'other', name: 'Other', kind: 'both' }
+    ]
+  }
+
+  beforeEach(() => {
+    vi.spyOn(api, 'getCaptureContext').mockResolvedValue(context)
+  })
+
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('shows the fictional-pilot Gemini disclosure before capture', () => {
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    const notice = screen.getByRole('note', { name: /fictional-pilot AI notice/i })
+    expect(notice).toHaveTextContent(/submitted text.*Artha server.*configured Gemini/i)
+    expect(notice).toHaveTextContent(/do not enter real family-finance data/i)
+    expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
   })
 
   it('keeps a parsed entry unsaved until explicit confirmation', async () => {
@@ -42,6 +67,103 @@ describe('QuickAddPage', () => {
     await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
     expect(screen.getByLabelText('Transaction date')).toHaveValue(localDateOffset(0))
     expect(screen.getByText(/nothing has been saved yet/i)).toBeInTheDocument()
+  })
+
+  it('does not let a delayed parse overwrite later manual edits', async () => {
+    const user = userEvent.setup()
+    let resolveParse!: (value: Awaited<ReturnType<typeof api.parseDraft>>) => void
+    vi.spyOn(api, 'parseDraft').mockReturnValue(new Promise((resolve) => { resolveParse = resolve }))
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), 'Paid 900 for an old draft')
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Latest manual correction')
+
+    await act(async () => resolveParse({
+      demo: false,
+      data: {
+        kind: 'debit', amountPaise: 90_000, merchant: 'Stale parsed draft', category: 'Food & Dining',
+        account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(0), note: '',
+        memberSplits: [], confidence: 'high', sourceText: 'Paid 900 for an old draft'
+      }
+    }))
+
+    expect(screen.getByLabelText('Amount in rupees')).toHaveValue(250)
+    expect(screen.getByLabelText('Description')).toHaveValue('Latest manual correction')
+  })
+
+  it('keeps the latest parse when two requests resolve out of order', async () => {
+    const user = userEvent.setup()
+    const pending: Array<(value: Awaited<ReturnType<typeof api.parseDraft>>) => void> = []
+    vi.spyOn(api, 'parseDraft').mockImplementation(() => new Promise((resolve) => { pending.push(resolve) }))
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    const examples = screen.getAllByRole('button', { name: /Paid|Received|Spent/ })
+    await user.click(examples[0])
+    await user.click(examples[1])
+    await waitFor(() => expect(pending).toHaveLength(2))
+
+    await act(async () => pending[1]({
+      demo: false,
+      data: {
+        kind: 'credit', amountPaise: 4_500_000, merchant: 'Latest salary', category: 'Salary',
+        account: 'ICICI Bank', sourceAccountId: 'demo-icici-bank', occurredAt: localDateOffset(0), note: '',
+        memberSplits: [], confidence: 'high', sourceText: 'latest'
+      }
+    }))
+    expect(screen.getByLabelText('Description')).toHaveValue('Latest salary')
+
+    await act(async () => pending[0]({
+      demo: false,
+      data: {
+        kind: 'debit', amountPaise: 85_000, merchant: 'Stale dinner', category: 'Food & Dining',
+        account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(-1), note: '',
+        memberSplits: [], confidence: 'high', sourceText: 'stale'
+      }
+    }))
+
+    expect(screen.getByLabelText('Description')).toHaveValue('Latest salary')
+    expect(screen.getByRole('radio', { name: 'Income' })).toBeChecked()
+  })
+
+  it('blocks confirmation when the date is empty or invalid', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Coffee')
+
+    const date = screen.getByLabelText('Transaction date')
+    expect(date).toBeRequired()
+    fireEvent.change(date, { target: { value: '' } })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/enter a valid transaction date/i)
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    expect(confirmButton).toBeDisabled()
+    await user.click(confirmButton)
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('blocks confirmation when the description exceeds 240 characters', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+
+    const description = screen.getByLabelText('Description')
+    expect(description).toBeRequired()
+    expect(description).toHaveAttribute('maxLength', '240')
+    fireEvent.change(description, { target: { value: 'x'.repeat(241) } })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/description must be 240 characters or fewer/i)
+    const confirmButton = screen.getByRole('button', { name: /confirm and add transaction/i })
+    expect(confirmButton).toBeDisabled()
+    await user.click(confirmButton)
+    expect(onConfirm).not.toHaveBeenCalled()
   })
 
   it('preserves the sentence and opens manual entry when AI capture is unavailable', async () => {
@@ -80,11 +202,11 @@ describe('QuickAddPage', () => {
   it('waits for a real account before confirming a recovered manual draft', async () => {
     const user = userEvent.setup()
     const sourceText = '  Paid 250 for coffee  '
-    let resolveAccounts!: (accounts: LedgerAccount[]) => void
-    const accountsPromise = new Promise<LedgerAccount[]>((resolve) => {
-      resolveAccounts = resolve
+    let resolveContext!: (context: CaptureContext) => void
+    const contextPromise = new Promise<CaptureContext>((resolve) => {
+      resolveContext = resolve
     })
-    vi.spyOn(api, 'getAccounts').mockReturnValue(accountsPromise)
+    vi.spyOn(api, 'getCaptureContext').mockReturnValue(contextPromise)
     vi.spyOn(api, 'parseDraft').mockImplementation(async (text) => {
       throw new api.CaptureDraftUnavailableError(text)
     })
@@ -105,7 +227,10 @@ describe('QuickAddPage', () => {
     expect(confirmButton).toBeDisabled()
     expect(onConfirm).not.toHaveBeenCalled()
 
-    resolveAccounts([{ id: 'account-1', name: 'ICICI', kind: 'bank' }])
+    resolveContext({
+      accounts: [{ id: 'account-1', name: 'ICICI', kind: 'bank' }],
+      categories: [{ id: 'other', name: 'Other', kind: 'both' }]
+    })
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Paid from account' })).toHaveDisplayValue('ICICI'))
     expect(confirmButton).toBeEnabled()
     await user.click(confirmButton)
@@ -120,15 +245,15 @@ describe('QuickAddPage', () => {
   it('uses accounts that load before an in-flight capture becomes unavailable', async () => {
     const user = userEvent.setup()
     const sourceText = '  Paid 450 for lunch  '
-    let resolveAccounts!: (accounts: LedgerAccount[]) => void
-    const accountsPromise = new Promise<LedgerAccount[]>((resolve) => {
-      resolveAccounts = resolve
+    let resolveContext!: (context: CaptureContext) => void
+    const contextPromise = new Promise<CaptureContext>((resolve) => {
+      resolveContext = resolve
     })
     let rejectParse!: (reason?: unknown) => void
     const parsePromise = new Promise<Awaited<ReturnType<typeof api.parseDraft>>>((_, reject) => {
       rejectParse = reject
     })
-    vi.spyOn(api, 'getAccounts').mockReturnValue(accountsPromise)
+    vi.spyOn(api, 'getCaptureContext').mockReturnValue(contextPromise)
     const parseSpy = vi.spyOn(api, 'parseDraft').mockReturnValue(parsePromise)
     const onConfirm = vi.fn().mockResolvedValue({
       id: 'loaded-before-recovery', kind: 'debit', amountPaise: 45_000, personalSharePaise: 45_000,
@@ -142,8 +267,11 @@ describe('QuickAddPage', () => {
     await waitFor(() => expect(parseSpy).toHaveBeenCalledWith(sourceText, []))
 
     await act(async () => {
-      resolveAccounts([{ id: 'account-2', name: 'HDFC', kind: 'bank' }])
-      await accountsPromise
+      resolveContext({
+        accounts: [{ id: 'account-2', name: 'HDFC', kind: 'bank' }],
+        categories: [{ id: 'other', name: 'Other', kind: 'both' }]
+      })
+      await contextPromise
     })
     await act(async () => {
       rejectParse(new api.CaptureDraftUnavailableError(sourceText))
@@ -240,5 +368,152 @@ describe('QuickAddPage', () => {
     expect(screen.getByRole('combobox', { name: 'Transfer to account' })).toHaveValue('')
     expect(screen.getByText(/choose a destination account/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /confirm and add transaction/i })).toBeDisabled()
+  })
+
+  it('preserves exact capture and draft fields through context failure and retry', async () => {
+    const user = userEvent.setup()
+    let rejectContext!: (reason?: unknown) => void
+    const failedContext = new Promise<CaptureContext>((_, reject) => {
+      rejectContext = reject
+    })
+    vi.spyOn(api, 'getCaptureContext')
+      .mockReturnValueOnce(failedContext)
+      .mockResolvedValueOnce(context)
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    expect(screen.getByRole('status')).toHaveTextContent(/loading accounts and categories/i)
+    await user.type(screen.getByLabelText(/your message/i), '  Paid 250 for coffee  ')
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '250')
+    await user.type(screen.getByLabelText('Description'), 'Coffee at Blue Tokai')
+    await act(async () => rejectContext(new Error('context unavailable')))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/accounts and categories are unavailable/i)
+    expect(screen.getByLabelText(/your message/i)).toHaveValue('  Paid 250 for coffee  ')
+    expect(screen.getByLabelText('Amount in rupees')).toHaveValue(250)
+    expect(screen.getByLabelText('Description')).toHaveValue('Coffee at Blue Tokai')
+    expect(screen.getByRole('button', { name: /confirm and add transaction/i })).toBeDisabled()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Paid from account' })).toHaveDisplayValue('HDFC UPI'))
+    expect(screen.getByLabelText(/your message/i)).toHaveValue('  Paid 250 for coffee  ')
+    expect(screen.getByLabelText('Amount in rupees')).toHaveValue(250)
+    expect(screen.getByLabelText('Description')).toHaveValue('Coffee at Blue Tokai')
+  })
+
+  it.each([
+    ['Expense', 'debit', 'Food & Dining'],
+    ['Income', 'credit', 'Salary'],
+    ['Transfer', 'transfer', 'Transfer']
+  ] as const)('recovers exact text as a manual %s', async (label, expectedKind, expectedCategory) => {
+    const user = userEvent.setup()
+    const sourceText = `  exact ${label} source text  `
+    vi.spyOn(api, 'parseDraft').mockImplementation(async (text) => {
+      throw new api.CaptureDraftUnavailableError(text)
+    })
+    const onConfirm = vi.fn().mockImplementation(async (draft: TransactionDraft) => ({
+      id: `confirmed-${label}`,
+      ...draft,
+      personalSharePaise: draft.amountPaise,
+      status: 'confirmed' as const
+    }))
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), sourceText)
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+    await screen.findByRole('alert')
+    await user.click(screen.getByRole('radio', { name: label }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '125')
+    await user.type(screen.getByLabelText('Description'), `${label} correction`)
+    if (label === 'Transfer') {
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Transfer to account' }), '1')
+    }
+
+    expect(onConfirm).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    expect(onConfirm.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      kind: expectedKind,
+      category: expectedCategory,
+      sourceText
+    }))
+  })
+
+  it('filters server-owned categories by transaction direction', async () => {
+    const user = userEvent.setup()
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+
+    const category = screen.getByRole('combobox', { name: 'Category' })
+    expect(category).toHaveDisplayValue('Food & Dining')
+    expect(screen.getByRole('option', { name: 'Food & Dining' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Salary' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('radio', { name: 'Income' }))
+    expect(category).toHaveDisplayValue('Salary')
+    expect(screen.getByRole('option', { name: 'Salary' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Food & Dining' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Other' })).toBeInTheDocument()
+  })
+
+  it('clears invalid split, destination and category fields when type changes', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn().mockImplementation(async (draft: TransactionDraft) => ({
+      id: 'switched-kind', ...draft, personalSharePaise: draft.amountPaise, status: 'confirmed' as const
+    }))
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[{ id: 'sam', name: 'Sam' }]} /></RouterProvider>)
+    await user.click(screen.getByRole('button', { name: 'Enter details manually' }))
+    await user.type(screen.getByLabelText('Amount in rupees'), '500')
+    await user.type(screen.getByLabelText('Description'), 'Changed transaction')
+    await user.click(screen.getByLabelText('Share with Sam'))
+    await user.click(screen.getByRole('radio', { name: 'Transfer' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Transfer to account' }), '1')
+    await user.click(screen.getByRole('radio', { name: 'Income' }))
+
+    expect(screen.queryByRole('combobox', { name: 'Transfer to account' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Share with Sam')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveDisplayValue('Salary')
+    await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    expect(onConfirm.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      kind: 'credit',
+      category: 'Salary',
+      memberSplits: [],
+      destinationAccountId: undefined,
+      destinationAccount: undefined
+    }))
+  })
+
+  it('requires correction when AI returns a category outside the server allow-list', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(api, 'parseDraft').mockResolvedValue({
+      demo: false,
+      data: {
+        kind: 'debit', amountPaise: 25_000, merchant: 'Coffee', category: 'Invented category',
+        account: 'HDFC UPI', sourceAccountId: 'demo-hdfc-upi', occurredAt: localDateOffset(0),
+        note: '', memberSplits: [], confidence: 'high', sourceText: 'Paid 250 for coffee'
+      }
+    })
+    const onConfirm = vi.fn()
+    render(<RouterProvider><QuickAddPage onConfirm={onConfirm} members={[]} /></RouterProvider>)
+
+    await user.type(screen.getByLabelText(/your message/i), 'Paid 250 for coffee')
+    await user.click(screen.getByRole('button', { name: /create review draft/i }))
+
+    const category = await screen.findByRole('combobox', { name: 'Category' })
+    expect(category).toHaveValue('')
+    expect(screen.queryByRole('option', { name: 'Invented category' })).not.toBeInTheDocument()
+    expect(screen.getByText(/choose a category available for this transaction type/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirm and add transaction/i })).toBeDisabled()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    await user.selectOptions(category, 'Food & Dining')
+    expect(screen.getByRole('button', { name: /confirm and add transaction/i })).toBeEnabled()
   })
 })

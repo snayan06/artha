@@ -33,7 +33,15 @@ from .assistant import (
 )
 from .auth import AuthDependency
 from .recovery import RecoveryBundle
-from .schemas import AccountCreate, MemberCreate, ParseRequest
+from .schemas import (
+    AccountCreate,
+    CaptureContextAccount,
+    CaptureContextCategory,
+    CaptureContextResponse,
+    MemberCreate,
+    ParseRequest,
+    normalize_required_description,
+)
 from .supabase_rest import SupabaseRestClient, rest_client_for_request
 
 router = APIRouter()
@@ -89,6 +97,11 @@ class ProductionDraft(BaseModel):
     destination_account_id: UUID | None = None
     occurred_at: datetime | None = None
     notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, description: str) -> str:
+        return normalize_required_description(description)
 
     @model_validator(mode="after")
     def split_total_matches(self) -> ProductionDraft:
@@ -201,6 +214,50 @@ async def list_accounts(client: ClientDependency) -> list[dict[str, Any]]:
     return await account_rows(client, household_id)
 
 
+@router.get(
+    "/api/v1/capture-context",
+    response_model=CaptureContextResponse,
+    tags=["transactions"],
+)
+async def capture_context(
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> CaptureContextResponse:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    accounts = await account_rows(client, household_id)
+    categories = sorted(
+        (await categories_by_id(client, household_id)).values(),
+        key=lambda category: (str(category["name"]).casefold(), str(category["id"])),
+    )
+    return CaptureContextResponse(
+        accounts=[
+            CaptureContextAccount(
+                id=str(account["id"]),
+                name=str(account["name"]),
+                kind=cast(
+                    Literal["bank", "cash", "wallet", "credit_card", "other"],
+                    str(account["kind"]),
+                ),
+            )
+            for account in accounts
+        ],
+        categories=[
+            CaptureContextCategory(
+                id=str(category["id"]),
+                name=str(category["name"]),
+                kind=cast(
+                    Literal["expense", "income", "both"],
+                    str(category["category_type"]),
+                ),
+            )
+            for category in categories
+            if category.get("category_type") in {"expense", "income", "both"}
+        ],
+    )
+
+
 @router.get("/api/v1/members", tags=["members"])
 async def list_members(client: ClientDependency) -> list[dict[str, Any]]:
     household_id = await current_household(client)
@@ -285,10 +342,40 @@ async def categories_by_id(
         params={
             "household_id": f"eq.{household_id}",
             "is_archived": "eq.false",
-            "select": "id,name,category_type",
+            "select": "id,name,category_type,is_archived",
+            "order": "name.asc,id.asc",
         },
     )
     return {str(row["id"]): row for row in rows}
+
+
+def normalize_category_name(value: str) -> str:
+    return " ".join(value.split()).casefold()
+
+
+async def grounded_category(
+    client: SupabaseRestClient,
+    household_id: str,
+    name: str,
+    direction: Literal["expense", "income"],
+) -> dict[str, Any]:
+    normalized = normalize_category_name(name)
+    category = next(
+        (
+            row
+            for row in (await categories_by_id(client, household_id)).values()
+            if row.get("is_archived") is not True
+            and row.get("category_type") in {direction, "both"}
+            and normalize_category_name(str(row.get("name", ""))) == normalized
+        ),
+        None,
+    )
+    if category is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "category is not available for this transaction type",
+        )
+    return category
 
 
 async def transaction_rows(
@@ -448,19 +535,12 @@ async def confirm_transaction(
             "is_deleted": False,
         }
     assert payload.category is not None
-    category_rows = await client.request(
-        "GET",
-        "categories",
-        params={
-            "household_id": f"eq.{household_id}",
-            "name": f"ilike.{payload.category}",
-            "is_archived": "eq.false",
-            "select": "id,name,category_type",
-            "limit": "1",
-        },
+    category = await grounded_category(
+        client,
+        household_id,
+        payload.category,
+        payload.kind,
     )
-    if not category_rows:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "category is not available")
     paid_by_member_id = str(payload.paid_by_member_id or owner_id)
     splits = [split.model_dump(mode="json") for split in payload.splits]
     if payload.personal_share_paise:
@@ -470,7 +550,7 @@ async def confirm_transaction(
         {
             "p_household_id": household_id,
             "p_account_id": str(payload.source_account_id),
-            "p_category_id": str(category_rows[0]["id"]),
+            "p_category_id": str(category["id"]),
             "p_paid_by_member_id": paid_by_member_id,
             "p_direction": payload.kind,
             "p_amount_paise": payload.amount_paise,
@@ -485,7 +565,7 @@ async def confirm_transaction(
     )
     result["transaction_splits"] = splits
     result["created_at"] = result.get("created_at") or datetime.now(UTC).isoformat()
-    return transaction_view(result, owner_id, {str(category_rows[0]["id"]): category_rows[0]})
+    return transaction_view(result, owner_id, {str(category["id"]): category})
 
 
 def member_balances(

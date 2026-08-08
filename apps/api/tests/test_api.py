@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from fastapi import FastAPI
 from httpx import AsyncClient
+
+from artha_api.models import Account
 
 
 def account_id(data: dict[str, Any], name: str) -> int:
@@ -40,6 +43,39 @@ async def test_concurrent_demo_bootstrap_is_replay_safe(client: AsyncClient) -> 
     assert sorted([first.json()["created"], second.json()["created"]]) == [False, True]
     assert len(first.json()["accounts"]) == len(second.json()["accounts"]) == 2
     assert len(first.json()["transactions"]) == len(second.json()["transactions"]) == 2
+
+
+async def test_capture_context_is_owner_scoped_and_filters_archived_accounts(
+    app: FastAPI,
+    client: AsyncClient,
+) -> None:
+    async with app.state.session_factory() as session:
+        session.add_all(
+            [
+                Account(user_id="demo-user", name="Active bank", kind="bank"),
+                Account(
+                    user_id="demo-user",
+                    name="Archived bank",
+                    kind="bank",
+                    is_archived=True,
+                ),
+                Account(user_id="another-owner", name="Other bank", kind="bank"),
+            ]
+        )
+        await session.commit()
+
+    response = await client.get("/api/v1/capture-context")
+
+    assert response.status_code == 200
+    assert [account["name"] for account in response.json()["accounts"]] == [
+        "Active bank"
+    ]
+    assert response.json()["categories"]
+    assert {category["kind"] for category in response.json()["categories"]} == {
+        "expense",
+        "income",
+        "both",
+    }
 
 
 async def test_seed_dashboard_respects_personal_share_and_account_movement(
@@ -151,6 +187,99 @@ async def test_confirm_is_idempotent_and_rejects_key_reuse(
     assert len(transactions.json()) == 3
 
 
+async def test_confirm_requires_an_exact_grounded_category(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    account = account_id(bootstrapped, "HDFC UPI")
+    base = {
+        "kind": "expense",
+        "amount_paise": 1_000,
+        "description": "Crafted category",
+        "personal_share_paise": 1_000,
+        "splits": [],
+        "source_account_id": account,
+    }
+
+    invented = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "Invented"},
+        headers={"Idempotency-Key": "category-invented"},
+    )
+    wildcard = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "Gro%"},
+        headers={"Idempotency-Key": "category-wildcard"},
+    )
+    wrong_direction = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "Salary"},
+        headers={"Idempotency-Key": "category-direction"},
+    )
+    valid = await client.post(
+        "/api/v1/transactions/confirm",
+        json={**base, "category": "  gRoCeRiEs  "},
+        headers={"Idempotency-Key": "category-normalized"},
+    )
+
+    assert invented.status_code == 422
+    assert wildcard.status_code == 422
+    assert wrong_direction.status_code == 422
+    assert valid.status_code == 201
+    assert valid.json()["category"] == "Groceries"
+
+
+async def test_confirm_rejects_blank_descriptions_without_writing_and_trims_valid_text(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    source = account_id(bootstrapped, "HDFC UPI")
+    destination = account_id(bootstrapped, "Cash")
+    before = (await client.get("/api/v1/transactions")).json()
+    cases = [
+        {"kind": "expense", "category": "Other"},
+        {"kind": "income", "category": "Salary"},
+        {
+            "kind": "transfer",
+            "category": "Crafted transfer category",
+            "destination_account_id": destination,
+        },
+    ]
+
+    for index, fields in enumerate(cases):
+        response = await client.post(
+            "/api/v1/transactions/confirm",
+            headers={"Idempotency-Key": f"blank-description-{index}"},
+            json={
+                **fields,
+                "amount_paise": 1_000,
+                "description": " \t  ",
+                "personal_share_paise": 1_000,
+                "splits": [],
+                "source_account_id": source,
+            },
+        )
+        assert response.status_code == 422
+
+    assert (await client.get("/api/v1/transactions")).json() == before
+
+    valid = await client.post(
+        "/api/v1/transactions/confirm",
+        headers={"Idempotency-Key": "trimmed-description"},
+        json={
+            "kind": "expense",
+            "amount_paise": 1_000,
+            "description": "  Family groceries  ",
+            "category": "Groceries",
+            "personal_share_paise": 1_000,
+            "splits": [],
+            "source_account_id": source,
+        },
+    )
+
+    assert valid.status_code == 201
+    assert valid.json()["description"] == "Family groceries"
+    assert len((await client.get("/api/v1/transactions")).json()) == len(before) + 1
+
+
 async def test_transfer_changes_accounts_but_not_spend_or_total(
     client: AsyncClient, bootstrapped: dict[str, Any]
 ) -> None:
@@ -162,7 +291,7 @@ async def test_transfer_changes_accounts_but_not_spend_or_total(
             "kind": "transfer",
             "amount_paise": 10_000,
             "description": "ATM withdrawal",
-            "category": None,
+            "category": "Crafted unsafe transfer category",
             "paid_by_member_id": None,
             "settlement_member_id": None,
             "personal_share_paise": 10_000,
@@ -174,6 +303,7 @@ async def test_transfer_changes_accounts_but_not_spend_or_total(
     after = (await client.get("/api/v1/dashboard")).json()
 
     assert response.status_code == 201
+    assert response.json()["category"] == "Transfer"
     assert response.json()["account_delta_paise"] == 0
     assert after["total_balance_paise"] == before["total_balance_paise"]
     assert after["spend_paise"] == before["spend_paise"]
@@ -602,6 +732,7 @@ async def test_onboarding_and_multi_member_balances(client: AsyncClient) -> None
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Household supplies",
+            "category": "Other",
             "paid_by_member_id": None,
             "settlement_member_id": None,
             "personal_share_paise": 400,
@@ -619,6 +750,7 @@ async def test_onboarding_and_multi_member_balances(client: AsyncClient) -> None
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Dinner",
+            "category": "Food & Dining",
             "paid_by_member_id": leo_id,
             "settlement_member_id": None,
             "personal_share_paise": 500,
@@ -741,6 +873,7 @@ async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Duplicate split",
+            "category": "Other",
             "personal_share_paise": 400,
             "splits": [
                 {"member_id": member, "amount_paise": 300},
@@ -756,6 +889,7 @@ async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Unknown account",
+            "category": "Other",
             "personal_share_paise": 1_000,
             "splits": [],
             "source_account_id": 999_999,
@@ -768,6 +902,7 @@ async def test_duplicate_splits_and_unknown_ledger_references_are_rejected(
             "kind": "expense",
             "amount_paise": 1_000,
             "description": "Unknown member",
+            "category": "Other",
             "personal_share_paise": 500,
             "splits": [{"member_id": 999_999, "amount_paise": 500}],
             "source_account_id": account,

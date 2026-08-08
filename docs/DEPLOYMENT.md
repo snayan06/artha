@@ -18,9 +18,10 @@ Do not record passwords, access tokens, JWTs or private keys.
 
 ## 1. Fresh Supabase project
 
-The five versioned migrations and live two-household RLS exercise passed against
-a legacy staging project. That project is under the wrong account and must never
-hold real Artha data.
+The repository contains eight versioned migrations. They have been applied to
+the exact `artha-production` project and its four required RPCs resolve through
+PostgREST. The final two-owner behavioural isolation exercise is still required
+before real data.
 
 1. Sign into Supabase with the user's personal account, not
    `aarshiimagingcenter`.
@@ -58,17 +59,15 @@ ARTHA_CORS_ORIGINS=https://artha-web-one.vercel.app
 SUPABASE_URL=https://vggvufukkkirlwxqkjhz.supabase.co
 SUPABASE_ANON_KEY=<publishable-or-anon-key>
 SUPABASE_JWT_AUDIENCE=authenticated
-ARTHA_LLM_PROVIDER=disabled
-# Add only after the fictional-data model gate passes:
-# ARTHA_LLM_PROVIDER=gemini
-# ARTHA_GEMINI_API_KEY=<server-side-key>
-# ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite
+ARTHA_LLM_PROVIDER=gemini
+ARTHA_GEMINI_API_KEY=<server-side-key>
+ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
 Use the actual PWA origin if Vercel assigns a different name. Do not add the
-service-role key. Keep the hosted model disabled until the ledger acceptance gate
-passes; later, add the Gemini key only to `artha-api`. Never add it to the web
-project or any `VITE_` variable.
+service-role key. The Gemini key belongs only in `artha-api`; never add it to the
+web project or any `VITE_` variable. Keep all model use fictional-only until a
+real-data privacy configuration is explicitly approved.
 
 ## 3. React PWA on Vercel Hobby
 
@@ -136,21 +135,29 @@ is a failed release even when `supabase migration list --linked` is synchronized
 
 ## Acceptance before calling production green
 
-Current status: **personal infrastructure live; authenticated final-domain and recovery acceptance pending**.
+Current status: **AI-primary is deployed; capture hardening is locally green
+but unpublished; real-data acceptance remains pending**.
 Do not enter real financial data until every unchecked item passes.
 
-- [ ] Magic-link login works on the final PWA domain.
+- [x] Magic-link login works on the final PWA domain.
 - [x] Required RPCs resolve through live PostgREST after the production migration.
-- [ ] Reload, token refresh and sign-out work without losing a confirmed entry.
+- [x] Reload, token refresh and sign-out work without losing a confirmed entry.
+- [ ] Session persistence passes a full browser process close and reopen.
 - [ ] Two test identities can onboard separate households and cannot read each
   other's API or direct Supabase data.
-- [ ] Quick Add creates only a draft before confirmation.
-- [ ] A confirmed shared transaction updates account movement, personal spend and
+- [x] Quick Add creates only a draft before confirmation.
+- [x] A confirmed shared transaction updates account movement, personal spend and
   every selected member receivable correctly.
-- [ ] Four bank accounts, multiple cards and a backdated entry work end to end.
+- [ ] Repeat four-bank/multiple-card setup with the owner's complete fictional configuration.
 - [x] Direct loads of every PWA route return the application rather than 404.
-- [ ] Mobile widths 320 px and 390 px plus desktop pass in light and dark modes.
+- [x] Mobile widths 320 px and 390 px plus desktop pass in light and dark modes.
+- [ ] Publish the capture-hardening follow-up, then manually accept Expense,
+  Income, Transfer and provider-unavailable recovery on the final domain.
+- [ ] Re-run the 50 capture, 30 auto-tag and 24 assistant hosted fictional gates.
 - [ ] API and browser logs contain no tokens or financial payloads.
+- [ ] Sanitized cold/warm authenticated latency is recorded without request or
+  financial payload content.
 - [ ] Encrypted export reconstructs the ledger and a restore drill succeeds.
+- [ ] A reviewed privacy configuration explicitly approves real family-finance text.
 - [x] Final URLs, owners, project IDs and sanitized evidence are stored under
   `docs/artifacts/qa/`.

@@ -46,6 +46,8 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | CAP-13 | API validation error | Error is shown and no draft is fabricated or saved | Automated |
 | CAP-14 | Merchant rule matches in the local/demo repository | The stored household rule is used without changing the production web capture contract | Automated; production learning is planned |
 | CAP-15 | Learned merchant rule | It affects future drafts only and does not rewrite history | Automated |
+| CAP-16 | Manual recovery type correction | Expense, Income and Transfer use direction-valid server-owned categories/accounts and remain unsaved until confirmation | Automated; final-domain acceptance pending |
+| CAP-17 | Account-context load fails | Exact text and any safe draft fields survive retry; confirmation stays disabled with an accessible reason | Automated; final-domain acceptance pending |
 
 ## Confirmation and ledger invariants
 
@@ -97,6 +99,7 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | SEC-09 | Assistant question | Transaction rows are unchanged before/after | Automated |
 | SEC-10 | Provider status | API key is never serialized to the browser | Automated |
 | SEC-11 | Two authenticated households | Cross-household reads/writes are denied by RLS | Production pending on fresh project |
+| SEC-12 | Gemini data-use notice | The fictional-only boundary is visible and telemetry contains no financial content | Automated; real-data privacy approval pending |
 
 ## UX, responsive, and operational behavior
 
@@ -111,8 +114,10 @@ Scope: local V1 source, fictional demo data, and production acceptance backlog
 | UX-07 | Capture API unavailable | Exact text is retained, manual review explains the error, and no silent save occurs | Automated; authenticated final-domain acceptance pending |
 | UX-08 | PWA production build | Manifest, service worker, and precache are generated | Automated build |
 | OPS-01 | Web/API restart from renamed folder | Root `.env` is loaded and both documented URLs become healthy | Automated configuration plus local smoke |
-| OPS-02 | Final-domain login/refresh/sign-out | Session survives refresh and signs out cleanly | Production pending |
+| OPS-02 | Final-domain login/refresh/sign-out | Session survives refresh and signs out cleanly | Production verified |
 | OPS-03 | Export, restore, and recovery drill | Restored totals match source and secrets remain protected | Production pending |
+| OPS-04 | Full browser process close and reopen | The authenticated session returns without repeating onboarding | Production pending |
+| OPS-05 | Sanitized logs and authenticated latency | Browser/API logs expose no token or financial payload; cold/warm timings contain no request content | Production pending |
 
 ## Release commands
 

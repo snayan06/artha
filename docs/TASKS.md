@@ -10,10 +10,14 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** V1 is live and the authenticated fictional-data journey is green. The AI-primary candidate is locally verified but not deployed. Do not enter real financial data until every remaining P0 security/recovery item below is complete.
+**Current stage:** V1 and AI-primary are live at merge `69e44a8`; the newer
+capture-hardening follow-up is locally green but not published. Do not enter
+real financial data until every remaining P0 security, recovery and privacy
+item below is complete.
 
 - [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
-- [ ] Restore reliable GitHub Actions triggering and obtain fresh green `main` CI/CodeQL runs; do not normalize owner overrides.
+- [x] Obtain fresh green `main` CI run `31268322011` and CodeQL run
+  `31268322023` for AI-primary merge `69e44a8`.
 - [x] React PWA, FastAPI API, database migrations, RLS policies and automated test suites are implemented.
 - [x] Personal Vercel account created under the intended owner.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
@@ -22,9 +26,16 @@ For the current ordered delivery view, blockers and user actions, see
 - [ ] Complete anonymous-denial and two-household behavioural isolation on the hosted database.
 - [x] Create and configure the `artha-api` and `artha-web` Vercel projects.
 - [x] Pass final-domain authentication, financial-flow and responsive-layout acceptance with fictional data.
+- [ ] Verify authentication survives a full browser-process close and reopen.
 - [ ] Pass two-owner isolation and encrypted restore acceptance.
+- [ ] Record sanitized browser/API log-redaction and authenticated cold/warm
+  latency evidence.
+- [ ] Approve the real-data privacy configuration and re-run all fresh hosted
+  fictional gates for the hardening follow-up.
 
-**Next action:** prove two-owner isolation, then restore the encrypted fictional backup into a fresh/empty production household.
+**Next action:** publish the capture-hardening follow-up and manually accept
+Expense, Income, Transfer and provider-unavailable recovery on the final domain;
+then prove two-owner isolation and restore the encrypted fictional backup.
 
 ## Current execution queue
 
@@ -70,9 +81,15 @@ For the current ordered delivery view, blockers and user actions, see
 - [x] Select Gemini 3.5 Flash-Lite for fictional pilot traffic and configure it server-side only.
 - [x] Remove deterministic production language parsing and fail into exact-text manual review without saving.
 - [x] Restrict assistant responses to approved intents and exact server-owned, database-grounded widget bundles.
-- [x] Pass the AI-primary candidate local gate: 154 web, 209 API and 104 AI contract cases.
-- [ ] Re-run the hosted fictional Gemini gates for the AI-primary candidate.
-- [ ] Deploy the AI-primary candidate and repeat authenticated capture/assistant success and unavailable-state acceptance.
+- [x] Merge AI-primary PR #20 as `69e44a8`; pass main CI, CodeQL and both web/API
+  Vercel deployments.
+- [x] Pass the current hardening local gate: 170 web, 223 API, 50 capture, 30
+  auto-tag and 24 assistant contracts, plus 8 migrations and 4 SQL contracts.
+- [x] Manually verify authenticated production Gemini capture and read-only
+  assistant behavior with fictional data during the prior deployed acceptance.
+- [ ] Re-run the hosted fictional Gemini gates for the hardening follow-up.
+- [ ] Publish the hardening follow-up and repeat final-domain manual Expense,
+  Income, Transfer and provider-unavailable acceptance.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
 
 ### Net-new gaps from the senior product audit
@@ -84,18 +101,20 @@ work. Full rationale and acceptance criteria:
 
 **Before real financial data:**
 
-- [ ] Make manual recovery support Expense, Income and Transfer, including safe
+- [x] Make manual recovery support Expense, Income and Transfer, including safe
   type correction and exact-text preservation.
-- [ ] Replace free-text category correction with server-owned, direction-valid
+- [x] Replace free-text category correction with server-owned, direction-valid
   category selection and explicit unavailable/retry states.
 - [ ] Add an immediate **View transaction** recovery entry point after confirm;
   reuse the planned audited correction/soft-delete workflow rather than adding
   another mutation path.
-- [ ] Show an in-product Gemini/provider data-use disclosure and keep the
+- [x] Show an in-product Gemini/provider data-use disclosure and keep the
   fictional-data restriction visible until an approved real-data privacy
   configuration exists.
-- [ ] Give Quick Add account-context loading an accessible error, retry action
+- [x] Give Quick Add account-context loading an accessible error, retry action
   and explicit disabled-confirm reason without losing the draft.
+- [ ] Approve a privacy configuration for real family-finance text; the current
+  implementation and disclosure authorize fictional pilot data only.
 - [ ] Remove stale active-QA claims of deterministic production capture or
   assistant fallback; keep provider benchmarks historical.
 

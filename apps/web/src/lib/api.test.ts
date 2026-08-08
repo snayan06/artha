@@ -22,6 +22,52 @@ describe('FastAPI adapter', () => {
     vi.resetModules()
   })
 
+  it('maps the authenticated capture context contract', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      accounts: [
+        { id: 'account-1', name: 'ICICI Bank', kind: 'bank' },
+        { id: 2, name: 'Cash', kind: 'cash' }
+      ],
+      categories: [
+        { id: 'food', name: 'Food & Dining', kind: 'expense' },
+        { id: 'salary', name: 'Salary', kind: 'income' },
+        { id: 'other', name: 'Other', kind: 'both' }
+      ]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { getCaptureContext } = await import('./api')
+
+    await expect(getCaptureContext()).resolves.toEqual({
+      accounts: [
+        { id: 'account-1', name: 'ICICI Bank', kind: 'bank' },
+        { id: 2, name: 'Cash', kind: 'cash' }
+      ],
+      categories: [
+        { id: 'food', name: 'Food & Dining', kind: 'expense' },
+        { id: 'salary', name: 'Salary', kind: 'income' },
+        { id: 'other', name: 'Other', kind: 'both' }
+      ]
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.artha.test/api/v1/capture-context',
+      expect.any(Object)
+    )
+  })
+
+  it('rejects an invalid capture-context category kind', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      accounts: [{ id: 'account-1', name: 'ICICI Bank', kind: 'bank' }],
+      categories: [{ id: 'transfer', name: 'Transfer', kind: 'transfer' }]
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    const { getCaptureContext } = await import('./api')
+
+    await expect(getCaptureContext()).rejects.toThrow('Capture context response was invalid.')
+  })
+
   it('preserves the parsed source account id through confirmation', async () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     vi.stubEnv('VITE_DEMO_MODE', 'true')

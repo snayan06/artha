@@ -12,9 +12,33 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+def normalize_required_description(description: str) -> str:
+    normalized = description.strip()
+    if not normalized:
+        raise ValueError("description cannot be blank")
+    return normalized
+
+
 class HealthResponse(ApiModel):
     status: str
     version: str
+
+
+class CaptureContextAccount(ApiModel):
+    id: int | str
+    name: str = Field(min_length=1, max_length=100)
+    kind: Literal["bank", "cash", "wallet", "credit_card", "other"]
+
+
+class CaptureContextCategory(ApiModel):
+    id: int | str
+    name: str = Field(min_length=1, max_length=80)
+    kind: Literal["expense", "income", "both"]
+
+
+class CaptureContextResponse(ApiModel):
+    accounts: list[CaptureContextAccount]
+    categories: list[CaptureContextCategory]
 
 
 class AccountCreate(ApiModel):
@@ -180,6 +204,11 @@ class TransactionDraft(ApiModel):
     settlement_direction: SettlementDirection | None = None
     occurred_at: datetime | None = None
     notes: str | None = None
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, description: str) -> str:
+        return normalize_required_description(description)
 
     @model_validator(mode="after")
     def validate_ledger_shape(self) -> TransactionDraft:

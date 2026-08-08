@@ -38,6 +38,9 @@ from .schemas import (
     AccountRead,
     AccountSetupRequest,
     BootstrapResponse,
+    CaptureContextAccount,
+    CaptureContextCategory,
+    CaptureContextResponse,
     DashboardCategory,
     DashboardMonth,
     DashboardResponse,
@@ -64,6 +67,46 @@ from .schemas import (
 
 router = APIRouter()
 SessionDependency = Annotated[AsyncSession, Depends(get_session)]
+
+LOCAL_CAPTURE_CATEGORIES = (
+    CaptureContextCategory(id="local-groceries", name="Groceries", kind="expense"),
+    CaptureContextCategory(
+        id="local-food-dining", name="Food & Dining", kind="expense"
+    ),
+    CaptureContextCategory(id="local-housing", name="Housing", kind="expense"),
+    CaptureContextCategory(id="local-transport", name="Transport", kind="expense"),
+    CaptureContextCategory(id="local-shopping", name="Shopping", kind="expense"),
+    CaptureContextCategory(id="local-salary", name="Salary", kind="income"),
+    CaptureContextCategory(id="local-other", name="Other", kind="both"),
+)
+
+
+def normalize_category_name(value: str) -> str:
+    return " ".join(value.split()).casefold()
+
+
+def ground_local_category(payload: TransactionDraft) -> TransactionDraft:
+    if payload.kind is TransactionKind.TRANSFER:
+        return payload.model_copy(update={"category": "Transfer"})
+    if payload.kind not in {TransactionKind.EXPENSE, TransactionKind.INCOME}:
+        return payload
+    expected_kind = "expense" if payload.kind is TransactionKind.EXPENSE else "income"
+    normalized = normalize_category_name(payload.category or "")
+    category = next(
+        (
+            item
+            for item in LOCAL_CAPTURE_CATEGORIES
+            if normalize_category_name(item.name) == normalized
+            and item.kind in {expected_kind, "both"}
+        ),
+        None,
+    )
+    if category is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "category is not available for this transaction type",
+        )
+    return payload.model_copy(update={"category": category.name})
 
 
 async def account_to_read(session: AsyncSession, account: Account) -> AccountRead:
@@ -142,6 +185,32 @@ async def health() -> HealthResponse:
 async def list_accounts(session: SessionDependency, auth: AuthDependency) -> list[AccountRead]:
     account_models = await list_account_models(session, auth.user_id)
     return [await account_to_read(session, account) for account in account_models]
+
+
+@router.get(
+    "/api/v1/capture-context",
+    response_model=CaptureContextResponse,
+    tags=["transactions"],
+)
+async def capture_context(
+    session: SessionDependency,
+    auth: AuthDependency,
+) -> CaptureContextResponse:
+    accounts = await list_account_models(session, auth.user_id)
+    return CaptureContextResponse(
+        accounts=[
+            CaptureContextAccount(
+                id=account.id,
+                name=account.name,
+                kind=account.kind.value,
+            )
+            for account in accounts
+        ],
+        categories=sorted(
+            LOCAL_CAPTURE_CATEGORIES,
+            key=lambda category: (category.name.casefold(), str(category.id)),
+        ),
+    )
 
 
 @router.post(
@@ -503,6 +572,7 @@ async def confirm_transaction(
     auth: AuthDependency,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
 ) -> TransactionRead:
+    payload = ground_local_category(payload)
     request_hash = hashlib.sha256(payload.model_dump_json().encode()).hexdigest()
     record = await session.scalar(
         select(IdempotencyRecord).where(

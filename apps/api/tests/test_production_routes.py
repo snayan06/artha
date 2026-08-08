@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
+from artha_api import production_routes
 from artha_api.assistant import (
     AssistantChatRequest,
     CaptureClarification,
@@ -16,7 +18,7 @@ from artha_api.assistant import (
     TagSuggestionRequest,
     TagSuggestionResponse,
 )
-from artha_api.auth import AuthContext
+from artha_api.auth import AuthContext, get_auth_context
 from artha_api.production_routes import (
     ProductionDraft,
     ProductionSplit,
@@ -40,6 +42,132 @@ DESTINATION_ACCOUNT_ID = "00000000-0000-0000-0000-000000000107"
 CATEGORY_ID = "00000000-0000-0000-0000-000000000104"
 USER_ID = "00000000-0000-0000-0000-000000000105"
 TRANSACTION_ID = "00000000-0000-0000-0000-000000000106"
+
+
+class FakeCaptureContextClient:
+    def __init__(
+        self,
+        *,
+        accounts: list[dict[str, Any]],
+        categories: list[dict[str, Any]],
+        include_owner: bool = True,
+    ) -> None:
+        self.accounts = accounts
+        self.categories = categories
+        self.include_owner = include_owner
+        self.params_by_path: dict[str, dict[str, str]] = {}
+
+    async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
+        if name == "get_current_household":
+            assert payload is None
+            return HOUSEHOLD_ID
+        if name == "get_account_balances":
+            assert payload == {"p_household_id": HOUSEHOLD_ID}
+            return []
+        raise AssertionError(f"unexpected RPC: {name}")
+
+    async def request(self, method: str, path: str, **kwargs: Any) -> Any:
+        assert method == "GET"
+        self.params_by_path[path] = kwargs["params"]
+        if path == "household_members":
+            return [
+                {
+                    "id": OWNER_ID,
+                    "profile_id": USER_ID if self.include_owner else "another-user",
+                    "display_name": "Owner",
+                    "member_type": "user",
+                    "role": "owner",
+                    "is_active": True,
+                    "created_at": "2026-08-04T00:00:00+00:00",
+                }
+            ]
+        if path == "accounts":
+            return self.accounts
+        if path == "categories":
+            return self.categories
+        raise AssertionError(f"unexpected path: {path}")
+
+
+async def test_production_capture_context_is_household_scoped_and_grounded() -> None:
+    client = FakeCaptureContextClient(
+        accounts=[
+            {
+                "id": ACCOUNT_ID,
+                "name": "Known Bank",
+                "account_type": "bank",
+                "currency": "INR",
+                "opening_balance_paise": 50_000,
+                "credit_limit_paise": None,
+                "statement_day": None,
+                "payment_due_day": None,
+                "is_archived": False,
+                "created_at": "2026-08-04T00:00:00+00:00",
+            }
+        ],
+        categories=[
+            {"id": "expense", "name": "Food", "category_type": "expense"},
+            {"id": "income", "name": "Salary", "category_type": "income"},
+            {"id": "both", "name": "Other", "category_type": "both"},
+            {"id": "invalid", "name": "Invalid", "category_type": "transfer"},
+        ],
+    )
+
+    response = await production_routes.capture_context(
+        cast(SupabaseRestClient, client),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert response.model_dump(mode="json") == {
+        "accounts": [{"id": ACCOUNT_ID, "name": "Known Bank", "kind": "bank"}],
+        "categories": [
+            {"id": "expense", "name": "Food", "kind": "expense"},
+            {"id": "both", "name": "Other", "kind": "both"},
+            {"id": "income", "name": "Salary", "kind": "income"},
+        ],
+    }
+    assert client.params_by_path["accounts"] == expect_capture_scope(
+        "id,name,account_type,currency,opening_balance_paise,credit_limit_paise,"
+        "statement_day,payment_due_day,is_archived,created_at",
+        order="created_at.asc,id.asc",
+    )
+    assert client.params_by_path["categories"] == expect_capture_scope(
+        "id,name,category_type,is_archived", order="name.asc,id.asc"
+    )
+
+
+async def test_production_capture_context_rejects_a_non_owner() -> None:
+    client = FakeCaptureContextClient(accounts=[], categories=[], include_owner=False)
+
+    with pytest.raises(HTTPException) as error:
+        await production_routes.capture_context(
+            cast(SupabaseRestClient, client),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 403
+
+
+async def test_production_capture_context_returns_empty_lists() -> None:
+    response = await production_routes.capture_context(
+        cast(
+            SupabaseRestClient,
+            FakeCaptureContextClient(accounts=[], categories=[]),
+        ),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert response.model_dump(mode="json") == {"accounts": [], "categories": []}
+
+
+def expect_capture_scope(select: str, *, order: str | None = None) -> dict[str, str]:
+    params = {
+        "household_id": f"eq.{HOUSEHOLD_ID}",
+        "is_archived": "eq.false",
+        "select": select,
+    }
+    if order is not None:
+        params["order"] = order
+    return params
 
 
 async def test_production_assistant_routes_return_503_when_provider_is_disabled(
@@ -90,12 +218,26 @@ async def test_production_assistant_routes_return_503_when_provider_is_disabled(
 
 
 class FakeProductionClient:
-    def __init__(self) -> None:
+    def __init__(self, *, categories: list[dict[str, Any]] | None = None) -> None:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
         self.activity_payload: dict[str, Any] | None = None
+        self.rpc_names: list[str] = []
+        self.categories = (
+            categories
+            if categories is not None
+            else [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": False,
+                }
+            ]
+        )
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
+        self.rpc_names.append(name)
         if name == "get_current_household":
             return HOUSEHOLD_ID
         if name == "confirm_transaction":
@@ -169,7 +311,7 @@ class FakeProductionClient:
                 },
             ]
         if path == "categories":
-            return [{"id": CATEGORY_ID, "name": "Groceries", "category_type": "expense"}]
+            return self.categories
         if path == "accounts":
             return [{
                 "id": ACCOUNT_ID,
@@ -277,7 +419,8 @@ async def test_production_tag_suggestion_uses_only_eligible_household_categories
     assert client.category_params == {
         "household_id": f"eq.{HOUSEHOLD_ID}",
         "is_archived": "eq.false",
-        "select": "id,name,category_type",
+        "select": "id,name,category_type,is_archived",
+        "order": "name.asc,id.asc",
     }
     assert len(captured) == 1
     assert isinstance(captured[0], TagSuggestionRequest)
@@ -417,6 +560,163 @@ async def test_production_confirmation_adds_owner_share_to_atomic_rpc() -> None:
     ]
     assert result["personal_share_paise"] == 6_000
     assert result["splits"] == [{"member_id": MEMBER_ID, "amount_paise": 4_000}]
+
+
+@pytest.mark.parametrize(
+    ("category", "rows"),
+    [
+        (
+            "Invented",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": False,
+                }
+            ],
+        ),
+        (
+            "Gro%",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": False,
+                }
+            ],
+        ),
+        (
+            "Groceries",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Groceries",
+                    "category_type": "expense",
+                    "is_archived": True,
+                }
+            ],
+        ),
+        (
+            "Salary",
+            [
+                {
+                    "id": CATEGORY_ID,
+                    "name": "Salary",
+                    "category_type": "income",
+                    "is_archived": False,
+                }
+            ],
+        ),
+    ],
+    ids=["invented", "wildcard", "archived", "wrong-direction"],
+)
+async def test_production_confirmation_rejects_ungrounded_categories(
+    category: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    fake = FakeProductionClient(categories=rows)
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=10_000,
+        description="Crafted category",
+        category=category,
+        personal_share_paise=10_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        await confirm_transaction(
+            draft,
+            cast(SupabaseRestClient, fake),
+            AuthContext(user_id=USER_ID),
+            f"category-{category}",
+        )
+
+    assert error.value.status_code == 422
+    assert fake.confirm_payload is None
+
+
+async def test_production_confirmation_accepts_exact_normalized_category() -> None:
+    fake = FakeProductionClient()
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=10_000,
+        description="Grounded category",
+        category="  gRoCeRiEs  ",
+        personal_share_paise=10_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    await confirm_transaction(
+        draft,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "category-normalized",
+    )
+
+    assert fake.confirm_payload is not None
+    assert fake.confirm_payload["p_category_id"] == CATEGORY_ID
+
+
+async def test_production_confirmation_rejects_blank_descriptions_before_any_rpc() -> None:
+    fake = FakeProductionClient()
+    app = FastAPI()
+    app.include_router(production_routes.router)
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id=USER_ID)
+    app.dependency_overrides[production_routes.production_client] = lambda: fake
+    cases = [
+        {"kind": "expense", "category": "Groceries"},
+        {"kind": "income", "category": "Salary"},
+        {
+            "kind": "transfer",
+            "category": "Crafted transfer category",
+            "destination_account_id": DESTINATION_ACCOUNT_ID,
+        },
+    ]
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        for index, fields in enumerate(cases):
+            response = await client.post(
+                "/api/v1/transactions/confirm",
+                headers={"Idempotency-Key": f"blank-description-{index}"},
+                json={
+                    **fields,
+                    "amount_paise": 10_000,
+                    "description": " \n  ",
+                    "personal_share_paise": 10_000,
+                    "splits": [],
+                    "source_account_id": ACCOUNT_ID,
+                },
+            )
+            assert response.status_code == 422
+
+    assert fake.rpc_names == []
+    assert fake.confirm_payload is None
+    assert fake.transfer_payload is None
+
+
+async def test_production_confirmation_trims_a_valid_description() -> None:
+    fake = FakeProductionClient()
+    draft = ProductionDraft(
+        kind="expense",
+        amount_paise=10_000,
+        description="  Family groceries  ",
+        category="Groceries",
+        personal_share_paise=10_000,
+        source_account_id=ACCOUNT_ID,
+    )
+
+    assert draft.description == "Family groceries"
+    await confirm_transaction(
+        draft,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "trimmed-description",
+    )
+    assert fake.confirm_payload is not None
+    assert fake.confirm_payload["p_merchant"] == "Family groceries"
 
 
 async def test_profile_hydrates_server_owned_household_and_participants() -> None:

@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 8 August 2026, 22:23 IST
+Updated: 8 August 2026, 23:18 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,26 +20,30 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: V1 is live; the AI-primary release candidate is locally verified but is not deployed yet.**
+**Status: V1 and the AI-primary release are live; the V1 capture-hardening
+follow-up is locally verified and not published yet.**
 
 Do not enter real financial data yet. New and returning login, onboarding,
 financial flows, Gemini capture/assistant behavior, encrypted export and the
-responsive page sweep passed on the final domain. Two-owner isolation and a
-final-domain restore into a fresh household remain the release guard.
+responsive page sweep passed on the final domain. The newer manual-recovery,
+grounded category/account context and AI-notice hardening is locally green but
+still needs publication and final-domain acceptance. Two-owner isolation and a
+final-domain restore into a fresh household remain release guards.
 
 | Surface | Current state |
 | --- | --- |
-| AI-primary candidate | Feature branch is locally green with model-only production capture/assistant behavior, exact-text manual recovery, updated product story and the repository-owned architecture diagram; publication and final-domain acceptance remain |
-| Production `main` | Merge `0376b60`; release PRs [#16](https://github.com/snayan06/artha/pull/16), [#17](https://github.com/snayan06/artha/pull/17) and [#18](https://github.com/snayan06/artha/pull/18) are merged |
-| GitHub checks | Both Vercel checks passed on every release PR. GitHub did not create the required Web/API/SQL runs, so the owner merge override was used only after the identical full local gate passed |
-| Vercel | Web and API production aliases serve the current release successfully from Mumbai |
+| AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
+| V1 capture hardening | The follow-up branch has server-owned capture context, complete manual Expense/Income/Transfer recovery and the fictional-pilot AI data-use notice; the local gate is green, but it is not published or final-domain accepted |
+| Production `main` | Merge `69e44a8`; release PRs [#16](https://github.com/snayan06/artha/pull/16), [#17](https://github.com/snayan06/artha/pull/17), [#18](https://github.com/snayan06/artha/pull/18) and [#20](https://github.com/snayan06/artha/pull/20) are merged |
+| GitHub checks | Main CI run [31268322011](https://github.com/snayan06/artha/actions/runs/31268322011) passed Web/API/SQL; CodeQL run [31268322023](https://github.com/snayan06/artha/actions/runs/31268322023) passed JavaScript/TypeScript and Python analysis for `69e44a8` |
+| Vercel | Web and API production deployments for `69e44a8` are ready; the capture-hardening follow-up is not deployed |
 | Supabase RPC catalog | The exact `artha-production` project now resolves balances, logical activity, encrypted export and atomic restore RPCs |
 | Public checks | API health and web return `200`; anonymous catalog probes resolve both required ledger RPCs without exposing ledger data |
 | Authenticated journey | New-user magic link, returning-user link, session persistence, sign-out and restored server-owned onboarding passed with fictional data |
 | Financial journey | Backdated split expense, `25k` income, `25k` transfer, card expense, filters and live dashboard/member updates passed |
-| Gemini production | `gemini-3.5-flash-lite` returned grounded capture drafts and read-only metric/chart UI; hosted fictional gates remain 50/50, 30/30 and 24/24 |
+| Gemini production | Authenticated capture drafts and read-only metric/chart UI were manually verified with fictional data on the prior deployed acceptance; hosted fictional gates remain 50/50, 30/30 and 24/24 |
 | Responsive/theme | Home, Transactions, Quick Add, Shared, Assistant and Settings have no horizontal overflow at 320, 390 or 1440 CSS px; light/dark switching and mobile/desktop dark UI passed |
-| Remaining gate | Two-owner hosted isolation, encrypted restore into a fresh/empty production household and sanitized log/latency evidence |
+| Remaining gate | Publish and manually accept the hardening follow-up; two-owner isolation; full browser-process reopen; final-domain encrypted restore; sanitized log/latency evidence; real-data privacy approval; fresh hosted eval rerun; all Sprint 2+ features |
 
 ## Resume checklist
 
@@ -59,11 +63,19 @@ final-domain restore into a fresh household remain the release guard.
   project before deploying the application code that exposes recovery.
 - [x] Merge and deploy the consolidated release; verify Gemini capture and
   assistant requests plus the hosted auto-tag gate.
+- [x] Merge AI-primary PR #20 as `69e44a8`; pass main CI, CodeQL and both Vercel
+  production deployments.
+- [ ] Publish the capture-hardening follow-up, then manually accept Expense,
+  Income, Transfer and provider-unavailable recovery on the final domain.
+- [ ] Re-run the 50 capture, 30 auto-tag and 24 assistant hosted fictional gates
+  for the hardening follow-up.
+- [ ] Verify session persistence across a full browser process close and reopen.
 - [x] Download a client-side encrypted final-domain backup with fictional data.
 - [ ] Restore that backup into a fresh/empty production household and compare totals.
+- [ ] Approve a real-data privacy configuration before entering real family-finance text.
 - [ ] Begin S2-01 owner-only **Accounts & family** settings after the acceptance gate.
 
-## Completed in the current release candidate
+## Completed in the deployed release and local hardening follow-up
 
 - Explicit expired/reused magic-link, wrong-browser PKCE, invalid-callback and
   stale-session recovery.
@@ -82,28 +94,32 @@ final-domain restore into a fresh household remain the release guard.
   empty-household-only database restore boundary.
 - Web bundle split: the main JavaScript chunk fell from 520 KB to 304 KB.
 - Updated product, architecture, UI, backend, database and QA artifacts.
+- Authenticated server-owned capture context for active accounts and
+  direction-valid household categories.
+- Exact-text manual Expense/Income/Transfer recovery, account-context retry and
+  direction-valid category correction with no write before confirmation.
+- A visible Gemini data-use notice that keeps the pilot fictional-only and
+  documents the no-financial-content telemetry boundary.
 
 ## Verification checkpoint
 
 ```text
-AI-primary candidate web: 17 files, 154 tests passed
-AI-primary candidate API: 209 tests passed
+Current hardening branch web: 18 files, 170 tests passed
+Current hardening branch API: 223 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 8 migrations, seed and 4 SQL contract tests parsed
 AI contracts: 50 capture, 30 auto-tag and 24 assistant cases valid
-Fresh hosted Gemini gate: not run in this worktree because ARTHA_GEMINI_API_KEY is unavailable; prior fictional production evidence remains 50/50, 30/30 and 24/24
-Manual candidate UI: grounded 25k ICICI -> HDFC unsaved transfer; zero-amount and incomplete-transfer confirmation guards; assistant success with approved server-owned widgets; assistant 503 retained the exact question and showed the honest error
-Responsive candidate UI: Quick Add and Assistant had no horizontal page overflow at 320 px, 390 px or 1440 px in light/dark checks; browser console had no warnings or errors
-Capture 503 recovery: focused automated tests pass; an authenticated production-like manual run remains for final-domain acceptance
+Fresh hosted Gemini gate: not run for this hardening follow-up; prior fictional production evidence remains 50/50, 30/30 and 24/24
+Hardening recovery: focused automated Expense/Income/Transfer, category allow-list, context-retry and provider-unavailable tests pass; final-domain manual acceptance remains
 Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
-Production: PRs #16-#18 merged; all web/API Vercel preview and production deployments are ready
+Production: AI-primary PR #20 merged as 69e44a8; main CI 31268322011, CodeQL 31268322023 and both web/API Vercel deployments are green
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
 Telemetry: Vercel Web Analytics and Speed Insights are mounted with tested query/fragment redaction
 Authenticated production: new/returning magic link, persisted session, sign-out/re-login and server-owned onboarding passed
 Financial production: expense, income, transfer, card, backdate, split, filters and live chart/member updates passed
-Gemini production: grounded capture plus metric/chart assistant responses passed with fictional data
+Gemini production: grounded capture plus metric/chart assistant responses passed with fictional data during the prior deployed acceptance; the hardening follow-up is not deployed
 ```
 
 Detailed evidence: [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliability-batch.md).
@@ -142,12 +158,12 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 ## Next engineering priorities
 
-1. Finish two-owner isolation and final-domain restore acceptance.
-2. Record sanitized browser/API log redaction and authenticated cold/warm latency.
-3. Build S2-01 through S2-05 **Accounts & family** owner management.
-4. Re-run the personal four-bank/multiple-card setup when the owner is ready to replace fictional QA data.
-5. Add invitation/RLS support only after owner-only hardening passes.
-6. Add the private capture-feedback learning loop.
+1. Publish the capture-hardening follow-up and complete final-domain manual acceptance.
+2. Finish two-owner isolation and final-domain restore acceptance.
+3. Record sanitized browser/API log redaction and authenticated cold/warm latency.
+4. Obtain real-data privacy approval and re-run the fresh hosted fictional gates.
+5. Verify full browser-process reopen, then build S2-01 through S2-05 only after
+   the V1 acceptance gate passes.
 
 ## Source-of-truth map
 
@@ -167,6 +183,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 8 Aug 2026 | Merged AI-primary PR #20 as `69e44a8`; main CI `31268322011`, CodeQL `31268322023` and web/API Vercel deployments passed. Separately added the editable architecture board and V1 capture hardening; after the latest boundary-quality fixes, that follow-up branch is locally green at 170 web, 223 API, 50+30+24 AI contracts and 8 migrations/4 SQL contracts, but is not published or deployed |
 | 8 Aug 2026 | AI-primary feature candidate passed the final local gate (154 web, 209 API and 104 AI contracts), independent technical review, and fictional responsive QA at 320/390/1440 in light/dark; production capture is Gemini-only and fails into exact-text manual review; the candidate is not deployed yet |
 | 7 Aug 2026 | Merged and deployed PRs #16-#18; completed real magic-link new/returning login, server-owned onboarding, fictional expense/income/transfer/card/split flows, transaction filters, Gemini capture/assistant, encrypted export and 320/390/1440 responsive acceptance; fixed live chart/member refresh and mobile chart overflow found during QA |
 | 7 Aug 2026 | Consolidated Gemini and dependency PRs onto encrypted recovery; full local gate passed with 98 web and 122 API tests plus 104 AI dataset contracts; applied and catalog-probed the exact production recovery migration; production Gemini variables configured pending deployment |

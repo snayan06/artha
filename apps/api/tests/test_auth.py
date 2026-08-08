@@ -12,8 +12,10 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
+from httpx import ASGITransport, AsyncClient
 from starlette.requests import Request
 
+from artha_api.app import create_app
 from artha_api.auth import (
     AuthContext,
     JwksUnavailableError,
@@ -211,6 +213,22 @@ async def test_production_requires_bearer_and_configuration(
     with pytest.raises(HTTPException) as missing_configuration:
         await get_auth_context(request, credentials)
     assert missing_configuration.value.status_code == 503
+
+
+async def test_production_capture_context_requires_bearer_integration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ARTHA_ENV", "production")
+    app = create_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/v1/capture-context")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Bearer JWT required"}
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 async def test_jwks_outage_maps_to_service_unavailable() -> None:
