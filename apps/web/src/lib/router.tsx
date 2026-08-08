@@ -30,8 +30,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     navigate: (path, state) => {
       window.history.pushState(state ?? null, '', path)
       setLocation({ path, state })
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
+      window.scrollTo({ top: 0, behavior: 'auto' })
     },
     back: () => window.history.back()
   }), [location])
