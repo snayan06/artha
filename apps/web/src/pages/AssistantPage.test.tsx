@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chatAssistant } from '../lib/api'
@@ -10,15 +10,40 @@ describe('AssistantPage generated UI', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+    window.history.replaceState(null, '', '/assistant')
   })
 
-  it('shows the fictional-pilot Gemini disclosure before a question is sent', () => {
+  it('shows an accurate read-only AI disclosure before a question is sent', () => {
     render(<AssistantPage />)
 
-    const notice = screen.getByRole('note', { name: /fictional-pilot AI notice/i })
-    expect(notice).toHaveTextContent(/submitted question.*Artha server.*configured Gemini/i)
-    expect(notice).toHaveTextContent(/do not enter real family-finance data/i)
+    const notice = screen.getByRole('note', { name: /AI-assisted answer/i })
+    expect(notice).toHaveTextContent(/configured AI provider.*reviewable answer/i)
+    expect(notice).toHaveTextContent(/read-only and cannot change your ledger/i)
+    expect(notice).not.toHaveTextContent(/fictional|pilot/i)
     expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
+  })
+
+  it('submits a routed ledger question once and shows it during the handoff', async () => {
+    vi.mocked(chatAssistant).mockReturnValue(new Promise(() => undefined))
+    window.history.replaceState({ initialQuestion: 'stale' }, '', '/assistant')
+
+    render(<AssistantPage initialHandoff={{ initialQuestion: 'Show my last three months', handoffId: 'handoff-1' }} />)
+
+    expect(await screen.findByText('Show my last three months', { selector: 'section p' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Reading your latest ledger summary')
+    expect(chatAssistant).toHaveBeenCalledTimes(1)
+    expect(chatAssistant).toHaveBeenCalledWith('Show my last three months')
+    expect(window.history.state).toBeNull()
+  })
+
+  it('restores the exact routed question when the assistant is unavailable', async () => {
+    vi.mocked(chatAssistant).mockRejectedValue(new Error('API request failed (503)'))
+
+    render(<AssistantPage initialHandoff={{ initialQuestion: '  Compare food spending  ', handoffId: 'handoff-2' }} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Artha could not reach the assistant')
+    expect(screen.getByLabelText('Ask Artha')).toHaveValue('  Compare food spending  ')
+    expect(chatAssistant).toHaveBeenCalledWith('Compare food spending')
   })
 
   it('renders generated chart data as an accessible table', async () => {
@@ -41,6 +66,33 @@ describe('AssistantPage generated UI', () => {
     const dataTable = screen.getByRole('table', { name: 'Monthly spend values' })
     expect(within(dataTable).getByRole('rowheader', { name: 'August' })).toBeInTheDocument()
     expect(within(dataTable).getByRole('cell', { name: '15000' })).toBeInTheDocument()
+  })
+
+  it('submits with Enter and documents Shift+Enter', async () => {
+    vi.mocked(chatAssistant).mockResolvedValue({
+      message: 'Here is your spending overview.',
+      provider: 'Test provider',
+      widgets: []
+    })
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+
+    await user.type(screen.getByLabelText('Ask Artha'), 'Show my spending{enter}')
+
+    await waitFor(() => expect(chatAssistant).toHaveBeenCalledWith('Show my spending'))
+    expect(screen.getByText(/Enter to continue/i)).toHaveTextContent(/Shift\+Enter for a new line/i)
+  })
+
+  it('does not submit Shift+Enter or an IME composition Enter', async () => {
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+    const composer = screen.getByLabelText('Ask Artha')
+
+    await user.type(composer, 'Show my spending')
+    fireEvent.keyDown(composer, { key: 'Enter', shiftKey: true })
+    fireEvent.keyDown(composer, { key: 'Enter', isComposing: true })
+
+    expect(chatAssistant).not.toHaveBeenCalled()
   })
 
   it('renders a chart-specific empty state instead of a broken graph', async () => {
@@ -152,7 +204,26 @@ describe('AssistantPage generated UI', () => {
     await user.type(input, 'Show my balance')
     await user.click(screen.getByRole('button', { name: 'Send question' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Reviewing your ledger…')
+    expect(await screen.findByRole('status')).toHaveTextContent('Reading your latest ledger summary…')
     expect(input).toBeDisabled()
+  })
+
+  it('shows honest progress messages without exposing model reasoning', () => {
+    vi.useFakeTimers()
+    vi.mocked(chatAssistant).mockReturnValue(new Promise(() => undefined))
+    render(<AssistantPage />)
+    const input = screen.getByLabelText('Ask Artha')
+
+    fireEvent.change(input, { target: { value: 'Where did I spend the most?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send question' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('Reading your latest ledger summary…')
+    act(() => vi.advanceTimersByTime(650))
+    expect(screen.getByRole('status')).toHaveTextContent('Choosing the safest view for your question…')
+    act(() => vi.advanceTimersByTime(650))
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing verified numbers and charts…')
+    expect(screen.getByRole('status')).not.toHaveTextContent(/thinking|reasoning|chain of thought/i)
+
+    vi.useRealTimers()
   })
 })

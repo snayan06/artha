@@ -1,4 +1,4 @@
-.PHONY: setup dev-web dev-api test lint build check check-sql check-supabase-link check-live-rpc-catalog eval-capture-validate eval-capture-hosted eval-feature-validate eval-feature-hosted
+.PHONY: setup dev-web dev-api test lint build check check-sql check-supabase-link check-live-rpc-catalog eval-capture-validate eval-capture-hosted eval-feature-validate eval-feature-hosted eval-router-hosted
 
 setup:
 	npm --prefix apps/web ci
@@ -50,3 +50,6 @@ eval-feature-validate:
 
 eval-feature-hosted:
 	cd apps/api && set -a && . ../../.env && set +a && uv run python -m artha_api.feature_evals --mode run --suite all
+
+eval-router-hosted:
+	cd apps/api && set -a && . ../../.env && set +a && uv run python -m artha_api.feature_evals --mode run --suite router

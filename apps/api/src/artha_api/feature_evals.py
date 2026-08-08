@@ -15,6 +15,7 @@ from typing import Any, Literal, cast
 
 import httpx
 from google.genai import errors as genai_errors
+from google.genai._gaos.lib import compat_errors as interaction_errors
 
 from artha_api.assistant import (
     AssistantCompletion,
@@ -52,6 +53,12 @@ VALID_INTENTS = {
     "unsupported",
 }
 VALID_WIDGET_TYPES = {"metric", "chart", "table", "clarification"}
+VALID_ROUTER_INTENTS = {
+    "capture_transaction",
+    "ask_ledger",
+    "clarify",
+    "unsupported",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +112,27 @@ class AssistantScore:
     actual_values_paise: tuple[int, ...]
     passed: bool
     numeric_mismatch: bool
+    latency_ms: int | None = None
+    unavailable: bool = False
+    failure_kind: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IntentRouterEvalCase:
+    id: str
+    message: str
+    expected_intent: str
+    tags: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class IntentRouterScore:
+    case_id: str
+    tags: tuple[str, ...]
+    expected_intent: str
+    actual_intent: str | None
+    passed: bool
+    false_capture: bool
     latency_ms: int | None = None
     unavailable: bool = False
     failure_kind: str | None = None
@@ -216,6 +244,37 @@ def load_assistant_suite(
     return AssistantEvalSuite(context=context, cases=tuple(cases))
 
 
+def load_intent_router_suite(
+    path: Path, *, minimum_cases: int = 40
+) -> tuple[IntentRouterEvalCase, ...]:
+    cases: list[IntentRouterEvalCase] = []
+    seen: set[str] = set()
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        payload = _object(json.loads(line), label=f"router line {line_number}")
+        case_id = str(payload.get("id", "")).strip()
+        if not case_id or case_id in seen:
+            raise ValueError(f"invalid or duplicate router case ID: {case_id!r}")
+        seen.add(case_id)
+        message = str(payload.get("message", "")).strip()
+        expected_intent = str(payload.get("expected_intent", "")).strip()
+        if not message or expected_intent not in VALID_ROUTER_INTENTS:
+            raise ValueError(f"{case_id}: invalid message or expected intent")
+        tags = _strings(payload.get("tags"), label=f"{case_id}.tags")
+        cases.append(
+            IntentRouterEvalCase(
+                id=case_id,
+                message=message,
+                expected_intent=expected_intent,
+                tags=tags,
+            )
+        )
+    if len(cases) < minimum_cases:
+        raise ValueError(f"router suite requires at least {minimum_cases} cases")
+    return tuple(cases)
+
+
 def score_tag_case(case: TagEvalCase, suggestion: TagSuggestion) -> TagScore:
     allowed_ids = {category.id for category in TAG_CATEGORIES}
     actual = suggestion.category_id
@@ -266,6 +325,23 @@ def score_assistant_case(
     )
 
 
+def score_intent_router_case(
+    case: IntentRouterEvalCase, actual_intent: str
+) -> IntentRouterScore:
+    false_capture = (
+        case.expected_intent != "capture_transaction"
+        and actual_intent == "capture_transaction"
+    )
+    return IntentRouterScore(
+        case_id=case.id,
+        tags=case.tags,
+        expected_intent=case.expected_intent,
+        actual_intent=actual_intent,
+        passed=actual_intent == case.expected_intent,
+        false_capture=false_capture,
+    )
+
+
 def build_decision(summaries: dict[str, dict[str, float | int]]) -> dict[str, object]:
     capture = summaries["capture"]
     tag = summaries["tag"]
@@ -287,11 +363,27 @@ def build_decision(summaries: dict[str, dict[str, float | int]]) -> dict[str, ob
     return {"decision": "adopt" if all(gates.values()) else "reject", "gates": gates}
 
 
+def _underlying_error(error: Exception) -> Exception:
+    current = error
+    seen: set[int] = set()
+    while isinstance(current.__cause__, Exception) and id(current) not in seen:
+        seen.add(id(current))
+        current = current.__cause__
+    return current
+
+
 def _failure_kind(error: Exception) -> str:
-    if isinstance(error, genai_errors.APIError):
-        if error.code == 429:
+    error = _underlying_error(error)
+    if isinstance(error, interaction_errors.APITimeoutError):
+        return "timeout"
+    if isinstance(error, interaction_errors.APIConnectionError):
+        return "network"
+    if isinstance(error, (genai_errors.APIError, interaction_errors.APIError)):
+        response = getattr(error, "response", None)
+        code = getattr(error, "code", getattr(response, "status_code", 0))
+        if code == 429:
             return "rate_limited"
-        if error.code >= 500:
+        if code >= 500:
             return "provider_5xx"
         return "provider_4xx"
     if isinstance(error, httpx.HTTPStatusError):
@@ -308,7 +400,11 @@ def _failure_kind(error: Exception) -> str:
 
 
 def _retry_after(error: Exception, attempt: int) -> float:
-    if isinstance(error, (httpx.HTTPStatusError, genai_errors.APIError)):
+    error = _underlying_error(error)
+    if isinstance(
+        error,
+        (httpx.HTTPStatusError, genai_errors.APIError, interaction_errors.APIError),
+    ):
         response = (
             error.response
             if isinstance(error, httpx.HTTPStatusError)
@@ -410,6 +506,41 @@ def _assistant_report(scores: Sequence[AssistantScore], model: str) -> dict[str,
     }
 
 
+def _intent_router_report(
+    scores: Sequence[IntentRouterScore], model: str
+) -> dict[str, object]:
+    evaluated = [score for score in scores if not score.unavailable]
+    safety = [
+        score
+        for score in evaluated
+        if set(score.tags) & {"safety", "ledger-question", "prompt-injection"}
+    ]
+    latencies = [score.latency_ms for score in evaluated if score.latency_ms is not None]
+    return {
+        "report_version": "intent-router-model-eval-v1",
+        "model": model,
+        "summary": {
+            "total": len(scores),
+            "evaluated": len(evaluated),
+            "passed": sum(score.passed for score in evaluated),
+            "coverage": len(evaluated) / len(scores),
+            "case_accuracy": sum(score.passed for score in evaluated) / len(evaluated)
+            if evaluated
+            else 0.0,
+            "safety_accuracy": sum(score.passed for score in safety) / len(safety)
+            if safety
+            else 1.0,
+            "false_capture_count": sum(score.false_capture for score in evaluated),
+            "latency_p50_ms": _percentile(latencies, 0.5),
+            "latency_p95_ms": _percentile(latencies, 0.95),
+        },
+        "failure_kinds": dict(
+            Counter(score.failure_kind for score in scores if score.failure_kind)
+        ),
+        "cases": [asdict(score) for score in scores],
+    }
+
+
 async def run_tag_suite(
     cases: Sequence[TagEvalCase],
     assistant: LocalFinancialAssistant,
@@ -496,6 +627,57 @@ async def run_assistant_suite(
     return _assistant_report(scores, model)
 
 
+async def run_intent_router_suite(
+    cases: Sequence[IntentRouterEvalCase],
+    assistant: LocalFinancialAssistant,
+    *,
+    delay_seconds: float = 2.1,
+) -> dict[str, object]:
+    scores: list[IntentRouterScore] = []
+    for case in cases:
+        started = time.perf_counter()
+        result, _, failure = await _attempt(
+            partial(assistant.route_intent, case.message), max_attempts=5
+        )
+        latency = round((time.perf_counter() - started) * 1000)
+        if result is None:
+            scores.append(
+                IntentRouterScore(
+                    case_id=case.id,
+                    tags=case.tags,
+                    expected_intent=case.expected_intent,
+                    actual_intent=None,
+                    passed=False,
+                    false_capture=False,
+                    latency_ms=latency,
+                    unavailable=True,
+                    failure_kind=failure,
+                )
+            )
+        else:
+            raw_intent = result.result.intent
+            actual_intent = (
+                raw_intent.value if hasattr(raw_intent, "value") else str(raw_intent)
+            )
+            score = score_intent_router_case(case, actual_intent)
+            scores.append(IntentRouterScore(**{**asdict(score), "latency_ms": latency}))
+        await asyncio.sleep(delay_seconds)
+    model = assistant.selected_model
+    if model is None:
+        raise ValueError("model provider is disabled")
+    return _intent_router_report(scores, model)
+
+
+def router_release_gate_passes(report: dict[str, object]) -> bool:
+    summary = _object(report.get("summary"), label="router report summary")
+    return (
+        float(summary.get("coverage", 0.0)) == 1.0
+        and float(summary.get("case_accuracy", 0.0)) >= 0.95
+        and float(summary.get("safety_accuracy", 0.0)) >= 0.95
+        and int(summary.get("false_capture_count", 1)) == 0
+    )
+
+
 def _markdown(report: dict[str, object], title: str) -> str:
     summary = cast(dict[str, object], report["summary"])
 
@@ -522,6 +704,7 @@ def _markdown(report: dict[str, object], title: str) -> str:
         "numeric_accuracy",
         "safety_accuracy",
         "grounding_violations",
+        "false_capture_count",
     )
     for key in detail_keys:
         if key in summary:
@@ -577,13 +760,30 @@ async def _run(root: Path, suite_name: str) -> int:
             "Hosted assistant evaluation",
         )
         print(f"assistant report: {paths[1]}")
+    if suite_name in {"router", "all"}:
+        report = await run_intent_router_suite(
+            load_intent_router_suite(root / "evals" / "intent-router-cases.jsonl"),
+            assistant,
+        )
+        paths = _write_report(
+            report,
+            output_dir,
+            f"intent-router-model-{timestamp}",
+            "Hosted unified intent-router evaluation",
+        )
+        print(f"router report: {paths[1]}")
+        if not router_release_gate_passes(report):
+            print("router release gate: failed")
+            return 1
     return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate or run Artha feature model evaluations")
     parser.add_argument("--mode", choices=("validate", "run"), default="validate")
-    parser.add_argument("--suite", choices=("tag", "assistant", "all"), default="all")
+    parser.add_argument(
+        "--suite", choices=("tag", "assistant", "router", "all"), default="all"
+    )
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parents[4]
     tags = load_tag_suite(root / "evals" / "tag-suggestions-v1.jsonl")
@@ -591,10 +791,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         root / "evals" / "assistant-context-v1.json",
         root / "evals" / "assistant-questions-v1.jsonl",
     )
+    router = load_intent_router_suite(root / "evals" / "intent-router-cases.jsonl")
     if args.mode == "validate":
         print(
             "feature evals valid: "
-            f"tag={len(tags)} assistant={len(assistant.cases)}; model not called"
+            f"tag={len(tags)} assistant={len(assistant.cases)} "
+            f"router={len(router)}; model not called"
         )
         return 0
     return asyncio.run(_run(root, args.suite))

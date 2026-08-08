@@ -1,7 +1,7 @@
 # Artha — System architecture and deployment
 
-Status: V1 private pilot deployed; current runtime documented
-Date: 7 August 2026
+Status: V1 production runtime; message/metadata release candidate documented
+Date: 9 August 2026
 
 ## Architecture decision
 
@@ -16,6 +16,11 @@ Gemini is unavailable or cannot return a valid interpretation, Artha preserves
 the user's exact text and opens the manual form. Production does not substitute
 a language parser or manufacture a likely draft.
 
+The Home and Quick Add composer first calls a bounded intent router. The router
+receives only the submitted text and returns one of `capture_transaction`,
+`ask_ledger`, `clarify` or `unsupported`. It does not receive household or
+ledger context, call tools, calculate money or write data.
+
 ## Chosen stack
 
 | Layer | Choice | Responsibility |
@@ -23,11 +28,11 @@ a language parser or manufacture a likely draft.
 | Web application | React 19 + TypeScript + Vite PWA | Screens, review/edit state, approved assistant widgets and installation |
 | Styling and charts | Tailwind CSS + repository UI components + Recharts | Accessible presentation controlled by application code |
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async | Authenticated orchestration, schemas, allow-lists and business services |
-| Authentication | Supabase Auth magic link | Private-pilot identity and short-lived access tokens |
+| Authentication | Supabase Auth password and magic link | Private identity and short-lived access tokens |
 | Production database | Supabase Postgres with RLS | Ledger truth, relational integrity, atomic RPCs and household isolation |
 | Local database | SQLite + aiosqlite | Keyless local demo and development |
 | Production AI | Gemini 3.5 Flash-Lite via Google's official SDK | Structured capture interpretation, category suggestions and assistant selection |
-| Hosting | Separate Vercel projects for the PWA and FastAPI | Current private-pilot deployment |
+| Hosting | Separate Vercel projects for the PWA and FastAPI | Current production deployment |
 | CI | GitHub Actions | Lint, types, tests and migration checks |
 
 An explicit Ollama provider remains available for local development. It is not
@@ -42,6 +47,7 @@ React PWA / Vercel
    ▼
 FastAPI / Vercel ───── server-side only ─────► Gemini
    │
+   ├── intent router ──────────► capture | Ask Artha | clarify | unsupported
    ├── capture orchestration ─► validated unsaved draft ─► review ─► confirm
    ├── ledger and read models ─► atomic database functions
    └── assistant contract ─────► approved narrative and widget selection
@@ -57,6 +63,12 @@ service-role key is not used in normal user request paths.
 
 ## Quick Add trust flow
 
+Before this flow, `POST /api/v1/intents/route` classifies only the entry's
+destination. A transaction continues below. A ledger question moves directly
+to `/assistant`, where the exact question is submitted once and route state is
+consumed. Routing failure never guesses: the original text remains editable and
+the user chooses transaction or ledger question.
+
 1. The authenticated user sends natural text to
    `POST /api/v1/drafts/parse`.
 2. FastAPI loads grounded household context: current date/timezone and allowed
@@ -65,8 +77,9 @@ service-role key is not used in normal user request paths.
 4. Application code rejects malformed values, invented IDs, invalid dates,
    floating-point money and inconsistent splits.
 5. A valid result becomes an unsaved draft in the review UI. The user reviews
-   every detail and may edit the available fields; transaction type remains
-   display-only.
+   core fields plus bounded merchant/platform/subcategory/context/tag suggestions.
+   Incomplete but safe results become one-question continuation cards with only
+   grounded choices.
 6. Only `POST /api/v1/transactions/confirm`, with an idempotency key, can invoke
    the atomic ledger write.
 
@@ -74,15 +87,20 @@ If step 3 or 4 fails, the exact source text is retained and the manual form
 opens. No deterministic language-parser guess is promoted as production
 recovery, and nothing is saved.
 
-Production Quick Add currently asks Gemini to select from existing household
-categories as part of capture; it does not load or apply `merchant_rules`.
+Production Quick Add asks Gemini to select from existing household categories,
+then applies active household merchant rules before the server-owned safe catalog
+and any grounded model suggestion.
 The standalone production tag-suggestion endpoint accepts only description,
 amount and direction; FastAPI loads up to 200 active, direction-eligible
 categories from the authenticated household and supplies that allow-list to
-Gemini. The V1 web app does not call this endpoint. The local SQLAlchemy demo
-path can match and learn merchant rules before model suggestion. Connecting that
-learned rule behavior to Supabase production capture is planned, not a live
-production claim.
+Gemini. The V1 web app does not call this standalone endpoint because Quick Add
+already returns its reviewed category suggestion inside the capture result.
+
+Only reviewed bounded metadata is persisted inside the existing RLS-protected
+`transactions.metadata` JSON object. Raw capture text remains browser-only and
+is not sent by confirmation. The existing encrypted recovery bundle preserves
+this metadata. Relational household tags and merchant/platform analytics remain
+a separate planned data-model release.
 
 ## Assistant and generative UI
 
@@ -102,6 +120,8 @@ Gemini cannot calculate authoritative financial values, add arbitrary numeric
 prose, alter the ledger or render HTML/JavaScript. When Gemini is unavailable or
 its output is invalid, the API returns a sanitized `503` and the UI shows an
 honest error; it does not fall back to fabricated cards or an assistant answer.
+The UI may show truthful progress messages about loading ledger facts and
+preparing validated widgets; it never exposes private model chain-of-thought.
 
 ## Ledger and security rules
 
@@ -115,13 +135,15 @@ honest error; it does not fall back to fabricated cards or an assistant answer.
 - Model output is untrusted input; arbitrary model HTML or JavaScript is never
   rendered.
 - Raw account/card numbers are neither required nor stored.
-- Free-tier Gemini must receive fictional data only; real financial text needs
+- Free-tier Gemini must receive sample/test data only; real financial text needs
   an appropriate paid privacy configuration.
 
 ## API boundaries
 
 Important V1 routes include:
 
+- `POST /api/v1/intents/route`: classify text into one bounded workflow without
+  loading ledger context or writing data.
 - `POST /api/v1/drafts/parse`: interpret natural language into an unsaved draft,
   or return manual-recovery context without guessing.
 - `POST /api/v1/transactions/confirm`: atomically save a reviewed draft.
@@ -175,7 +197,7 @@ artha/
   docs/
     assets/              # repository-owned architecture visual
     artifacts/           # versioned architecture and QA evidence
-  evals/                 # fictional model evaluation data
+  evals/                 # sanitized model evaluation data
   .github/workflows/     # continuous integration
 ```
 
