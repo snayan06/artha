@@ -152,7 +152,7 @@ export function UnifiedEntryComposer({
         <Card className="mt-4 p-4 shadow-none" role={recovery === 'failure' ? 'alert' : undefined}>
           <p className="text-sm font-bold">
             {recovery === 'failure'
-              ? 'Artha could not understand where to send this. Choose an option below.'
+              ? 'Artha couldn’t route this automatically. Choose what you meant.'
               : 'What would you like Artha to do with this?'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">

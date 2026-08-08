@@ -91,6 +91,8 @@ async def test_gemini_router_returns_only_the_validated_intent() -> None:
     assert "Paid 850 at Zomato" in str(call["input"])
     assert "untrusted data" in str(call["system_instruction"])
     assert "chain-of-thought" in str(call["system_instruction"])
+    assert "commands to move real money" in str(call["system_instruction"])
+    assert "Recorded a 5k transfer" in str(call["system_instruction"])
     assert "response_format" in call
 
 

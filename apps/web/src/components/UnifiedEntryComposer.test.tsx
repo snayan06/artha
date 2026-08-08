@@ -96,7 +96,7 @@ describe('UnifiedEntryComposer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Continue' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Artha could not understand where to send this')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Artha couldn’t route this automatically')
     expect(screen.getByLabelText('Add a transaction or ask Artha')).toHaveValue('Paid or show food')
     await user.click(screen.getByRole('button', { name: 'Add as transaction' }))
     expect(onCapture).toHaveBeenCalledWith('Paid or show food')

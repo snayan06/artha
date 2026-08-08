@@ -234,8 +234,8 @@ make check
 ```
 
 This runs web linting, TypeScript checks, Vitest, the production PWA build,
-Ruff, strict mypy, pytest, every SQL syntax contract, and both keyless validators
-for the 50-case capture dataset and hosted-model runner.
+Ruff, strict mypy, pytest, every SQL syntax contract, and keyless validators for
+50 capture, 30 auto-tag, 24 assistant and 48 intent-router cases.
 
 Previous release evidence (recorded before the current documentation pass):
 
@@ -261,6 +261,7 @@ Previous release evidence (recorded before the current documentation pass):
 | `GET/POST` | `/api/v1/merchant-rules` | Manage stored household rules; production Quick Add integration is planned |
 | `POST` | `/api/v1/merchant-rules/learn` | Store a prospective rule; production Quick Add integration is planned |
 | `POST` | `/api/v1/drafts/parse` | Parse an unsaved transaction draft |
+| `POST` | `/api/v1/intents/route` | Route text to capture, Ask Artha, clarification or unsupported without ledger access or writes |
 | `POST` | `/api/v1/transactions/confirm` | Confirm a reviewed draft idempotently |
 | `GET` | `/api/v1/transactions` | List confirmed transactions |
 | `PATCH/DELETE` | `/api/v1/transactions/{id}` | Correct or soft-delete a transaction |
