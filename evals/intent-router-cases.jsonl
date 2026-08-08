@@ -16,7 +16,7 @@
 {"id":"ROUTE-016","message":"How much does Aarav owe me for lunch?","expected_intent":"ask_ledger","tags":["ledger-question","shared","near-neighbour","safety"]}
 {"id":"ROUTE-017","message":"Zomato 450","expected_intent":"clarify","tags":["ambiguous","fragment","merchant"]}
 {"id":"ROUTE-018","message":"HDFC","expected_intent":"clarify","tags":["ambiguous","fragment","account"]}
-{"id":"ROUTE-019","message":"Food this month","expected_intent":"clarify","tags":["ambiguous","fragment","analytics"]}
+{"id":"ROUTE-019","message":"Food this month","expected_intent":"ask_ledger","tags":["ledger-question","shorthand","analytics"]}
 {"id":"ROUTE-020","message":"Paid or show food spending","expected_intent":"clarify","tags":["ambiguous","mixed-intent","safety"]}
 {"id":"ROUTE-021","message":"Yesterday 900","expected_intent":"clarify","tags":["ambiguous","fragment","date"]}
 {"id":"ROUTE-022","message":"Salary","expected_intent":"clarify","tags":["ambiguous","fragment","income"]}
