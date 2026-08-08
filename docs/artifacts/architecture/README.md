@@ -3,6 +3,8 @@
 This directory holds rendered or generated technical snapshots. The maintained
 sources currently live in:
 
+- [Editable Artha architecture board](../../assets/artha-architecture.excalidraw)
+- [Rendered Artha architecture board](../../assets/artha-architecture.svg)
 - [System architecture](../../system-architecture.md)
 - [Database structure](../../database-schema.md)
 - [Supabase migrations](../../../supabase/migrations/)

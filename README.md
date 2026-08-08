@@ -113,6 +113,8 @@ paise rather than floating-point values.
 
 ![Artha review-before-save architecture](docs/assets/artha-architecture.svg)
 
+[Open the editable Excalidraw board.](docs/assets/artha-architecture.excalidraw)
+
 Gemini interprets authenticated household context, but strict application code
 owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
 authentication, RLS, idempotency and ledger invariants. A draft is not a
