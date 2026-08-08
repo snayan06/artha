@@ -21,11 +21,11 @@ Sprint 1 dependency.
 
 | Area | Status | What this means |
 | --- | --- | --- |
-| Unified intent entry | Integrated release candidate | One composer routes transactions to review and questions directly to Ask Artha; ambiguous/mixed input requires a choice and all 49 keyless cases pass. Combined PR review, CI, deployment and live QA remain |
+| Unified intent entry | Deployed | One composer routes transactions to review and questions directly to Ask Artha; ambiguous/mixed input requires a choice. PRs #23/#24, 49 keyless cases, hosted router safety, CI, CodeQL, deployment and fictional browser QA passed; signed-in user acceptance remains |
 | AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
 | V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
-| Message UX and metadata | Integrated release candidate | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are implemented; CI/deployment/final-domain QA remain |
-| Public repository and CI | Done for current release | Main CI `31271421128` and CodeQL `31271421107` passed for `c4ae0dc` |
+| Message UX and metadata | Deployed | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are live from `e32b5b6` |
+| Public repository and CI | Done for current release | Main CI `31278245585` and CodeQL `31278245587` passed for `e32b5b6` |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
 | Server-owned onboarding/profile | Done for one fictional identity | Profile, household and participants returned from the server without repeating onboarding |
@@ -38,7 +38,7 @@ Sprint 1 dependency.
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
-| Production acceptance | In progress | Current V1 fictional happy path and responsive sweep passed; two-owner isolation, fresh-household encrypted restore and real provider-unavailable recovery remain |
+| Production acceptance | In progress | Public production and fictional routed-flow QA passed; signed-in user acceptance of the new entry flow, two-owner isolation, fresh-household encrypted restore and real provider-unavailable recovery remain |
 
 ## Senior product audit — net-new additions
 
@@ -53,19 +53,19 @@ only additions that were missing from the board.
 | PA-01 | Done — implementation/automated | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
 | PA-02 | Done — implementation/automated | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
 | PA-03 | Planned | First Sprint 2 slice; real-data gate | Post-confirm **View transaction** recovery entry point | Reuses audited edit/soft-delete; balances recalculate atomically; retries are idempotent |
-| PA-04 | Done — implementation/automated | Fictional-pilot hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Fictional-only restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
+| PA-04 | Done — implementation/automated | Demo-data hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Demo/test-data restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
 | PA-05 | Done — implementation/automated | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
-| PA-06 | Planned | Before candidate publication | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
+| PA-06 | Done | Published release | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
 | PA-07 | Planned | Sprint 2 product quality | Resumable onboarding, field errors and first-transaction guidance | Refresh preserves safe setup fields; each error identifies its field; empty states offer a next action |
 | PA-08 | Planned | Sprint 2 shared-money slice | Member-paid expense capture in the web | Owner account does not move; owner's payable and member balance update; settlement later clears without income/spend |
 | PA-09 | Planned | Sprint 2 measurement | Privacy-safe activation/capture/reliability events | No text, amounts, balances, emails, account/member names or assistant questions are emitted |
 | PA-10 | Later | After daily capture is proven | Optional missing-transaction reminder and weekly review | User-controlled cadence; no financial content in notifications; dismissal/snooze supported |
 
-PA-01, PA-02, PA-04 and PA-05 are complete only at the implementation and
-automated-test level on the unpublished hardening branch. After deployment,
-Expense, Income, Transfer and provider-unavailable recovery still require
-manual final-domain acceptance. Real family-finance data also remains blocked
-on privacy approval, isolation, restore and log-redaction evidence.
+PA-01, PA-02, PA-04 and PA-05 are deployed and covered by automated checks.
+Expense, Income, Transfer and provider-unavailable recovery still require the
+remaining named final-domain acceptance drills. Real family-finance data also
+remains blocked on privacy approval, isolation, restore and log-redaction
+evidence.
 
 ## Sprint 1 — trust and capture foundation
 
@@ -114,8 +114,9 @@ on privacy approval, isolation, restore and log-redaction evidence.
   receives text only and cannot read or write the ledger.
 - [x] Add 49 fictional router cases with near-neighbours, ambiguity, Hinglish,
   unsupported actions and prompt injection; false capture is a safety failure.
-- [ ] Publish the combined unified-entry release, pass CI/deployment, then accept both routed
-  paths on mobile and desktop against the final domain.
+- [x] Publish the combined unified-entry release and pass CI, CodeQL, both
+  deployments and isolated fictional mobile/desktop acceptance.
+- [ ] Accept both routed paths while signed in on the final production domain.
 
 - [x] Define a strict provider-neutral capture schema for kind, paise, accounts, category, members and date.
 - [x] Ground every model-selected ID against server-provided allow-lists.
@@ -146,8 +147,8 @@ on privacy approval, isolation, restore and log-redaction evidence.
 - [x] Manually verify fictional capture success, zero/incomplete-transfer guards, assistant success/failure and no 320/390/1440 Quick Add/Assistant overflow in light/dark.
 - [ ] Re-run hosted fictional Gemini gates with the ignored server-side key for
   the current hardening follow-up.
-- [ ] Publish the hardening follow-up, then manually verify Expense, Income,
-  Transfer and provider-unavailable recovery on the final domain.
+- [x] Publish the hardening follow-up through PRs #23/#24 as `e32b5b6`.
+- [ ] Manually verify provider-unavailable recovery on the final domain.
 
 ## Sprint 2 — Accounts & family
 
@@ -293,8 +294,10 @@ session before implementation.
 - [x] Security headers are enabled and verified.
 - [ ] Encrypted export/restore reconstructs the ledger successfully.
 - [ ] Real family-finance text is approved only after a reviewed privacy configuration.
-- [ ] The capture-hardening follow-up passes final-domain Expense, Income,
-  Transfer and provider-unavailable acceptance after deployment.
+- [x] The combined capture/message/unified-entry follow-up is merged, deployed
+  and passes automated plus isolated fictional browser acceptance.
+- [ ] A signed-in user accepts the new routed capture/assistant flow and the
+  provider-unavailable recovery on the final domain.
 
 ## Actions needed from the user
 

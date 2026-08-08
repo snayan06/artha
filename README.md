@@ -246,7 +246,7 @@ Ruff, strict mypy, pytest, every SQL syntax contract, and keyless validators for
 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases. Hosted-model
 runners are separate, opt-in release gates because they require a private API key.
 
-Current local release-candidate evidence:
+Current production-release evidence:
 
 | Gate | Result |
 | --- | --- |
