@@ -53,6 +53,7 @@ html.dark select.bg-white { background-color: #151a17; }
 html.dark input::placeholder,
 html.dark textarea::placeholder { color: #87928c; }
 html.dark .assistant-input { background-color: transparent; }
+.disable-scroll-anchor { overflow-anchor: none; }
 html.dark .shadow-card { box-shadow: 0 16px 42px rgba(0, 0, 0, .32); }
 html.dark .recharts-cartesian-axis-tick-value { fill: #a7b0aa; }
 html.dark {

@@ -12,6 +12,12 @@ describe('AssistantPage generated UI', () => {
     vi.clearAllMocks()
   })
 
+  it('disables browser scroll anchoring while assistant content changes', () => {
+    const { container } = render(<AssistantPage />)
+
+    expect(container.firstElementChild).toHaveClass('disable-scroll-anchor')
+  })
+
   it('renders generated chart data as an accessible table', async () => {
     vi.mocked(chatAssistant).mockResolvedValue({
       message: 'Here is your spending overview.',

@@ -39,7 +39,7 @@ export function AssistantPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="disable-scroll-anchor mx-auto max-w-3xl">
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-moss-100 text-moss-800"><Bot className="h-5 w-5" aria-hidden="true" /></span>
         <div><p className="flex items-center gap-1.5 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" aria-hidden="true" /> Preview</p><h1 className="font-display mt-1 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Ask your Artha.</h1><p className="mt-2 text-pretty text-sm text-[#718078] tone-muted">Get a plain-language view of your ledger. Answers are rendered only as safe, approved widgets.</p></div>
