@@ -11,7 +11,10 @@ export function SettingsPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-moss-700">Fictional pilot</p>
         <h2 id="ai-data-use-heading" className="font-display mt-1 text-lg font-bold">AI and data use</h2>
         <div className="mt-3 space-y-3 text-sm leading-6 text-[#66746d] tone-muted">
+          <p>Provider: Gemini, configured server-side.</p>
+          <p>Purpose: create reviewable capture drafts and answer read-only Ask Artha ledger questions using bounded household context.</p>
           <p>Natural-language capture and Ask Artha send the submitted fictional text or question, plus bounded household context, to the configured Gemini model through the Artha server.</p>
+          <p>Artha sends Gemini Interactions requests with store=false. This describes the request setting only; it is not a broader provider-retention claim and does not approve real family-finance data.</p>
           <p>Gemini cannot write to your ledger. Every capture requires review and confirmation. Real family-finance text is not approved during this fictional pilot.</p>
           <p>Vercel analytics receives no financial text, amounts, emails, account or member names, or assistant questions.</p>
         </div>

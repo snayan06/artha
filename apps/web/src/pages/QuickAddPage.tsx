@@ -193,6 +193,8 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
         <p className="mt-2 text-sm text-[#718078] tone-muted">Write naturally. You’ll review every detail before it is saved.</p>
       </div>
 
+      <div role="note" aria-label="Fictional-pilot AI notice" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><strong>Fictional pilot.</strong> Submitted text is sent through the Artha server to the configured Gemini model. Do not enter real family-finance data. <a href="/settings" className="font-semibold underline underline-offset-2">Settings</a> has details.</div>
+
       <Card className="p-4 sm:p-5">
         <label htmlFor="capture" className="text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</label>
         <textarea id="capture" name="transaction-capture" autoComplete="off" rows={3} value={capture} onChange={(event) => setCapture(event.target.value)} placeholder={`${members[0] ? `Paid 1,840 for groceries yesterday, split with ${members[0].name}` : 'Paid 1,840 for groceries yesterday'}…`} className="mt-2 w-full resize-none rounded-2xl border border-line bg-[#fafbf9] p-4 text-base leading-6 outline-none transition placeholder:text-[#a0aaa4] tone-subtle focus-visible:border-moss-400 focus-visible:ring-4 focus-visible:ring-moss-100 dark:bg-night-input" />

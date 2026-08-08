@@ -49,6 +49,8 @@ export function AssistantPage() {
         <div><p className="flex items-center gap-1.5 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" aria-hidden="true" /> Preview</p><h1 className="font-display mt-1 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Ask your Artha.</h1><p className="mt-2 text-pretty text-sm text-[#718078] tone-muted">Get a plain-language view of your ledger. Answers are rendered only as safe, approved widgets.</p></div>
       </div>
 
+      <div role="note" aria-label="Fictional-pilot AI notice" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><strong>Fictional pilot.</strong> Your submitted question is sent through the Artha server to the configured Gemini model. Do not enter real family-finance data. <a href="/settings" className="font-semibold underline underline-offset-2">Settings</a> has details.</div>
+
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-start gap-3 border-b border-line bg-moss-50 p-4 text-xs text-[#607068] tone-muted sm:items-center">
           <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-moss-700 sm:mt-0" aria-hidden="true" />

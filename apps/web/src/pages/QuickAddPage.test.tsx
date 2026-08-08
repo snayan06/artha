@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../lib/api'
@@ -27,6 +27,15 @@ describe('QuickAddPage', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('shows the fictional-pilot Gemini disclosure before capture', () => {
+    render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
+
+    const notice = screen.getByRole('note', { name: /fictional-pilot AI notice/i })
+    expect(notice).toHaveTextContent(/submitted text.*Artha server.*configured Gemini/i)
+    expect(notice).toHaveTextContent(/do not enter real family-finance data/i)
+    expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
   })
 
   it('keeps a parsed entry unsaved until explicit confirmation', async () => {
