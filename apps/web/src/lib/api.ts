@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantWidget, CaptureAccount, CaptureCategory, CaptureContext, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureContext, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -574,6 +574,20 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
     message: assistantMessage,
     widgets: widgets as AssistantWidget[],
     provider: `${provider} · ${model}`
+  }
+}
+
+export async function getAssistantStatus(): Promise<AssistantRuntimeStatus> {
+  const raw = await request<JsonObject>('/api/v1/assistant/status')
+  const dataPolicy = raw.data_policy === 'private_approved' ? 'private_approved' : 'sample_only'
+  return {
+    configured: raw.configured === true,
+    provider: stringValue(raw.provider, 'disabled'),
+    model: typeof raw.model === 'string' && raw.model ? safeText(raw.model, '', 120) : null,
+    available: raw.available === true,
+    dataPolicy,
+    personalDataEnabled: raw.personal_data_enabled === true,
+    isDemo: raw.is_demo === true
   }
 }
 

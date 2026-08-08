@@ -12,12 +12,13 @@ describe('AssistantPage generated UI', () => {
     vi.clearAllMocks()
   })
 
-  it('shows the fictional-pilot Gemini disclosure before a question is sent', () => {
+  it('shows an accurate read-only AI disclosure before a question is sent', () => {
     render(<AssistantPage />)
 
-    const notice = screen.getByRole('note', { name: /fictional-pilot AI notice/i })
-    expect(notice).toHaveTextContent(/submitted question.*Artha server.*configured Gemini/i)
-    expect(notice).toHaveTextContent(/do not enter real family-finance data/i)
+    const notice = screen.getByRole('note', { name: /AI-assisted answer/i })
+    expect(notice).toHaveTextContent(/configured AI provider.*reviewable answer/i)
+    expect(notice).toHaveTextContent(/read-only and cannot change your ledger/i)
+    expect(notice).not.toHaveTextContent(/fictional|pilot/i)
     expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
   })
 

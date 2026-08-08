@@ -121,3 +121,13 @@ export interface AssistantReply {
   widgets: AssistantWidget[]
   provider: string
 }
+
+export interface AssistantRuntimeStatus {
+  configured: boolean
+  provider: string
+  model: string | null
+  available: boolean
+  dataPolicy: 'sample_only' | 'private_approved'
+  personalDataEnabled: boolean
+  isDemo: boolean
+}

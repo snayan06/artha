@@ -29,12 +29,13 @@ describe('QuickAddPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows the fictional-pilot Gemini disclosure before capture', () => {
+  it('shows an accurate AI-assisted disclosure before capture', () => {
     render(<RouterProvider><QuickAddPage onConfirm={vi.fn()} members={[]} /></RouterProvider>)
 
-    const notice = screen.getByRole('note', { name: /fictional-pilot AI notice/i })
-    expect(notice).toHaveTextContent(/submitted text.*Artha server.*configured Gemini/i)
-    expect(notice).toHaveTextContent(/do not enter real family-finance data/i)
+    const notice = screen.getByRole('note', { name: /AI-assisted capture/i })
+    expect(notice).toHaveTextContent(/configured AI provider.*reviewable result/i)
+    expect(notice).toHaveTextContent(/nothing is written to your ledger until you confirm/i)
+    expect(notice).not.toHaveTextContent(/fictional|pilot/i)
     expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
   })
 
