@@ -55,10 +55,10 @@ export function AssistantPage() {
           <p>No model HTML is rendered. Verify financial decisions against the transaction list.</p>
         </div>
         <div className="min-h-[280px] space-y-6 p-4 sm:p-6" aria-live="polite">
+          {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
           {history.length === 0 && <EmptyState onPick={setMessage} />}
           {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} />)}
           {loading && <div role="status" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> Reviewing your ledger…</div>}
-          {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
         </div>
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
           <label htmlFor="assistant-message" className="sr-only">Ask Artha</label>

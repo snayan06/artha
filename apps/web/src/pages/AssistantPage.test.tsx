@@ -100,6 +100,30 @@ describe('AssistantPage generated UI', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('places an unavailable error before existing conversation history', async () => {
+    vi.mocked(chatAssistant)
+      .mockResolvedValueOnce({
+        message: 'Here is your current account overview.',
+        provider: 'Gemini · gemini-3.5-flash-lite',
+        widgets: []
+      })
+      .mockRejectedValueOnce(new Error('API request failed (503)'))
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+    const input = screen.getByLabelText('Ask Artha')
+
+    await user.type(input, 'What is my balance?')
+    await user.click(screen.getByRole('button', { name: 'Send question' }))
+    expect(await screen.findByText('Here is your current account overview.')).toBeInTheDocument()
+
+    await user.type(input, 'Show my spending')
+    await user.click(screen.getByRole('button', { name: 'Send question' }))
+
+    const alert = await screen.findByRole('alert')
+    const priorQuestion = screen.getByText('What is my balance?', { selector: 'section p' })
+    expect(alert.compareDocumentPosition(priorQuestion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('does not submit a blank-only question', async () => {
     const user = userEvent.setup()
     render(<AssistantPage />)
