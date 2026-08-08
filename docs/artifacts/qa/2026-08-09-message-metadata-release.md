@@ -48,12 +48,18 @@ Focused feature evidence:
 
 The replacement Gemini key is stored locally in the ignored root `.env` and as
 Sensitive Vercel Production and Preview variables; it is never written to this
-repository. A hosted run reached the configured Gemini Interactions model and
-then hit its 15-request free-tier quota. That run exposed and fixed the newer
-Interactions SDK error boundary: rate limits, timeouts and connection failures
-now become sanitized retryable capture diagnostics or the normal unavailable
-state, never a raw provider exception. The complete hosted benchmark and
-deployed acceptance remain release gates after the companion feature is ready.
+repository. The hosted 60-case run initially reached the 15-request free-tier
+quota. That exposed and fixed the newer Interactions SDK error boundary: rate
+limits, timeouts and connection failures now become sanitized retryable capture
+diagnostics or the normal unavailable state, never a raw provider exception.
+
+The rate-limited rerun then completed all 60 cases with 100% provider
+availability. Exact-case accuracy was 50/60 (83.3%) and structured-field
+accuracy was 94.3%. Amounts were 48/48, kinds 48/48, source accounts 48/48 and
+destination accounts 9/9. The ten exact misses are concentrated in metadata
+display/canonicalization and one missing-account clarification; those remain
+combined-release work rather than being presented as green. Deployed acceptance
+also remains a release gate after the companion feature is ready.
 
 ## Persistence and privacy
 
@@ -91,10 +97,12 @@ acceptance after this branch is merged and deployed.
 Pending:
 
 1. Reconcile the companion feature into the open PR #23 release line.
-2. Review the combined diff; pass CI and CodeQL.
-3. Merge the combined candidate to `main`.
-4. Verify both Vercel deployments correspond to the merge SHA.
-5. Run authenticated final-domain demo-account and personal-account smoke tests.
+2. Resolve the hosted metadata/missing-account misses and rerun their affected
+   cases before the full hosted gate.
+3. Review the combined diff; pass CI and CodeQL.
+4. Merge the combined candidate to `main`.
+5. Verify both Vercel deployments correspond to the merge SHA.
+6. Run authenticated final-domain demo-account and personal-account smoke tests.
 
 ## Next sprint plan
 
