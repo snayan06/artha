@@ -19,13 +19,17 @@ from artha_api.assistant import (
 )
 from artha_api.feature_evals import (
     AssistantEvalCase,
+    IntentRouterEvalCase,
     TagEvalCase,
     build_decision,
     load_assistant_suite,
+    load_intent_router_suite,
     load_tag_suite,
     main,
+    run_intent_router_suite,
     run_tag_suite,
     score_assistant_case,
+    score_intent_router_case,
     score_tag_case,
 )
 
@@ -38,9 +42,20 @@ def test_versioned_feature_datasets_are_valid_and_diverse() -> None:
         ROOT / "evals" / "assistant-context-v1.json",
         ROOT / "evals" / "assistant-questions-v1.jsonl",
     )
+    router_suite = load_intent_router_suite(ROOT / "evals" / "intent-router-cases.jsonl")
 
     assert len(tag_suite) >= 30
     assert len(assistant_suite.cases) >= 24
+    assert len(router_suite) >= 40
+    assert {case.expected_intent for case in router_suite} == {
+        "capture_transaction",
+        "ask_ledger",
+        "clarify",
+        "unsupported",
+    }
+    assert sum("near-neighbour" in case.tags for case in router_suite) >= 16
+    assert any("prompt-injection" in case.tags for case in router_suite)
+    assert any("indian-english" in case.tags for case in router_suite)
     assert {case.expected_category_id for case in tag_suite} >= {None, "food", "transport"}
     assert {case.expected_intent for case in assistant_suite.cases} >= {
         "summary",
@@ -51,6 +66,72 @@ def test_versioned_feature_datasets_are_valid_and_diverse() -> None:
         "clarification",
         "unsupported",
     }
+
+
+def test_router_loader_rejects_duplicate_ids(tmp_path: Path) -> None:
+    dataset = tmp_path / "router.jsonl"
+    row = json.dumps({
+        "id": "ROUTE-001",
+        "message": "Paid 500 for lunch",
+        "expected_intent": "capture_transaction",
+        "tags": ["capture"],
+    })
+    dataset.write_text(f"{row}\n{row}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate router case ID"):
+        load_intent_router_suite(dataset, minimum_cases=1)
+
+
+def test_router_scoring_flags_a_ledger_question_sent_to_capture() -> None:
+    case = IntentRouterEvalCase(
+        id="ROUTE-SAFETY",
+        message="How much did I spend on food?",
+        expected_intent="ask_ledger",
+        tags=("ledger-question", "safety"),
+    )
+
+    score = score_intent_router_case(case, "capture_transaction")
+
+    assert score.passed is False
+    assert score.false_capture is True
+
+
+@pytest.mark.asyncio
+async def test_hosted_router_benchmark_reports_safety_and_latency() -> None:
+    assistant = SimpleNamespace(
+        route_intent=vi_async_result("ask_ledger"),
+        selected_model="gemini-test",
+    )
+    cases = [
+        IntentRouterEvalCase(
+            id="ROUTE-QUESTION",
+            message="Show my food spending",
+            expected_intent="ask_ledger",
+            tags=("ledger-question", "safety"),
+        )
+    ]
+
+    report = await run_intent_router_suite(cases, assistant, delay_seconds=0)
+
+    assert report["summary"] == pytest.approx({
+        "total": 1,
+        "evaluated": 1,
+        "passed": 1,
+        "coverage": 1.0,
+        "case_accuracy": 1.0,
+        "safety_accuracy": 1.0,
+        "false_capture_count": 0,
+        "latency_p50_ms": 0,
+        "latency_p95_ms": 0,
+    }, abs=5)
+
+
+def vi_async_result(intent: str):
+    async def route(message: str) -> SimpleNamespace:
+        assert message
+        return SimpleNamespace(result=SimpleNamespace(intent=intent))
+
+    return route
 
 
 @pytest.mark.asyncio

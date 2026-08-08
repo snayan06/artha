@@ -63,6 +63,13 @@ must safely produce no suggestion. `assistant-context-v1.json` and
 approved widgets, deterministic financial values, unsupported writes and
 prompt-injection attempts.
 
+`intent-router-cases.jsonl` adds 48 fictional cases for the shared Home and
+Quick Add entry box. It tests four bounded destinations—transaction capture,
+Ask Artha, clarification and unsupported—plus transaction/question
+near-neighbours, Hinglish, Indian English and prompt injection. A ledger
+question sent to transaction capture is a safety failure and is reported as a
+false capture.
+
 Validate all three datasets without calling a model:
 
 ```bash
@@ -75,6 +82,8 @@ After configuring the server-only key, run the Gemini feature suites with:
 ```bash
 ARTHA_LLM_PROVIDER=gemini ARTHA_GEMINI_MODEL=gemini-3.5-flash-lite make eval-feature-hosted
 ```
+
+Run only the intent-router suite with `make eval-router-hosted`.
 
 The Vitest suite imports the capture dataset and gates the common and
 safety-critical behavior required from the no-provider browser fallback. The

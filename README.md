@@ -54,14 +54,17 @@ capture itself feel like accounting.
 
 1. **Set up once.** Add multiple bank, cash, wallet and credit-card accounts,
    opening balances, card details and people you split expenses with.
-2. **Write naturally.** Try `self transfer 25k ICICI -> HDFC` or
-   `Paid 1840 for groceries from HDFC, split with Krima, 3 days ago`.
+2. **Write or ask naturally.** The same entry accepts `self transfer 25k ICICI
+   -> HDFC` and questions such as `Compare my food spending over the last three
+   months`.
 3. **Review before saving.** Check the displayed transaction type, then correct
    the amount, description, category, account, date or equal-split member
    selection. Nothing reaches the ledger until confirmation.
 4. **Understand the result.** See balances, personal spending, income, account
    activity, shared receivables and a six-month trend.
-5. **Ask the ledger.** Gemini selects one supported intent, then must return that
+5. **Ask the ledger.** A small Gemini router moves ledger questions directly to
+   Ask Artha and submits them once. The assistant then selects one supported
+   intent and must return that
    intent's exact approved narrative and server-owned widget bundle—never model-
    authored HTML, model-calculated balances or direct writes.
 6. **Keep control.** Export a client-side encrypted backup whose passphrase never
@@ -91,6 +94,8 @@ the assistant shows an honest error when its model is unavailable.
 - First-run setup for multiple bank, cash, wallet and credit-card accounts.
 - Equal expense splits across the selected household participants.
 - Read-only Gemini assistant with safe inline metrics, charts and tables.
+- One intent-aware Home/Quick Add entry that routes transaction sentences to an
+  unsaved review draft and ledger questions directly to Ask Artha.
 - Light, dark and system theme support across mobile and desktop.
 
 ### Privacy, reliability and portability
@@ -119,6 +124,11 @@ Gemini interprets authenticated household context, but strict application code
 owns every trust boundary: schemas, allowed IDs, integer-paise and split maths,
 authentication, RLS, idempotency and ledger invariants. A draft is not a
 transaction; only the reviewed confirmation can write.
+
+Before either workflow, an authenticated, text-only router returns exactly one
+of `capture_transaction`, `ask_ledger`, `clarify` or `unsupported`. It receives
+no ledger snapshot, has no tools and cannot write. Ambiguity or provider failure
+keeps the original text and lets the user choose the destination.
 
 The assistant follows the same separation. FastAPI builds a bounded snapshot
 from database-backed dashboard data and the canonical widget bundle for every

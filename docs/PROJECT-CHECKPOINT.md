@@ -32,8 +32,9 @@ release guards.
 
 | Surface | Current state |
 | --- | --- |
+| Unified intent entry candidate | Local branch only; not deployed | Strict text-only Gemini router, shared composer and one-time Ask Artha handoff implemented; 48-case keyless router contract added. Merge, CI, deployment and live acceptance remain open |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
-| V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context, complete manual Expense/Income/Transfer recovery and the fictional-pilot AI data-use notice are deployed and final-domain accepted |
+| V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
 | Production `main` | Merge `c4ae0dc`; release PRs [#16](https://github.com/snayan06/artha/pull/16), [#17](https://github.com/snayan06/artha/pull/17), [#18](https://github.com/snayan06/artha/pull/18), [#20](https://github.com/snayan06/artha/pull/20) and [#21](https://github.com/snayan06/artha/pull/21) are merged |
 | GitHub checks | Main CI run [31271421128](https://github.com/snayan06/artha/actions/runs/31271421128) passed Web/API/SQL; CodeQL run [31271421107](https://github.com/snayan06/artha/actions/runs/31271421107) passed JavaScript/TypeScript and Python analysis for `c4ae0dc` |
 | Vercel | Web deployment `5811366329` and API deployment `5811363817` completed successfully for `c4ae0dc`; the final web and health URLs return `200` |

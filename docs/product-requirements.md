@@ -54,6 +54,9 @@ Money trackers fail because recording every payment feels like work. They also c
 4. **Cash and expense are different:** a payer’s account may lose the full amount while their personal expense is only their share.
 5. **Answers are calculated, not guessed:** the language model interprets the question; database functions calculate the result.
 6. **Private by default:** household data is visible only to authorized members.
+7. **One entry, bounded destinations:** natural language may describe a
+   transaction or ask about the ledger, but routing itself has no data access,
+   tools or write authority.
 
 ## 5. Product scope
 
@@ -64,6 +67,9 @@ Money trackers fail because recording every payment feels like work. They also c
 - Account setup: cash, bank, UPI-linked bank, credit card, and wallet.
 - Opening balance for each account.
 - Natural-language debit/credit capture.
+- A unified Home and Quick Add composer that routes transaction descriptions to
+  review and ledger questions directly to Ask Artha, with explicit user choice
+  on ambiguity or routing failure.
 - Parsed review: displayed transaction type, amount, description, category,
   account(s), date, and equal-split member selection.
 - Manual correction of amount, description, category, account(s), date, and
@@ -124,16 +130,20 @@ Money trackers fail because recording every payment feels like work. They also c
 
 ### Primary flow
 
-1. User opens the app directly to a persistent “What happened?” field.
-2. User types one sentence for Gemini or chooses manual form entry.
-3. For text capture, Gemini interprets the sentence against the authenticated
+1. User opens the app to “What would you like to do?”
+2. User writes a transaction or asks a ledger question, or chooses manual entry.
+3. A bounded Gemini router returns `capture_transaction`, `ask_ledger`,
+   `clarify` or `unsupported`. It receives only the submitted text.
+4. Ledger questions move directly to Ask Artha and submit once. Ambiguous or
+   unavailable routing preserves the exact text and offers both destinations.
+5. For transaction capture, Gemini interprets the sentence against the authenticated
    household's known accounts, members and categories.
-4. A valid result becomes a compact unsaved draft. If interpretation is
+6. A valid result becomes a compact unsaved draft. If interpretation is
    unavailable or invalid, Artha preserves the exact text and opens the manual
    form without guessing.
-5. The user reviews the displayed transaction type and edits the amount,
+7. The user reviews the displayed transaction type and edits the amount,
    description, category, account(s), date and equal-split member selection.
-6. User taps **Confirm**. Only then do the ledger, dashboard and shared balance
+8. User taps **Confirm**. Only then do the ledger, dashboard and shared balance
    update together.
 
 ### Example
