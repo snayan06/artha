@@ -211,8 +211,6 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
         <p className="mt-2 text-sm text-[#718078] tone-muted">Add a transaction or ask Artha about your ledger. Write naturally.</p>
       </div>
 
-      <div role="note" aria-label="Fictional-pilot AI notice" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><strong>Fictional pilot.</strong> Submitted text is sent through the Artha server to the configured Gemini model. Do not enter real family-finance data. <a href="/settings" className="font-semibold underline underline-offset-2">Settings</a> has details.</div>
-
       <Card className="p-4 sm:p-5">
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#78847e] tone-muted">Your message</p>
         <UnifiedEntryComposer

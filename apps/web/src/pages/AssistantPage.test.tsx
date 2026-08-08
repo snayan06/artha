@@ -10,15 +10,37 @@ describe('AssistantPage generated UI', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+    window.history.replaceState(null, '', '/assistant')
   })
 
-  it('shows the fictional-pilot Gemini disclosure before a question is sent', () => {
+  it('submits a routed ledger question once and shows it during the handoff', async () => {
+    vi.mocked(chatAssistant).mockReturnValue(new Promise(() => undefined))
+    window.history.replaceState({ initialQuestion: 'stale' }, '', '/assistant')
+
+    render(<AssistantPage initialHandoff={{ initialQuestion: 'Show my last three months', handoffId: 'handoff-1' }} />)
+
+    expect(await screen.findByText('Show my last three months', { selector: 'section p' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Reviewing your ledger')
+    expect(chatAssistant).toHaveBeenCalledTimes(1)
+    expect(chatAssistant).toHaveBeenCalledWith('Show my last three months')
+    expect(window.history.state).toBeNull()
+  })
+
+  it('restores the exact routed question when the assistant is unavailable', async () => {
+    vi.mocked(chatAssistant).mockRejectedValue(new Error('API request failed (503)'))
+
+    render(<AssistantPage initialHandoff={{ initialQuestion: '  Compare food spending  ', handoffId: 'handoff-2' }} />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Artha could not reach the assistant')
+    expect(screen.getByLabelText('Ask Artha')).toHaveValue('  Compare food spending  ')
+    expect(chatAssistant).toHaveBeenCalledWith('Compare food spending')
+  })
+
+  it('keeps provider details out of the task flow', () => {
     render(<AssistantPage />)
 
-    const notice = screen.getByRole('note', { name: /fictional-pilot AI notice/i })
-    expect(notice).toHaveTextContent(/submitted question.*Artha server.*configured Gemini/i)
-    expect(notice).toHaveTextContent(/do not enter real family-finance data/i)
-    expect(within(notice).getByRole('link', { name: /Settings/i })).toHaveAttribute('href', '/settings')
+    expect(screen.queryByRole('note', { name: /AI notice/i })).not.toBeInTheDocument()
+    expect(screen.queryByText(/configured Gemini/i)).not.toBeInTheDocument()
   })
 
   it('renders generated chart data as an accessible table', async () => {

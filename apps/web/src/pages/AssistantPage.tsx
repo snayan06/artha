@@ -1,5 +1,5 @@
 import { Bot, ChartNoAxesCombined, LockKeyhole, Send, Sparkles } from 'lucide-react'
-import { useLayoutEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Button, Card } from '../components/ui'
 import { chatAssistant } from '../lib/api'
@@ -13,22 +13,30 @@ interface Exchange {
 
 const suggestions = ['Where did I spend the most this month?', 'Show my monthly spending trend', 'What is my available balance?']
 
-export function AssistantPage() {
+export interface AssistantHandoff {
+  initialQuestion?: string
+  handoffId?: string
+}
+
+export function AssistantPage({ initialHandoff = null }: { initialHandoff?: AssistantHandoff | null }) {
   const [message, setMessage] = useState('')
   const [history, setHistory] = useState<Exchange[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [pendingQuestion, setPendingQuestion] = useState('')
+  const activeRequest = useRef(false)
+  const handledHandoff = useRef<string | null>(null)
 
   useLayoutEffect(() => {
     if (error) window.scrollTo({ top: 0, behavior: 'auto' })
   }, [error])
 
-  async function send(event?: FormEvent) {
-    event?.preventDefault()
-    const rawQuestion = message
+  const sendQuestion = useCallback(async (rawQuestion: string) => {
     const question = rawQuestion.trim()
-    if (!question || loading) return
+    if (!question || activeRequest.current) return
+    activeRequest.current = true
     setLoading(true)
+    setPendingQuestion(question)
     setMessage('')
     setError('')
     try {
@@ -38,8 +46,25 @@ export function AssistantPage() {
       setError('Artha could not reach the assistant. Your ledger was not changed; please try again.')
       setMessage(rawQuestion)
     } finally {
+      activeRequest.current = false
       setLoading(false)
+      setPendingQuestion('')
     }
+  }, [])
+
+  useEffect(() => {
+    const rawQuestion = initialHandoff?.initialQuestion
+    if (!rawQuestion?.trim()) return
+    const handoffKey = initialHandoff?.handoffId ?? rawQuestion
+    if (handledHandoff.current === handoffKey) return
+    handledHandoff.current = handoffKey
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${window.location.hash}`)
+    void sendQuestion(rawQuestion)
+  }, [initialHandoff, sendQuestion])
+
+  function send(event?: FormEvent) {
+    event?.preventDefault()
+    void sendQuestion(message)
   }
 
   return (
@@ -49,8 +74,6 @@ export function AssistantPage() {
         <div><p className="flex items-center gap-1.5 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" aria-hidden="true" /> Preview</p><h1 className="font-display mt-1 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Ask your Artha.</h1><p className="mt-2 text-pretty text-sm text-[#718078] tone-muted">Get a plain-language view of your ledger. Answers are rendered only as safe, approved widgets.</p></div>
       </div>
 
-      <div role="note" aria-label="Fictional-pilot AI notice" className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><strong>Fictional pilot.</strong> Your submitted question is sent through the Artha server to the configured Gemini model. Do not enter real family-finance data. <a href="/settings" className="font-semibold underline underline-offset-2">Settings</a> has details.</div>
-
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-start gap-3 border-b border-line bg-moss-50 p-4 text-xs text-[#607068] tone-muted sm:items-center">
           <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-moss-700 sm:mt-0" aria-hidden="true" />
@@ -58,9 +81,9 @@ export function AssistantPage() {
         </div>
         <div className="min-h-[280px] space-y-6 p-4 sm:p-6" aria-live="polite">
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-          {history.length === 0 && <EmptyState onPick={setMessage} />}
+          {history.length === 0 && !pendingQuestion && <EmptyState onPick={setMessage} />}
           {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} />)}
-          {loading && <div role="status" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> Reviewing your ledger…</div>}
+          {pendingQuestion && <section className="space-y-3"><p className="ml-auto w-fit max-w-[88%] break-words rounded-[20px] rounded-br-md bg-moss-900 px-4 py-3 text-sm leading-6 text-white dark:bg-[#27604e]">{pendingQuestion}</p><div role="status" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> Reviewing your ledger…</div></section>}
         </div>
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
           <label htmlFor="assistant-message" className="sr-only">Ask Artha</label>
