@@ -1,6 +1,6 @@
 # Artha product story and AI boundary design
 
-Date: 7 August 2026  
+Date: 7 August 2026
 Status: Approved direction; implementation pending
 
 ## Objective
