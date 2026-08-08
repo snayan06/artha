@@ -102,7 +102,9 @@ the assistant shows an honest error when its model is unavailable.
   passphrase never leaves the browser.
 - Privacy-filtered Vercel Web Analytics and Speed Insights; telemetry keeps the
   route but removes URL query strings and fragments before sending.
-- Local SQLite demo that requires no cloud account or paid AI service.
+- Local SQLite demo for manual ledger and UI exploration without a cloud
+  account. The production-grade natural-language examples use configured
+  Gemini; the local deterministic parser remains limited to demo fixtures.
 
 The backend uses FastAPI, Pydantic and SQLAlchemy, and stores money as integer
 paise rather than floating-point values.

@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 7 August 2026, 19:41 IST
+Updated: 8 August 2026, 22:23 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -86,8 +86,8 @@ final-domain restore into a fresh household remain the release guard.
 ## Verification checkpoint
 
 ```text
-AI-primary candidate web: 16 files, 150 tests passed
-AI-primary candidate API: 204 tests passed
+AI-primary candidate web: 17 files, 153 tests passed
+AI-primary candidate API: 209 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 8 migrations, seed and 4 SQL contract tests parsed
@@ -167,7 +167,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
-| 7 Aug 2026 | AI-primary feature candidate passed the fresh full local gate (150 web, 204 API and 104 AI contracts) plus fictional rendered QA for grounded capture, guards, assistant success/failure and 320/390/1440 light/dark overflow; hosted Gemini and authenticated capture-503 recovery were not rerun locally, and the candidate is not deployed |
+| 8 Aug 2026 | AI-primary feature candidate passed the final local gate (153 web, 209 API and 104 AI contracts), independent technical review, and fictional responsive QA at 320/390/1440 in light/dark; production capture is Gemini-only and fails into exact-text manual review; the candidate is not deployed yet |
 | 7 Aug 2026 | Merged and deployed PRs #16-#18; completed real magic-link new/returning login, server-owned onboarding, fictional expense/income/transfer/card/split flows, transaction filters, Gemini capture/assistant, encrypted export and 320/390/1440 responsive acceptance; fixed live chart/member refresh and mobile chart overflow found during QA |
 | 7 Aug 2026 | Consolidated Gemini and dependency PRs onto encrypted recovery; full local gate passed with 98 web and 122 API tests plus 104 AI dataset contracts; applied and catalog-probed the exact production recovery migration; production Gemini variables configured pending deployment |
 | 7 Aug 2026 | Implemented encrypted export/restore, Settings recovery UI, recovery RPCs and two-household/round-trip SQL contracts; full local gate passed with 98 web and 112 API tests; production migration and consolidated Gemini release remain |
