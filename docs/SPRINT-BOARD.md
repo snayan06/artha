@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 8 August 2026
+Updated: 9 August 2026
 Goal: make the private pilot trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -230,11 +230,36 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 
 ### Investments and liabilities (independent release gate)
 
+- [ ] Add a top-level **Investments** tab; detailed product, valuation and data-source scope must be approved during sprint planning before implementation.
+- [ ] Start the first tracking slice with mutual funds and stocks only.
+- [ ] Show invested amount, current value, absolute gain/loss, allocation and the timestamp/source of every valuation.
 - [ ] Model investment accounts, instruments, holdings/lots, liabilities and dated prices.
 - [ ] Start with manual entry and CSV import; defer bank/broker aggregation.
 - [ ] Keep portfolio transfers separate from spending and show valuation timestamps.
 - [ ] Reconcile holdings from transactions and prevent net-worth double counting.
 - [ ] Defer trading, advice, tax calculations and automatic corporate actions.
+
+## Future sprint candidate — agentic Ask Artha
+
+This is intentionally parked. Its exact scope, sequencing, model/tool choice,
+cost budget and acceptance gates must be decided in a dedicated sprint-planning
+session before implementation.
+
+- [ ] Evolve Ask Artha beyond its current fixed-intent assistant into a bounded
+  multi-step financial-analysis agent.
+- [ ] Define server-owned read-only tools for transaction search, period and
+  category comparison, account analysis, recurring-spend detection, anomaly
+  review and evidence retrieval.
+- [ ] Require every number and conclusion to link back to deterministic ledger
+  calculations and matching transactions; model reasoning is never ledger truth.
+- [ ] Show a user-friendly activity/evidence trail and generative UI without
+  exposing raw private chain-of-thought or rendering model-authored HTML.
+- [ ] Keep read-only analysis automatic; any create/edit/delete capability may
+  only prepare a reviewable draft and requires explicit user confirmation.
+- [ ] Define tool-step, latency, token/cost, privacy, audit, failure and evaluation
+  budgets before enabling an agent loop in production.
+- [ ] Keep payments, transfers of real money, trading and autonomous financial
+  actions outside Artha's authority.
 
 ## Release blockers before real financial data
 

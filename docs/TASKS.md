@@ -139,7 +139,10 @@ work. Full rationale and acceptance criteria:
   examples (`25k`, transfers and custom accounts) or replace it with a clearly
   manual-only offline demo contract.
 - [ ] Add optional WhatsApp or Telegram capture.
-- [ ] Add investments, liabilities and net-worth tracking.
+- [ ] Add a future **Investments** tab, starting with mutual funds and stocks;
+  approve the detailed tracking, valuation and import scope during sprint planning.
+- [ ] Plan the future bounded agentic evolution of Ask Artha in a dedicated
+  sprint; do not add a multi-step agent runtime to the current messaging release.
 
 ### Definition of done for every task
 
@@ -254,6 +257,13 @@ work. Full rationale and acceptance criteria:
 - [x] Return validated metric, chart and transaction-table schemas.
 - [ ] Show evidence date range, source count and matching transactions.
 - [ ] Add evaluation cases for totals, comparisons and affordability questions.
+- [ ] Hold a dedicated sprint-planning session for agentic Ask Artha: define its
+  read-only tool catalogue, deterministic evidence contract, generative UI,
+  authority limits, privacy/audit model, cost/latency budgets and evaluations.
 - [x] Build versioned fictional capture, auto-tag and assistant benchmarks and select Gemini for the pilot from measured results.
 - [ ] Add optional Telegram/WhatsApp capture adapter.
-- [ ] Add investments, liabilities and net-worth model.
+- [ ] Add a top-level **Investments** tab for mutual funds and stocks first;
+  track holdings, invested/current value, gain/loss, allocation and valuation
+  timestamps before expanding to liabilities and broader net worth.
+- [ ] Keep investment V1 tracking-only: no trading, investment advice, tax
+  calculation or autonomous transactions.
