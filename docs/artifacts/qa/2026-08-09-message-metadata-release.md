@@ -41,6 +41,10 @@ Focused feature evidence:
 - API assistant, production routes and metadata: 122 checks passed.
 - Metadata capture evaluation: 10 evaluation-runner tests passed and 60 cases
   validated.
+- Independent branch review findings were corrected before publication:
+  descending merchant-rule priority, category-correction provenance, strict
+  confirmation metadata/tag validation, accurate clarification actions, and
+  optional platform/subcategory clearing now have regression coverage.
 
 The linked Vercel API project confirms that a production Gemini key is present,
 but Vercel marks it sensitive and does not export the raw value through either

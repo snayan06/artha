@@ -496,14 +496,23 @@ export function isCaptureClarification(result: CaptureResult): result is Capture
 
 function toApiDraft(draft: TransactionDraft): JsonObject {
   const memberTotalPaise = draft.memberSplits.reduce((sum, split) => sum + split.amountPaise, 0)
+  const reviewedEvidence = draft.metadata
+    ? Object.entries(draft.metadata.evidence).filter(([field]) => (
+        (field !== 'platform' || Boolean(draft.platform?.trim()))
+        && (field !== 'subcategory' || Boolean(draft.subcategory?.trim()))
+      ))
+    : []
   const reviewedMetadata = draft.metadata ? {
     version: 1,
-    evidence: Object.fromEntries(Object.entries(draft.metadata.evidence).map(([field, evidence]) => [field, {
+    evidence: Object.fromEntries(reviewedEvidence.map(([field, evidence]) => [field, {
       source: 'user_corrected',
       confidence: evidence?.confidence,
       review_status: 'reviewed'
     }])),
-    attributes: draft.metadata.attributes.map((attribute) => ({
+    attributes: draft.metadata.attributes.filter((attribute) => (
+      attribute.value.trim()
+      && (attribute.key !== 'order_channel' || Boolean(draft.platform?.trim()))
+    )).map((attribute) => ({
       key: attribute.key,
       value: attribute.value,
       source: 'user_corrected',

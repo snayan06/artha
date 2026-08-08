@@ -197,6 +197,17 @@ describe('QuickAddPage', () => {
     await user.selectOptions(screen.getByLabelText('Category'), 'Other')
     expect(screen.queryByRole('heading', { name: 'Suggested category' })).not.toBeInTheDocument()
     expect(screen.queryByText("Burger King is in Artha's food merchant catalog.")).not.toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Platform'))
+    await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    const submitted = onConfirm.mock.calls[0]?.[0] as TransactionDraft
+    expect(submitted.platform).toBeUndefined()
+    expect(submitted.metadata?.evidence.platform).toBeUndefined()
+    expect(submitted.metadata?.attributes).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'order_channel' })
+    ]))
+    expect(submitted.metadata?.evidence.category).toMatchObject({ source: 'user_corrected' })
   })
 
   it('offers a form-first entry with an explicit date picker', async () => {

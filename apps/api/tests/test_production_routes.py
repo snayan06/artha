@@ -741,6 +741,7 @@ def test_production_confirmation_rejects_untrusted_or_redundant_metadata() -> No
             amount_paise=10_000,
             description="Date Night",
             category="Food & Dining",
+            metadata=ReviewedMetadata(),
             tags=[
                 SuggestedTag(
                     name="Date Night",
@@ -761,6 +762,17 @@ def test_production_confirmation_rejects_untrusted_or_redundant_metadata() -> No
             description="Dinner",
             category="Food & Dining",
             platform="   ",
+            personal_share_paise=10_000,
+            source_account_id=ACCOUNT_ID,
+        )
+
+    with pytest.raises(ValidationError, match="structured fields require metadata"):
+        ProductionDraft(
+            kind="expense",
+            amount_paise=10_000,
+            description="Dinner",
+            category="Food & Dining",
+            platform="Zomato",
             personal_share_paise=10_000,
             source_account_id=ACCOUNT_ID,
         )
@@ -1197,6 +1209,23 @@ def test_category_clarification_points_to_the_form_without_fake_choices() -> Non
     assert result["choices"] == []
     assert result["explanation"] == (
         "Open the form below and choose a category. Nothing has been saved."
+    )
+
+    kind_result = production_routes.capture_clarification_response(
+        CaptureClarification(
+            outcome="clarify",
+            question="untrusted model wording",
+            missing=["kind"],
+            amount_paise=54_000,
+            description="Zomato",
+        ),
+        source_text="Zomato 540",
+        accounts=[],
+        parser_source="gemini:test-model",
+    )
+    assert kind_result["choices"] == []
+    assert kind_result["explanation"] == (
+        "Open the form below and choose the movement type. Nothing has been saved."
     )
 
 

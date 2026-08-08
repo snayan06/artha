@@ -133,7 +133,9 @@ def capture_clarification_response(
         explanation = "Add the amount to continue. Nothing has been saved."
     elif missing_field == "kind":
         question = "Was this money spent, received, or transferred?"
-        explanation = "Choose the movement type to continue. Nothing has been saved."
+        explanation = (
+            "Open the form below and choose the movement type. Nothing has been saved."
+        )
     elif missing_field == "description":
         question = "What was this transaction for?"
         explanation = "Add a short description to continue. Nothing has been saved."
@@ -262,6 +264,8 @@ class ProductionDraft(BaseModel):
             raise ValueError("income cannot contain expense metadata or tags")
         if self.kind != "transfer" and self.category is None:
             raise ValueError("expense and income require a category")
+        if self.metadata is None and (self.platform or self.subcategory or self.tags):
+            raise ValueError("structured fields require metadata")
         review_statuses = [
             *(item.review_status for item in (self.metadata.attributes if self.metadata else [])),
             *(

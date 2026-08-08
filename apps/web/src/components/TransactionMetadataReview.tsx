@@ -17,14 +17,21 @@ export function TransactionMetadataReview({
     field: 'merchant' | 'platform' | 'subcategory',
     value: string
   ) => {
-    const normalized = value || undefined
+    const normalized = value.trim() ? value : undefined
+    const evidence = { ...draft.metadata?.evidence }
+    if (field !== 'merchant' && normalized === undefined) delete evidence[field]
+    else evidence[field] = correctedEvidence
+    const attributes = field === 'platform' && normalized === undefined
+      ? (draft.metadata?.attributes ?? []).filter((attribute) => attribute.key !== 'order_channel')
+      : (draft.metadata?.attributes ?? [])
     onChange({
       ...draft,
       [field]: field === 'merchant' ? value : normalized,
       metadata: draft.metadata
         ? {
             ...draft.metadata,
-            evidence: { ...draft.metadata.evidence, [field]: correctedEvidence }
+            evidence,
+            attributes
           }
         : draft.metadata
     })
