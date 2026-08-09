@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -227,6 +228,50 @@ async def test_managed_account_listing_can_include_archived_rows() -> None:
 
     assert rows[0]["current_balance_paise"] == 50_000
     assert "is_archived" not in client.params_by_path["accounts"]
+
+
+@pytest.mark.parametrize("operation", ["create_managed_account", "update_managed_account"])
+async def test_managed_account_duplicate_name_has_a_clear_recoverable_error(
+    operation: str,
+) -> None:
+    class DuplicateAccountClient(FakeAccountManagementClient):
+        async def rpc(
+            self, name: str, payload: dict[str, Any] | None = None
+        ) -> Any:
+            if name == operation:
+                raise HTTPException(
+                    status_code=409,
+                    detail="database write conflicts with existing data",
+                )
+            return await super().rpc(name, payload)
+
+    client = DuplicateAccountClient()
+
+    with pytest.raises(HTTPException) as error:
+        if operation == "create_managed_account":
+            await production_routes.create_managed_account(
+                payload=production_routes.AccountCreate(
+                    name="Known Bank",
+                    kind="bank",
+                    opening_balance_paise=0,
+                ),
+                idempotency_key="account-create-duplicate-0001",
+                client=cast(SupabaseRestClient, client),
+                auth=AuthContext(user_id=USER_ID),
+            )
+        else:
+            await production_routes.update_managed_account(
+                account_id=UUID(ACCOUNT_ID),
+                payload=production_routes.ManagedAccountUpdateRequest(
+                    name="Known Bank"
+                ),
+                idempotency_key="account-update-duplicate-0001",
+                client=cast(SupabaseRestClient, client),
+                auth=AuthContext(user_id=USER_ID),
+            )
+
+    assert error.value.status_code == 409
+    assert error.value.detail == "An active account with this name already exists."
 
 
 async def test_balance_reconciliation_calls_owner_only_adjustment_rpc() -> None:
