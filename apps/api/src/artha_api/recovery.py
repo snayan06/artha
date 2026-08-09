@@ -117,6 +117,8 @@ class RecoveryTransaction(RecoveryModel):
         "transfer_in",
         "settlement_out",
         "settlement_in",
+        "adjustment_in",
+        "adjustment_out",
     ]
     amount_paise: int = Field(gt=0)
     currency: str = Field(pattern=r"^[A-Z]{3}$")

@@ -675,19 +675,16 @@ export async function restoreRecoveryBundle(bundle: RecoveryBundle, idempotencyK
   }
 }
 
-export async function getManagedAccounts(): Promise<ManagedAccount[]> {
-  const raw = await request<unknown>('/api/v1/accounts?include_archived=true')
-  const rows = Array.isArray(raw) ? raw : []
-  return rows.flatMap((item) => {
-    if (!isJsonObject(item)) return []
+function mapManagedAccount(item: unknown): ManagedAccount | null {
+    if (!isJsonObject(item)) return null
     const id = entityId(item.id)
     const kind = item.kind ?? item.account_type
     if (
       id === undefined
       || !isBoundedText(item.name, 80)
       || (kind !== 'bank' && kind !== 'cash' && kind !== 'wallet' && kind !== 'credit_card' && kind !== 'other')
-    ) return []
-    const managed: ManagedAccount = {
+    ) return null
+    return {
       id,
       name: item.name,
       kind,
@@ -699,8 +696,42 @@ export async function getManagedAccounts(): Promise<ManagedAccount[]> {
       paymentDueDay: typeof item.payment_due_day === 'number' ? item.payment_due_day : null,
       isArchived: item.is_archived === true
     }
-    return [managed]
+}
+
+export async function getManagedAccounts(): Promise<ManagedAccount[]> {
+  const raw = await request<unknown>('/api/v1/accounts?include_archived=true')
+  return (Array.isArray(raw) ? raw : []).flatMap((item) => {
+    const account = mapManagedAccount(item)
+    return account ? [account] : []
   })
+}
+
+async function managedAccountMutation(path: string, method: 'POST' | 'PATCH', body?: unknown): Promise<ManagedAccount> {
+  const raw = await request<unknown>(path, {
+    method,
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+  })
+  const account = mapManagedAccount(raw)
+  if (!account) throw new Error('Artha returned an invalid account.')
+  return account
+}
+
+export function createManagedAccount(input: AccountSetupInput): Promise<ManagedAccount> {
+  return managedAccountMutation('/api/v1/accounts', 'POST', input)
+}
+
+export function updateManagedAccount(accountId: EntityId, input: { name: string; creditLimitPaise: number | null; statementDay: number | null; paymentDueDay: number | null }): Promise<ManagedAccount> {
+  return managedAccountMutation(`/api/v1/accounts/${encodeURIComponent(String(accountId))}`, 'PATCH', {
+    name: input.name,
+    credit_limit_paise: input.creditLimitPaise,
+    statement_day: input.statementDay,
+    payment_due_day: input.paymentDueDay
+  })
+}
+
+export function setManagedAccountArchived(accountId: EntityId, archived: boolean): Promise<ManagedAccount> {
+  return managedAccountMutation(`/api/v1/accounts/${encodeURIComponent(String(accountId))}/${archived ? 'archive' : 'restore'}`, 'POST')
 }
 
 export async function reconcileAccountBalance(
@@ -717,16 +748,9 @@ export async function reconcileAccountBalance(
       occurred_at: input.occurredAt
     })
   })
-  if (!isJsonObject(raw)) throw new Error('Artha returned an invalid account.')
-  const mapped = await Promise.resolve([raw]).then((rows) => rows.flatMap((item) => {
-    const id = entityId(item.id)
-    const kind = item.kind ?? item.account_type
-    if (id === undefined || !isBoundedText(item.name, 80) || (kind !== 'bank' && kind !== 'cash' && kind !== 'wallet' && kind !== 'credit_card' && kind !== 'other')) return []
-    const managed: ManagedAccount = { id, name: item.name, kind, currency: stringValue(item.currency, 'INR'), openingBalancePaise: numberValue(item.opening_balance_paise), currentBalancePaise: numberValue(item.current_balance_paise), creditLimitPaise: typeof item.credit_limit_paise === 'number' ? item.credit_limit_paise : null, statementDay: typeof item.statement_day === 'number' ? item.statement_day : null, paymentDueDay: typeof item.payment_due_day === 'number' ? item.payment_due_day : null, isArchived: item.is_archived === true }
-    return [managed]
-  }))
-  if (!mapped[0]) throw new Error('Artha returned an invalid account.')
-  return mapped[0]
+  const account = mapManagedAccount(raw)
+  if (!account) throw new Error('Artha returned an invalid account.')
+  return account
 }
 
 export async function getAccounts(): Promise<LedgerAccount[]> {
