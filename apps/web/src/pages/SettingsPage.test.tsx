@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../lib/api'
 import { RouterProvider } from '../lib/router'
@@ -80,5 +80,19 @@ describe('SettingsPage', () => {
     expect(within(region).getByText('Salary Bank')).toBeVisible()
     expect(within(region).getByText('₹1,250')).toBeVisible()
     expect(within(region).getByRole('button', { name: /Set actual balance for Salary Bank/i })).toBeVisible()
+  })
+
+  it('keeps account input and shows a recoverable create error', async () => {
+    vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({ configured: true, provider: 'gemini', model: 'test', available: true, dataPolicy: 'private_approved', personalDataEnabled: true, isDemo: false })
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
+    vi.spyOn(api, 'createManagedAccount').mockRejectedValue(new Error('An account with this name already exists.'))
+    render(<RouterProvider><SettingsPage /></RouterProvider>)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add account or card' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'ICICI Bank' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add account' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already exists/i)
+    expect(screen.getByLabelText('Name')).toHaveValue('ICICI Bank')
   })
 })
