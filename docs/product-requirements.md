@@ -1,6 +1,6 @@
 # Artha — MVP Product Requirements Document
 
-Status: V1 private pilot; current product contract
+Status: V1 personal release; current product contract
 Date: 7 August 2026
 Product type: Private, shared money-tracking PWA with conversational capture
 
@@ -300,7 +300,7 @@ All money values use integer paise, never floating-point numbers.
 | Natural-language capture | Gemini via the official Google SDK, grounded in authenticated household context | Strict validated unsaved drafts; preserved text and manual form when interpretation is unavailable |
 | Category grounding | Gemini capture plus a bounded standalone API | Server-owned authenticated household categories; standalone API is not called by V1 web |
 | Source + CI | GitHub Free + GitHub Actions | Version control and automated checks |
-| Observability | Privacy-filtered Vercel analytics and structured server logs | Current private-pilot visibility without financial payloads |
+| Observability | Privacy-filtered Vercel analytics and structured server logs | Current personal-release visibility without financial payloads |
 | Domain | `*.vercel.app` initially | ₹0; a custom domain is optional and normally paid |
 
 ### Planned architecture additions

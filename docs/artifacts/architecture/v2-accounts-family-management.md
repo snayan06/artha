@@ -1,8 +1,21 @@
 # Accounts & family management architecture
 
-Date: 6 August 2026  
-Status: implementation design; no production code implemented by this artifact  
+Date: 10 August 2026
+Status: account/card owner-maintenance slice implemented in PR #27; participant and invitation slices remain planned
 Scope: owner-managed accounts, cards, household profile and non-login participants
+
+## Implementation status
+
+The shipped slice covers account/card listing, creation, editing, reversible
+archive/restore and append-only balance reconciliation. FastAPI exposes the
+owner-scoped endpoints, Supabase owns authorization and atomic writes, and the
+Settings UI keeps failed edits recoverable. Every mutation has exact replay
+semantics, request-hash conflict detection and a shared per-account lock with
+ledger writes and voids.
+
+This artifact remains the target design for household/profile editing,
+participant lifecycle management and invitations. Those parts are not implied
+to be implemented by the account/card release.
 
 ## Outcome
 

@@ -34,7 +34,7 @@ Sprint 1 dependency.
 | Structured Gemini features | Production verified | Grounded capture and read-only metric/chart responses passed; hosted fictional gates remain 50/50, 30/30 and 24/24 |
 | Parser evaluation dataset | Done | 60 fictional cases, including merchant/platform/context/tag scenarios, plus an automated contract checker are in the repository |
 | Private AI learning/eval ledger | Priority next | Audited private interactions, user corrections, token budgets and eval runs need RLS-backed storage, export/delete controls and sanitized dataset promotion |
-| Accounts & family | Next implementation track | Product contract and secure architecture are complete; owner maintenance ships before invitations |
+| Accounts & family | Release candidate | Account/card maintenance and audited balance reconciliation are implemented; the production database is migrated and PR #27 is green, while main deployment and signed-in browser acceptance remain |
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
@@ -163,10 +163,10 @@ and [`artifacts/architecture/v2-accounts-family-management.md`](artifacts/archit
 
 | ID | Status | Task | Depends on | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| S2-01 | Next | Owner-only **Accounts & family** settings snapshot and responsive route | Sprint 1 production acceptance | Returning owner sees active/archived server data; non-owner gets `403` |
-| S2-02 | Planned | Add, rename, archive and restore banks, cash, wallets and cards | S2-01 | Immutable type/currency, duplicate-name and non-zero/archive rules pass |
-| S2-03 | Planned | Update card limit, statement day and due day | S2-02 | Card-only validation and over-limit warning pass |
-| S2-04 | Planned | Audited balance correction using append-only adjustment movements | S2-02 | Balance changes exactly; income/spend/splits remain unchanged |
+| S2-01 | Release candidate | Owner-only **Accounts & family** settings snapshot and responsive route | Sprint 1 production acceptance | Automated owner boundary and UI states pass; deployed responsive acceptance remains |
+| S2-02 | Release candidate | Add, rename, archive and restore banks, cash, wallets and cards | S2-01 | Immutable type/currency, duplicate-name, zero-balance archive and retry rules pass |
+| S2-03 | Release candidate | Update card limit, statement day and due day | S2-02 | Card-only validation and recoverable errors pass |
+| S2-04 | Release candidate | Audited balance correction using append-only adjustment movements | S2-02 | Remote rollback-safe SQL proves balance-only movement; deployed browser acceptance remains |
 | S2-05 | Planned | Add, rename, deactivate and restore non-login participants | S2-01 | Historical splits survive; unsettled people cannot be deactivated |
 
 ### Sprint 2B — family access

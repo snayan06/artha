@@ -3,23 +3,22 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff and release guard.
 
-Updated: 8 August 2026
+Updated: 10 August 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
 
 ## Live launch status
 
-**Current stage:** V1, AI-primary and capture hardening are live at merge
-`c4ae0dc`. Final-domain fictional QA passed, but do not enter real financial
+**Current stage:** V1, AI-primary, capture hardening and unified entry are live
+at merge `e32b5b6`. Final-domain fictional QA passed, but do not enter real financial
 data until every remaining P0 security, recovery and privacy item below is
 complete.
 
-**Current candidate:** `codex/message-ux` adds password sign-in, server-verified
-demo-account separation, safe composer behavior, grounded capture continuation,
-reviewed structured metadata, honest progress messages, a manager-ready
-architecture pack and 60 capture evaluation cases. It remains unpublished until
-PR, CI, merge, deployment and final-domain acceptance complete.
+**Current candidate:** PR #27 adds post-onboarding account/card maintenance and
+audited balance reconciliation. The correct production database has all four
+new migrations, schema lint and rollback-safe SQL behavior checks; application
+merge, production deployment and signed-in browser acceptance remain.
 
 - [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
 - [x] Obtain fresh green `main` CI run `31271421128` and CodeQL run
@@ -76,14 +75,14 @@ without losing the submitted text.
    - [ ] Restore a downloaded encrypted backup into a fresh/empty production household.
    - Done when: recovery evidence, final URLs and the signed-off QA report are recorded.
 
-### P1 — private-pilot improvements
+### P1 — personal-release improvements
 
 - [x] Add a versioned 60-case sample capture/parser dataset and CI contract checker.
 - [x] Add deterministic and hosted-provider scoring runners with sanitized accuracy/error slices.
 - [ ] Add edit, correction and soft-delete controls to the UI for the existing API operations.
 - [ ] Show assistant evidence date range, source count and matching transactions.
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
-- [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the pilot model.
+- [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the production model.
 - [x] Select Gemini 3.5 Flash-Lite for sample-data evaluation and configure it server-side only.
 - [x] Remove deterministic production language parsing and fail into exact-text manual review without saving.
 - [x] Restrict assistant responses to approved intents and exact server-owned, database-grounded widget bundles.
@@ -238,7 +237,7 @@ work. Full rationale and acceptance criteria:
 - [x] Record remaining V1 limitations explicitly.
 - [x] Maintain a V1 QA matrix covering happy paths, financial invariants and edge cases.
 
-## Milestone 6 — Artha private-pilot launch
+## Milestone 6 — Artha personal release
 
 - [x] Rename the product, packages, environment variables and documentation from Artha's former working name.
 - [x] Select Vercel Hobby for the PWA/API plus Supabase Free; retain Render as a documented container fallback.
@@ -257,14 +256,14 @@ work. Full rationale and acceptance criteria:
 
 ## Assistant preview and V2
 
-- [ ] Add post-onboarding **Accounts & family** management.
-  - [ ] Let users add, rename and archive bank, cash and wallet accounts after initial setup.
-  - [ ] Let users add and update credit-card names, limits, statement days and payment due days.
-  - [ ] Record balance corrections as explicit audited adjustments; never silently rewrite an opening balance or transaction history.
+- [ ] Complete post-onboarding **Accounts & family** management.
+  - [x] Let users add, rename, archive and restore bank, cash and wallet accounts after initial setup.
+  - [x] Let users add and update credit-card names, limits, statement days and payment due days.
+  - [x] Record balance corrections as explicit audited adjustments; never silently rewrite an opening balance or transaction history.
   - [ ] Let users add, rename and deactivate non-login family participants used for splits.
   - [ ] Keep authenticated household invitations and roles as a separate authorization flow.
-  - [ ] Cover empty, duplicate-name, outstanding-over-limit and archived-account edge cases.
-  - [ ] Verify the management screens at 320 px, 390 px and desktop in light and dark modes.
+  - [x] Cover empty, duplicate-name, card-limit and archived-account edge cases in automated tests.
+  - [ ] Verify the deployed management screen at 320 px, 390 px and desktop in light and dark modes.
 - [ ] Invite selected participants as authenticated household members.
 - [x] Add Gemini through the official server-side SDK and retain explicit local
   Ollama for development; retire hosted alternate providers from active runtime.
@@ -275,7 +274,7 @@ work. Full rationale and acceptance criteria:
 - [ ] Hold a dedicated sprint-planning session for agentic Ask Artha: define its
   read-only tool catalogue, deterministic evidence contract, generative UI,
   authority limits, privacy/audit model, cost/latency budgets and evaluations.
-- [x] Build versioned fictional capture, auto-tag and assistant benchmarks and select Gemini for the pilot from measured results.
+- [x] Build versioned fictional capture, auto-tag and assistant benchmarks and select Gemini for production from measured results.
 - [ ] Add optional Telegram/WhatsApp capture adapter.
 - [ ] Add a top-level **Investments** tab for mutual funds and stocks first;
   track holdings, invested/current value, gain/loss, allocation and valuation
