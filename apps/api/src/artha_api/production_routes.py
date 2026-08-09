@@ -457,22 +457,6 @@ async def refreshed_account(
     return account
 
 
-async def managed_account_name_write(
-    client: SupabaseRestClient,
-    rpc_name: str,
-    payload: dict[str, Any],
-) -> Any:
-    try:
-        return await client.rpc(rpc_name, payload)
-    except HTTPException as error:
-        if error.status_code == status.HTTP_409_CONFLICT:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                "An active account with this name already exists.",
-            ) from error
-        raise
-
-
 @router.post("/api/v1/accounts", status_code=status.HTTP_201_CREATED, tags=["accounts"])
 async def create_managed_account(
     payload: AccountCreate,
@@ -483,7 +467,7 @@ async def create_managed_account(
     household_id = await current_household(client)
     assert household_id is not None
     await owner_member(client, household_id, auth.user_id)
-    created = await managed_account_name_write(client, "create_managed_account", {
+    created = await client.rpc("create_managed_account", {
         "p_household_id": household_id, "p_name": payload.name,
         "p_account_type": payload.kind.value,
         "p_opening_balance_paise": payload.opening_balance_paise,
@@ -506,7 +490,7 @@ async def update_managed_account(
     household_id = await current_household(client)
     assert household_id is not None
     await owner_member(client, household_id, auth.user_id)
-    await managed_account_name_write(client, "update_managed_account", {
+    await client.rpc("update_managed_account", {
         "p_household_id": household_id, "p_account_id": str(account_id),
         "p_name": payload.name, "p_credit_limit_paise": payload.credit_limit_paise,
         "p_statement_day": payload.statement_day,

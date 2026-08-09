@@ -9,6 +9,33 @@ from fastapi import HTTPException, Request, status
 
 from .auth import AuthContext
 
+GENERIC_DATABASE_CONFLICT = "database write conflicts with existing data"
+SAFE_DATABASE_CONFLICT_DETAILS = {
+    "an active account with this name already exists": (
+        "An active account with this name already exists."
+    ),
+    "idempotency key was already used for a different request": (
+        "This request was already used with different details. Please try again."
+    ),
+}
+
+
+def safe_database_conflict_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return GENERIC_DATABASE_CONFLICT
+    if not isinstance(payload, dict):
+        return GENERIC_DATABASE_CONFLICT
+    message = payload.get("message")
+    if not isinstance(message, str):
+        return GENERIC_DATABASE_CONFLICT
+    normalized = message.strip().casefold().removesuffix(".")
+    return SAFE_DATABASE_CONFLICT_DETAILS.get(
+        normalized,
+        GENERIC_DATABASE_CONFLICT,
+    )
+
 
 @dataclass(frozen=True, slots=True)
 class SupabaseRestSettings:
@@ -77,7 +104,8 @@ class SupabaseRestClient:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "database record was not found")
         if response.status_code == status.HTTP_409_CONFLICT:
             raise HTTPException(
-                status.HTTP_409_CONFLICT, "database write conflicts with existing data"
+                status.HTTP_409_CONFLICT,
+                safe_database_conflict_detail(response),
             )
         if response.status_code in {
             status.HTTP_400_BAD_REQUEST,
