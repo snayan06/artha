@@ -224,11 +224,13 @@ declare
   v_balance bigint;
 begin
   perform private.assert_account_owner(p_household_id);
-  select a.*, b.balance_paise into v_account, v_balance
+  select a into v_account
   from public.accounts a
-  join public.get_account_balances(p_household_id) b on b.account_id = a.id
   where a.id = p_account_id and a.household_id = p_household_id;
   if not found then raise exception 'account not found' using errcode = 'P0002'; end if;
+  select b.balance_paise into strict v_balance
+  from public.get_account_balances(p_household_id) b
+  where b.account_id = p_account_id;
   if p_archived and v_balance <> 0 then
     raise exception 'only a zero-balance account can be archived' using errcode = '22023';
   end if;
