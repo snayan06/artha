@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 9 August 2026, 02:47 IST
+Updated: 10 August 2026, 01:15 IST
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,9 +20,10 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: the combined message UX, structured metadata and unified-entry release
-is merged to production `main` as `e32b5b6`. PRs #23 and #24, main CI, CodeQL,
-both Vercel deployments and public smoke checks are green.**
+**Status: owner account/card maintenance and audited balance reconciliation are
+deployed from production `main` at `41b53b8`. PRs #27 and #28, main CI, CodeQL,
+both Vercel deployments, production database contracts, public smoke checks and
+signed-in Settings acceptance are green.**
 
 Do not enter real financial data yet. New and returning login, onboarding,
 financial flows, Gemini capture/assistant behavior, encrypted export, manual
@@ -34,12 +35,13 @@ release guards.
 | Surface | Current state |
 | --- | --- |
 | Combined message, metadata and unified-entry release | Deployed from `e32b5b6`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, strict text-only intent routing, shared composer and one-time Ask Artha handoff are live |
+| Accounts and cards | Deployed and accepted from `41b53b8`; add/edit, card details, zero-balance archive/restore, available credit and append-only audited balance reconciliation passed signed-in production acceptance |
 | Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
 | V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
-| Production `main` | Merge `e32b5b6`; release PRs [#23](https://github.com/snayan06/artha/pull/23) and [#24](https://github.com/snayan06/artha/pull/24) are merged with the earlier V1 releases |
-| GitHub checks | Main CI run [31278245585](https://github.com/snayan06/artha/actions/runs/31278245585) passed Web/API/SQL; CodeQL run [31278245587](https://github.com/snayan06/artha/actions/runs/31278245587) passed JavaScript/TypeScript and Python analysis for `e32b5b6` |
-| Vercel | Web deployment `dpl_3N9eY6NL57ZGjbhzqbwXA6FqvGsv` and API deployment `dpl_4cULJbxRhDrSQHojiYKYAS4Lhw6A` are Ready for `e32b5b6`; the public web and API health URLs return `200` |
+| Production `main` | Merge `41b53b8`; account release PRs [#27](https://github.com/snayan06/artha/pull/27) and [#28](https://github.com/snayan06/artha/pull/28) are merged with the earlier V1 releases |
+| GitHub checks | Main CI run [31332275508](https://github.com/snayan06/artha/actions/runs/31332275508) passed Web/API/runtime SQL; CodeQL run [31332275498](https://github.com/snayan06/artha/actions/runs/31332275498) passed JavaScript/TypeScript and Python analysis for `41b53b8` |
+| Vercel | Both production deployments completed for `41b53b8`; the public web, Settings and API health URLs return `200` |
 | Supabase RPC catalog | The exact `artha-production` project now resolves balances, logical activity, encrypted export and atomic restore RPCs |
 | Public checks | API health and web return `200`; anonymous catalog probes resolve both required ledger RPCs without exposing ledger data |
 | Authenticated journey | New-user magic link, returning-user link, session persistence, sign-out and restored server-owned onboarding passed with fictional data |
@@ -81,7 +83,7 @@ release guards.
 - [x] Download a client-side encrypted final-domain backup with fictional data.
 - [ ] Restore that backup into a fresh/empty production household and compare totals.
 - [ ] Approve a real-data privacy configuration before entering real family-finance text.
-- [ ] Begin S2-01 owner-only **Accounts & family** settings after the acceptance gate.
+- [x] Deploy and accept S2-01 through S2-04 owner account/card maintenance and audited reconciliation.
 
 ## Completed in the deployed release and local hardening follow-up
 
@@ -112,16 +114,16 @@ release guards.
 ## Verification checkpoint
 
 ```text
-Current production release web: 20 files, 206 tests passed
-Current production release API: 275 tests passed
+Current production release web: 20 files, 208 tests passed
+Current production release API: 280 tests passed
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
-SQL: 8 migrations, seed and 4 SQL contract tests parsed
+SQL: 12 migrations, seed and 6 SQL contract tests parsed; runtime account behavior contracts passed locally, in PR CI and against production
 AI contracts: 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases valid
 Fresh hosted Gemini gate: intent routing completed 49/49 with 48/49 exact, 100% safety accuracy and zero false captures; combined capture rerun remains
 Hardening recovery: focused automated Expense/Income/Transfer, category allow-list, context-retry and provider-unavailable tests pass; final-domain manual Expense/Income/Transfer recovery passed; real provider unavailability remains
 Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
-Production release: PRs #23 and #24 merged as e32b5b6; main CI 31278245585, CodeQL 31278245587 and both web/API Vercel deployments are green
+Production release: PRs #27 and #28 merged as 41b53b8; main CI 31332275508, CodeQL 31332275498 and both web/API Vercel deployments are green
 Release acceptance: isolated fictional browser QA passed routed capture, Ask Artha and mixed-intent choice at 390 px and 1440 px; signed-in final-domain user acceptance remains
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
@@ -131,7 +133,8 @@ Financial production: expense, income, transfer, card, backdate, split, filters 
 Gemini production: grounded ₹123 expense, 25k income, 25k transfer and exact-balance assistant responses passed with fictional data on c4ae0dc
 ```
 
-Detailed evidence: [unified-entry production release](artifacts/qa/2026-08-09-unified-entry-production-release.md),
+Detailed evidence: [account management production release](artifacts/qa/2026-08-10-account-management-production-release.md),
+[unified-entry production release](artifacts/qa/2026-08-09-unified-entry-production-release.md),
 [capture-hardening production acceptance](artifacts/qa/2026-08-08-capture-hardening-production-acceptance.md)
 and [Sprint 1 reliability batch](artifacts/qa/2026-08-05-reliability-batch.md).
 
@@ -193,6 +196,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 10 Aug 2026 | Merged account management PR #27 and conflict-guidance hotfix PR #28 as `41b53b8`. Applied and behavior-tested all account migrations against the exact production database, passed 208 web + 280 API local tests, main CI `31332275508`, CodeQL `31332275498`, both production deployments and signed-in duplicate/edit/reconciliation/mobile acceptance. |
 | 9 Aug 2026 | Merged combined PRs #23 and #24 as `e32b5b6`. Main CI `31278245585`, CodeQL `31278245587`, both exact-SHA Vercel deployments and public web/API smoke checks passed. Fresh local gate passed 206 web, 275 API and 60/30/24/49 AI contracts. Hosted intent routing reached 48/49 exact, 100% safety and zero false captures. Isolated fictional browser QA passed routed capture, routed Ask Artha and mixed-intent choice at 390 px and 1440 px; signed-in user acceptance of the new routing remains. |
 | 9 Aug 2026 | Implemented the message/metadata release candidate on `codex/message-ux`: safe Enter/Shift+Enter/IME behavior, grounded one-question capture continuation, merchant/platform/category precedence, bounded reviewed context and optional tags, truthful Quick Add/Ask Artha progress messages, versioned JSON persistence, 60 capture evals and a clean manager-ready editable architecture pack. Fresh local gate: 184 web, 256 API, build, SQL and 60/30/24 keyless AI contracts. Hosted Gemini completed all 60 baseline capture cases with 50/60 exact and 94.3% structured-field accuracy; the affected metadata path now canonicalizes labels case-insensitively, derives only explicit safe attributes/tags, lets the safe platform catalog own order-channel values and never defaults an unmentioned account. The combined full hosted rerun remains. The candidate is published as PR #23 but is intentionally not merged or deployed while the companion feature is completed. |
 | 9 Aug 2026 | Prepared the approved message-UX and structured-transaction-metadata design on isolated branch `codex/message-ux` from current `origin/main`. The design covers composer keyboard safety, contextual capture continuation, warm accessible messaging, visible category reasoning, distinct merchant/platform/subcategory/tag taxonomy, bounded field evidence, normalized household tags/aliases, RLS/recovery/analytics/eval coverage and fictional final-domain acceptance. This is design-only and unpublished; no product code, migration, remote branch, PR or deployment was created before the work was handed back to the parent task. |

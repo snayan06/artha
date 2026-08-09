@@ -10,15 +10,15 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** V1, AI-primary, capture hardening and unified entry are live
-at merge `e32b5b6`. Final-domain fictional QA passed, but do not enter real financial
+**Current stage:** V1, AI-primary, unified entry and owner account/card
+maintenance are live at merge `41b53b8`. Final-domain signed-in QA passed, but do not enter real financial
 data until every remaining P0 security, recovery and privacy item below is
 complete.
 
-**Current candidate:** PR #27 adds post-onboarding account/card maintenance and
-audited balance reconciliation. The correct production database has all four
-new migrations, schema lint and rollback-safe SQL behavior checks; application
-merge, production deployment and signed-in browser acceptance remain.
+**Current account release:** PRs #27 and #28 add post-onboarding account/card
+maintenance, audited balance reconciliation and clear recoverable uniqueness
+guidance. The exact production database, main CI/CodeQL, both deployments and
+signed-in Settings acceptance are green.
 
 - [x] Public GitHub repository and CI/CodeQL workflows created under `snayan06/artha`.
 - [x] Obtain fresh green `main` CI run `31271421128` and CodeQL run
@@ -95,6 +95,8 @@ without losing the submitted text.
 - [ ] Re-run the hosted fictional Gemini gates for the hardening follow-up.
 - [x] Publish the hardening follow-up and repeat final-domain manual Expense,
   Income, Transfer and exact-text manual-recovery acceptance.
+- [x] Deploy and accept owner account/card maintenance, available credit,
+  zero-balance archive/restore and audited balance reconciliation.
 - [ ] Exercise real provider-unavailable recovery on the final domain.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
 - [x] Add safe Enter/Shift+Enter/IME composer behavior without keyboard confirmation.
@@ -103,7 +105,8 @@ without losing the submitted text.
   with rule/catalog/model precedence and atomic versioned JSON persistence.
 - [x] Add truthful Quick Add and Ask Artha progress messages without exposing
   model chain-of-thought.
-- [ ] Publish and accept the message/metadata candidate on the final domain.
+- [x] Publish the message/metadata release on the final domain; signed-in routed
+  entry acceptance remains tracked separately in the Sprint 1 release guards.
 
 ### Net-new gaps from the senior product audit
 
@@ -256,14 +259,16 @@ work. Full rationale and acceptance criteria:
 
 ## Assistant preview and V2
 
-- [ ] Complete post-onboarding **Accounts & family** management.
+- [ ] Complete post-onboarding **Accounts & family** management; owner money
+  sources are live, while participant maintenance and invitations remain.
   - [x] Let users add, rename, archive and restore bank, cash and wallet accounts after initial setup.
   - [x] Let users add and update credit-card names, limits, statement days and payment due days.
   - [x] Record balance corrections as explicit audited adjustments; never silently rewrite an opening balance or transaction history.
   - [ ] Let users add, rename and deactivate non-login family participants used for splits.
   - [ ] Keep authenticated household invitations and roles as a separate authorization flow.
   - [x] Cover empty, duplicate-name, card-limit and archived-account edge cases in automated tests.
-  - [ ] Verify the deployed management screen at 320 px, 390 px and desktop in light and dark modes.
+  - [x] Verify the deployed management screen at mobile and desktop widths in
+    the existing light/dark responsive sweep, including a fresh signed-in dark mobile check.
 - [ ] Invite selected participants as authenticated household members.
 - [x] Add Gemini through the official server-side SDK and retain explicit local
   Ollama for development; retire hosted alternate providers from active runtime.

@@ -24,7 +24,7 @@ shared family expenses consistent.
 | **Problem** | Logging is tedious, transfers get mistaken for spending, and shared bills distort personal totals |
 | **Promise** | Capture a transaction in seconds, see exactly what Artha understood, and save only after explicit confirmation |
 | **Current scope** | A private personal ledger with non-login participants for expense splits |
-| **Next scope** | Post-onboarding account management, audited corrections and invited family access |
+| **Next scope** | Transaction correction, shared settlements and invited family access |
 | **Live app** | [Web app](https://artha-web-one.vercel.app) · [API health](https://artha-api-mu.vercel.app/health) |
 
 ## Why Artha?
@@ -95,6 +95,8 @@ the assistant shows an honest error when its model is unavailable.
 - Installable React and TypeScript PWA with responsive bottom navigation.
 - Dashboard balances, six-month cash-flow chart and recent activity.
 - First-run setup for multiple bank, cash, wallet and credit-card accounts.
+- Post-onboarding account/card maintenance with available-credit summaries,
+  zero-balance archive/restore and audited balance reconciliation.
 - Equal expense splits across the selected household participants.
 - Read-only Gemini assistant with safe inline metrics, charts and tables.
 - Honest progress messages while capture and Ask Artha prepare reviewable results;
@@ -311,7 +313,7 @@ The current ordered status and named blockers are in the
 ## Roadmap
 
 - Complete final-domain encrypted restore and two-household isolation drills.
-- Post-onboarding account/card/participant management and audited corrections.
+- Participant management, audited transaction corrections and shared settlements.
 - Member invitations and collaborative household access.
 - Optional WhatsApp or Telegram draft capture.
 - Investments, liabilities and net-worth tracking.
