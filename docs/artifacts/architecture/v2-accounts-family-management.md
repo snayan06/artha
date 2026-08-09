@@ -1,12 +1,12 @@
 # Accounts & family management architecture
 
 Date: 10 August 2026
-Status: account/card owner-maintenance slice implemented in PR #27; participant and invitation slices remain planned
+Status: account/card owner-maintenance slice deployed through PRs #27/#28; participant and invitation slices remain planned
 Scope: owner-managed accounts, cards, household profile and non-login participants
 
 ## Implementation status
 
-The shipped slice covers account/card listing, creation, editing, reversible
+The deployed slice covers account/card listing, creation, editing, reversible
 archive/restore and append-only balance reconciliation. FastAPI exposes the
 owner-scoped endpoints, Supabase owns authorization and atomic writes, and the
 Settings UI keeps failed edits recoverable. Every mutation has exact replay
@@ -47,11 +47,11 @@ participant record into a login identity.
 9. An account with a non-zero derived balance cannot be archived.
 10. A participant with an unsettled shared balance cannot be deactivated.
 
-## Current-state findings
+## Baseline findings before owner maintenance
 
 ### Database
 
-The production schema already has most reference data:
+Before PR #27, the production schema already had most reference data:
 
 - `accounts` stores name, type, currency, opening balance, credit limit,
   statement day, payment due day, archive flag and timestamps;
@@ -62,13 +62,17 @@ The production schema already has most reference data:
 - `audit_events` is append-only and suitable for management audit records;
 - a trigger prevents removal of the final active owner.
 
-There are four important gaps:
+The baseline review found four important gaps:
 
 1. account and participant lifecycle rows do not record who archived them or
    when;
 2. active participant names are not uniquely constrained at the database layer;
 3. there is no append-only balance-correction movement;
 4. there is no replay receipt for idempotent reference-data mutations.
+
+The deployed account/card slice closes the account-side audit, append-only
+adjustment and replay gaps. Participant lifecycle audit and participant-name
+uniqueness remain part of S2-05.
 
 ### Security boundary
 

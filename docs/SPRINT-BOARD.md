@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 9 August 2026
+Updated: 10 August 2026
 Goal: make personal production use trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -25,7 +25,7 @@ Sprint 1 dependency.
 | AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
 | V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
 | Message UX and metadata | Deployed | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are live from `e32b5b6` |
-| Public repository and CI | Done for current release | Main CI `31278245585` and CodeQL `31278245587` passed for `e32b5b6` |
+| Public repository and CI | Done for current release | Main CI `31332275508` and CodeQL `31332275498` passed for `41b53b8` |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
 | Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
 | Server-owned onboarding/profile | Done for one fictional identity | Profile, household and participants returned from the server without repeating onboarding |
@@ -34,10 +34,10 @@ Sprint 1 dependency.
 | Structured Gemini features | Production verified | Grounded capture and read-only metric/chart responses passed; hosted fictional gates remain 50/50, 30/30 and 24/24 |
 | Parser evaluation dataset | Done | 60 fictional cases, including merchant/platform/context/tag scenarios, plus an automated contract checker are in the repository |
 | Private AI learning/eval ledger | Priority next | Audited private interactions, user corrections, token budgets and eval runs need RLS-backed storage, export/delete controls and sanitized dataset promotion |
-| Accounts & family | Release candidate | Account/card maintenance and audited balance reconciliation are implemented; the production database is migrated and PR #27 is green, while main deployment and signed-in browser acceptance remain |
+| Accounts & family | Owner maintenance deployed and accepted | PRs #27/#28 are merged at `41b53b8`; account/card maintenance, available credit, append-only balance reconciliation, production database behavior and signed-in mobile Settings acceptance passed |
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
-| Accounts/cards management after onboarding | Backlog | Detailed V2 settings task is recorded |
+| Accounts/cards management after onboarding | Done for owner | Add/edit, card details, zero-balance archive/restore and audited reconciliation are live; participant maintenance and invitations remain separate slices |
 | Production acceptance | In progress | Public production and fictional routed-flow QA passed; signed-in user acceptance of the new entry flow, two-owner isolation, fresh-household encrypted restore and real provider-unavailable recovery remain |
 
 ## Senior product audit — net-new additions
@@ -163,10 +163,10 @@ and [`artifacts/architecture/v2-accounts-family-management.md`](artifacts/archit
 
 | ID | Status | Task | Depends on | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| S2-01 | Release candidate | Owner-only **Accounts & family** settings snapshot and responsive route | Sprint 1 production acceptance | Automated owner boundary and UI states pass; deployed responsive acceptance remains |
-| S2-02 | Release candidate | Add, rename, archive and restore banks, cash, wallets and cards | S2-01 | Immutable type/currency, duplicate-name, zero-balance archive and retry rules pass |
-| S2-03 | Release candidate | Update card limit, statement day and due day | S2-02 | Card-only validation and recoverable errors pass |
-| S2-04 | Release candidate | Audited balance correction using append-only adjustment movements | S2-02 | Remote rollback-safe SQL proves balance-only movement; deployed browser acceptance remains |
+| S2-01 | Deployed and accepted | Owner-only **Accounts & family** settings snapshot and responsive route | Sprint 1 production acceptance | Owner boundary, automated UI states and signed-in mobile/desktop Settings acceptance passed |
+| S2-02 | Deployed and accepted | Add, rename, archive and restore banks, cash, wallets and cards | S2-01 | Immutable type/currency, clear duplicate-name recovery, zero-balance archive and retry rules passed |
+| S2-03 | Deployed and accepted | Update card limit, statement day and due day | S2-02 | Card-only validation and recoverable errors passed |
+| S2-04 | Deployed and accepted | Audited balance correction using append-only adjustment movements | S2-02 | Production rollback-safe SQL and open/cancel browser acceptance passed without rewriting history |
 | S2-05 | Planned | Add, rename, deactivate and restore non-login participants | S2-01 | Historical splits survive; unsettled people cannot be deactivated |
 
 ### Sprint 2B — family access
