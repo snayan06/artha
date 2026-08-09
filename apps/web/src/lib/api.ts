@@ -698,7 +698,13 @@ function mapManagedAccount(item: unknown): ManagedAccount | null {
     }
 }
 
+let demoManagedAccounts: ManagedAccount[] = [
+  { id: 'demo-hdfc-upi', name: 'HDFC UPI', kind: 'bank', currency: 'INR', openingBalancePaise: 1_250_000, currentBalancePaise: 1_250_000, creditLimitPaise: null, statementDay: null, paymentDueDay: null, isArchived: false },
+  { id: 'demo-hdfc-card', name: 'HDFC Card', kind: 'credit_card', currency: 'INR', openingBalancePaise: -24_000, currentBalancePaise: -24_000, creditLimitPaise: 500_000, statementDay: 5, paymentDueDay: 25, isArchived: false }
+]
+
 export async function getManagedAccounts(): Promise<ManagedAccount[]> {
+  if (DEMO_MODE) return demoManagedAccounts.map((account) => ({ ...account }))
   const raw = await request<unknown>('/api/v1/accounts?include_archived=true')
   return (Array.isArray(raw) ? raw : []).flatMap((item) => {
     const account = mapManagedAccount(item)
@@ -718,10 +724,22 @@ async function managedAccountMutation(path: string, method: 'POST' | 'PATCH', bo
 }
 
 export function createManagedAccount(input: AccountSetupInput): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const created: ManagedAccount = { id: `demo-${crypto.randomUUID()}`, name: input.name.trim(), kind: input.kind, currency: 'INR', openingBalancePaise: input.opening_balance_paise, currentBalancePaise: input.opening_balance_paise, creditLimitPaise: input.credit_limit_paise, statementDay: input.statement_day, paymentDueDay: input.payment_due_day, isArchived: false }
+    demoManagedAccounts = [...demoManagedAccounts, created]
+    return Promise.resolve({ ...created })
+  }
   return managedAccountMutation('/api/v1/accounts', 'POST', input)
 }
 
 export function updateManagedAccount(accountId: EntityId, input: { name: string; creditLimitPaise: number | null; statementDay: number | null; paymentDueDay: number | null }): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const current = demoManagedAccounts.find((account) => String(account.id) === String(accountId))
+    if (!current) return Promise.reject(new Error('Account not found.'))
+    const updated = { ...current, name: input.name.trim(), creditLimitPaise: input.creditLimitPaise, statementDay: input.statementDay, paymentDueDay: input.paymentDueDay }
+    demoManagedAccounts = demoManagedAccounts.map((account) => String(account.id) === String(accountId) ? updated : account)
+    return Promise.resolve({ ...updated })
+  }
   return managedAccountMutation(`/api/v1/accounts/${encodeURIComponent(String(accountId))}`, 'PATCH', {
     name: input.name,
     credit_limit_paise: input.creditLimitPaise,
@@ -731,6 +749,13 @@ export function updateManagedAccount(accountId: EntityId, input: { name: string;
 }
 
 export function setManagedAccountArchived(accountId: EntityId, archived: boolean): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const current = demoManagedAccounts.find((account) => String(account.id) === String(accountId))
+    if (!current) return Promise.reject(new Error('Account not found.'))
+    const updated = { ...current, isArchived: archived }
+    demoManagedAccounts = demoManagedAccounts.map((account) => String(account.id) === String(accountId) ? updated : account)
+    return Promise.resolve({ ...updated })
+  }
   return managedAccountMutation(`/api/v1/accounts/${encodeURIComponent(String(accountId))}/${archived ? 'archive' : 'restore'}`, 'POST')
 }
 
@@ -739,6 +764,13 @@ export async function reconcileAccountBalance(
   input: { actualBalancePaise: number; reason: string; occurredAt: string },
   idempotencyKey: string = crypto.randomUUID()
 ): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const current = demoManagedAccounts.find((account) => String(account.id) === String(accountId))
+    if (!current) throw new Error('Account not found.')
+    const updated = { ...current, currentBalancePaise: input.actualBalancePaise }
+    demoManagedAccounts = demoManagedAccounts.map((account) => String(account.id) === String(accountId) ? updated : account)
+    return { ...updated }
+  }
   const raw = await request<unknown>(`/api/v1/accounts/${encodeURIComponent(String(accountId))}/adjustments`, {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
