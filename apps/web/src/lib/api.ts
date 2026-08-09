@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, EntityId, HouseholdMember, LedgerAccount, ManagedAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -673,6 +673,116 @@ export async function restoreRecoveryBundle(bundle: RecoveryBundle, idempotencyK
     idempotentReplay: response.idempotent_replay === true,
     sha256: stringValue(response.sha256, '')
   }
+}
+
+function mapManagedAccount(item: unknown): ManagedAccount | null {
+    if (!isJsonObject(item)) return null
+    const id = entityId(item.id)
+    const kind = item.kind ?? item.account_type
+    if (
+      id === undefined
+      || !isBoundedText(item.name, 80)
+      || (kind !== 'bank' && kind !== 'cash' && kind !== 'wallet' && kind !== 'credit_card' && kind !== 'other')
+    ) return null
+    return {
+      id,
+      name: item.name,
+      kind,
+      currency: stringValue(item.currency, 'INR'),
+      openingBalancePaise: numberValue(item.opening_balance_paise),
+      currentBalancePaise: numberValue(item.current_balance_paise),
+      creditLimitPaise: typeof item.credit_limit_paise === 'number' ? item.credit_limit_paise : null,
+      statementDay: typeof item.statement_day === 'number' ? item.statement_day : null,
+      paymentDueDay: typeof item.payment_due_day === 'number' ? item.payment_due_day : null,
+      isArchived: item.is_archived === true
+    }
+}
+
+let demoManagedAccounts: ManagedAccount[] = [
+  { id: 'demo-hdfc-upi', name: 'HDFC UPI', kind: 'bank', currency: 'INR', openingBalancePaise: 1_250_000, currentBalancePaise: 1_250_000, creditLimitPaise: null, statementDay: null, paymentDueDay: null, isArchived: false },
+  { id: 'demo-hdfc-card', name: 'HDFC Card', kind: 'credit_card', currency: 'INR', openingBalancePaise: -24_000, currentBalancePaise: -24_000, creditLimitPaise: 500_000, statementDay: 5, paymentDueDay: 25, isArchived: false }
+]
+
+export async function getManagedAccounts(): Promise<ManagedAccount[]> {
+  if (DEMO_MODE) return demoManagedAccounts.map((account) => ({ ...account }))
+  const raw = await request<unknown>('/api/v1/accounts?include_archived=true')
+  return (Array.isArray(raw) ? raw : []).flatMap((item) => {
+    const account = mapManagedAccount(item)
+    return account ? [account] : []
+  })
+}
+
+async function managedAccountMutation(path: string, method: 'POST' | 'PATCH', body?: unknown): Promise<ManagedAccount> {
+  const raw = await request<unknown>(path, {
+    method,
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+  })
+  const account = mapManagedAccount(raw)
+  if (!account) throw new Error('Artha returned an invalid account.')
+  return account
+}
+
+export function createManagedAccount(input: AccountSetupInput): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const created: ManagedAccount = { id: `demo-${crypto.randomUUID()}`, name: input.name.trim(), kind: input.kind, currency: 'INR', openingBalancePaise: input.opening_balance_paise, currentBalancePaise: input.opening_balance_paise, creditLimitPaise: input.credit_limit_paise, statementDay: input.statement_day, paymentDueDay: input.payment_due_day, isArchived: false }
+    demoManagedAccounts = [...demoManagedAccounts, created]
+    return Promise.resolve({ ...created })
+  }
+  return managedAccountMutation('/api/v1/accounts', 'POST', input)
+}
+
+export function updateManagedAccount(accountId: EntityId, input: { name: string; creditLimitPaise: number | null; statementDay: number | null; paymentDueDay: number | null }): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const current = demoManagedAccounts.find((account) => String(account.id) === String(accountId))
+    if (!current) return Promise.reject(new Error('Account not found.'))
+    const updated = { ...current, name: input.name.trim(), creditLimitPaise: input.creditLimitPaise, statementDay: input.statementDay, paymentDueDay: input.paymentDueDay }
+    demoManagedAccounts = demoManagedAccounts.map((account) => String(account.id) === String(accountId) ? updated : account)
+    return Promise.resolve({ ...updated })
+  }
+  return managedAccountMutation(`/api/v1/accounts/${encodeURIComponent(String(accountId))}`, 'PATCH', {
+    name: input.name,
+    credit_limit_paise: input.creditLimitPaise,
+    statement_day: input.statementDay,
+    payment_due_day: input.paymentDueDay
+  })
+}
+
+export function setManagedAccountArchived(accountId: EntityId, archived: boolean): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const current = demoManagedAccounts.find((account) => String(account.id) === String(accountId))
+    if (!current) return Promise.reject(new Error('Account not found.'))
+    const updated = { ...current, isArchived: archived }
+    demoManagedAccounts = demoManagedAccounts.map((account) => String(account.id) === String(accountId) ? updated : account)
+    return Promise.resolve({ ...updated })
+  }
+  return managedAccountMutation(`/api/v1/accounts/${encodeURIComponent(String(accountId))}/${archived ? 'archive' : 'restore'}`, 'POST')
+}
+
+export async function reconcileAccountBalance(
+  accountId: EntityId,
+  input: { actualBalancePaise: number; reason: string; occurredAt: string },
+  idempotencyKey: string = crypto.randomUUID()
+): Promise<ManagedAccount> {
+  if (DEMO_MODE) {
+    const current = demoManagedAccounts.find((account) => String(account.id) === String(accountId))
+    if (!current) throw new Error('Account not found.')
+    const updated = { ...current, currentBalancePaise: input.actualBalancePaise }
+    demoManagedAccounts = demoManagedAccounts.map((account) => String(account.id) === String(accountId) ? updated : account)
+    return { ...updated }
+  }
+  const raw = await request<unknown>(`/api/v1/accounts/${encodeURIComponent(String(accountId))}/adjustments`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({
+      actual_balance_paise: input.actualBalancePaise,
+      reason: input.reason,
+      occurred_at: input.occurredAt
+    })
+  })
+  const account = mapManagedAccount(raw)
+  if (!account) throw new Error('Artha returned an invalid account.')
+  return account
 }
 
 export async function getAccounts(): Promise<LedgerAccount[]> {

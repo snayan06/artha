@@ -4,6 +4,7 @@ import { RecoveryExportPanel } from '../components/RecoveryPanel'
 import { getAssistantStatus } from '../lib/api'
 import { AppLink } from '../lib/router'
 import type { AssistantRuntimeStatus } from '../types'
+import { AccountManagementPanel } from '../components/AccountManagementPanel'
 
 export function SettingsPage() {
   const [assistantStatus, setAssistantStatus] = useState<AssistantRuntimeStatus | null>(null)
@@ -37,6 +38,7 @@ export function SettingsPage() {
           <p>Vercel analytics receives no financial text, amounts, emails, account or member names, or assistant questions.</p>
         </div>
       </section>
+      <AccountManagementPanel />
       <div className="mt-7"><RecoveryExportPanel /></div>
       <div className="mt-5 rounded-2xl border border-line bg-white p-4 text-xs leading-5 text-[#66746d] tone-muted dark:border-night-border dark:bg-night-surface"><strong className="text-ink">Important:</strong> keep the backup file and its passphrase in separate safe places. The encryption happens on this device; Artha never sends the passphrase to its server.</div>
     </div>

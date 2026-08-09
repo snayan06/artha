@@ -246,7 +246,7 @@ begin
 
   if position(
     'insert into public.audit_events' in lower(pg_get_functiondef(
-      to_regprocedure('public.void_transaction(uuid,uuid,text)')
+      to_regprocedure('private.void_transaction_unlocked(uuid,uuid,text)')
     ))
   ) = 0 then
     raise exception 'void_transaction must append an audit event';

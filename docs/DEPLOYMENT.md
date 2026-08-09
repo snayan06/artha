@@ -1,6 +1,6 @@
 # Artha deployment runbook
 
-The private-pilot topology is two Vercel Hobby projects plus one Supabase Free
+The personal-release topology is two Vercel Hobby projects plus one Supabase Free
 project. All three must be owned by the user's personal account; the legacy
 `aarshiimagingcenter` Supabase/hosting accounts are explicitly out of scope.
 
@@ -18,7 +18,7 @@ Do not record passwords, access tokens, JWTs or private keys.
 
 ## 1. Fresh Supabase project
 
-The repository contains eight versioned migrations. They have been applied to
+The repository contains twelve versioned migrations. They have been applied to
 the exact `artha-production` project and its four required RPCs resolve through
 PostgREST. The final two-owner behavioural isolation exercise is still required
 before real data.

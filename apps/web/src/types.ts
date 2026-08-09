@@ -19,6 +19,19 @@ export interface LedgerAccount {
   kind: SetupAccountKind | 'other'
 }
 
+export interface ManagedAccount {
+  id: EntityId
+  name: string
+  kind: SetupAccountKind | 'other'
+  currency: string
+  openingBalancePaise: Paise
+  currentBalancePaise: Paise
+  creditLimitPaise: Paise | null
+  statementDay: number | null
+  paymentDueDay: number | null
+  isArchived: boolean
+}
+
 export interface CaptureAccount extends LedgerAccount {
   id: EntityId
 }
