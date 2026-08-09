@@ -11,6 +11,7 @@ describe('SettingsPage', () => {
   })
 
   it('shows the server-owned private-data policy and analytics notice', async () => {
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
       configured: true,
       provider: 'gemini',
@@ -34,6 +35,7 @@ describe('SettingsPage', () => {
   })
 
   it('explains sample-only policy without claiming personal AI is available', async () => {
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
       configured: true,
       provider: 'gemini',
@@ -47,5 +49,36 @@ describe('SettingsPage', () => {
 
     const notice = screen.getByRole('region', { name: /AI and data use/i })
     expect((await within(notice).findByText(/Private-data AI access/i)).closest('p')).toHaveTextContent(/not enabled.*manual entry remains available/i)
+  })
+
+  it('shows every account balance with a reconciliation action', async () => {
+    vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
+      configured: true,
+      provider: 'gemini',
+      model: 'gemini-3.5-flash-lite',
+      available: true,
+      dataPolicy: 'private_approved',
+      personalDataEnabled: true,
+      isDemo: false
+    })
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([{
+      id: 'account-1',
+      name: 'Salary Bank',
+      kind: 'bank',
+      currency: 'INR',
+      openingBalancePaise: 100_000,
+      currentBalancePaise: 125_000,
+      creditLimitPaise: null,
+      statementDay: null,
+      paymentDueDay: null,
+      isArchived: false
+    }])
+
+    render(<RouterProvider><SettingsPage /></RouterProvider>)
+
+    const region = await screen.findByRole('region', { name: /Accounts & cards/i })
+    expect(within(region).getByText('Salary Bank')).toBeVisible()
+    expect(within(region).getByText('₹1,250')).toBeVisible()
+    expect(within(region).getByRole('button', { name: /Set actual balance for Salary Bank/i })).toBeVisible()
   })
 })

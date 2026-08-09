@@ -188,6 +188,67 @@ def expect_capture_scope(select: str, *, order: str | None = None) -> dict[str, 
     return params
 
 
+class FakeAccountManagementClient(FakeCaptureContextClient):
+    def __init__(self) -> None:
+        super().__init__(
+            accounts=[
+                {
+                    "id": ACCOUNT_ID,
+                    "name": "Known Bank",
+                    "account_type": "bank",
+                    "currency": "INR",
+                    "opening_balance_paise": 50_000,
+                    "credit_limit_paise": None,
+                    "statement_day": None,
+                    "payment_due_day": None,
+                    "is_archived": False,
+                    "created_at": "2026-08-04T00:00:00+00:00",
+                }
+            ],
+            categories=[],
+        )
+        self.rpc_calls: list[tuple[str, dict[str, Any] | None]] = []
+
+    async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
+        if name in {"get_current_household", "get_account_balances"}:
+            return await super().rpc(name, payload)
+        self.rpc_calls.append((name, payload))
+        return {"id": TRANSACTION_ID}
+
+
+async def test_managed_account_listing_can_include_archived_rows() -> None:
+    client = FakeAccountManagementClient()
+
+    rows = await production_routes.list_accounts(
+        cast(SupabaseRestClient, client),
+        AuthContext(user_id=USER_ID),
+        include_archived=True,
+    )
+
+    assert rows[0]["current_balance_paise"] == 50_000
+    assert "is_archived" not in client.params_by_path["accounts"]
+
+
+async def test_balance_reconciliation_calls_owner_only_adjustment_rpc() -> None:
+    client = FakeAccountManagementClient()
+    payload_type = production_routes.AccountBalanceAdjustmentRequest
+
+    result = await production_routes.reconcile_account_balance(
+        account_id=ACCOUNT_ID,
+        payload=payload_type(
+            actual_balance_paise=75_000,
+            reason="Bank statement reconciliation",
+            occurred_at="2026-08-09T12:00:00+00:00",
+        ),
+        idempotency_key="account-adjustment-0001",
+        client=cast(SupabaseRestClient, client),
+        auth=AuthContext(user_id=USER_ID),
+    )
+
+    assert result["current_balance_paise"] == 50_000
+    assert client.rpc_calls[0][0] == "create_balance_adjustment"
+
+
 async def test_production_assistant_routes_return_503_when_provider_is_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

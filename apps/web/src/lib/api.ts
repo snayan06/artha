@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, HouseholdMember, LedgerAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, EntityId, HouseholdMember, LedgerAccount, ManagedAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -673,6 +673,60 @@ export async function restoreRecoveryBundle(bundle: RecoveryBundle, idempotencyK
     idempotentReplay: response.idempotent_replay === true,
     sha256: stringValue(response.sha256, '')
   }
+}
+
+export async function getManagedAccounts(): Promise<ManagedAccount[]> {
+  const raw = await request<unknown>('/api/v1/accounts?include_archived=true')
+  const rows = Array.isArray(raw) ? raw : []
+  return rows.flatMap((item) => {
+    if (!isJsonObject(item)) return []
+    const id = entityId(item.id)
+    const kind = item.kind ?? item.account_type
+    if (
+      id === undefined
+      || !isBoundedText(item.name, 80)
+      || (kind !== 'bank' && kind !== 'cash' && kind !== 'wallet' && kind !== 'credit_card' && kind !== 'other')
+    ) return []
+    const managed: ManagedAccount = {
+      id,
+      name: item.name,
+      kind,
+      currency: stringValue(item.currency, 'INR'),
+      openingBalancePaise: numberValue(item.opening_balance_paise),
+      currentBalancePaise: numberValue(item.current_balance_paise),
+      creditLimitPaise: typeof item.credit_limit_paise === 'number' ? item.credit_limit_paise : null,
+      statementDay: typeof item.statement_day === 'number' ? item.statement_day : null,
+      paymentDueDay: typeof item.payment_due_day === 'number' ? item.payment_due_day : null,
+      isArchived: item.is_archived === true
+    }
+    return [managed]
+  })
+}
+
+export async function reconcileAccountBalance(
+  accountId: EntityId,
+  input: { actualBalancePaise: number; reason: string; occurredAt: string },
+  idempotencyKey: string = crypto.randomUUID()
+): Promise<ManagedAccount> {
+  const raw = await request<unknown>(`/api/v1/accounts/${encodeURIComponent(String(accountId))}/adjustments`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({
+      actual_balance_paise: input.actualBalancePaise,
+      reason: input.reason,
+      occurred_at: input.occurredAt
+    })
+  })
+  if (!isJsonObject(raw)) throw new Error('Artha returned an invalid account.')
+  const mapped = await Promise.resolve([raw]).then((rows) => rows.flatMap((item) => {
+    const id = entityId(item.id)
+    const kind = item.kind ?? item.account_type
+    if (id === undefined || !isBoundedText(item.name, 80) || (kind !== 'bank' && kind !== 'cash' && kind !== 'wallet' && kind !== 'credit_card' && kind !== 'other')) return []
+    const managed: ManagedAccount = { id, name: item.name, kind, currency: stringValue(item.currency, 'INR'), openingBalancePaise: numberValue(item.opening_balance_paise), currentBalancePaise: numberValue(item.current_balance_paise), creditLimitPaise: typeof item.credit_limit_paise === 'number' ? item.credit_limit_paise : null, statementDay: typeof item.statement_day === 'number' ? item.statement_day : null, paymentDueDay: typeof item.payment_due_day === 'number' ? item.payment_due_day : null, isArchived: item.is_archived === true }
+    return [managed]
+  }))
+  if (!mapped[0]) throw new Error('Artha returned an invalid account.')
+  return mapped[0]
 }
 
 export async function getAccounts(): Promise<LedgerAccount[]> {

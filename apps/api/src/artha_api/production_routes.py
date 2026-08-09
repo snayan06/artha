@@ -186,6 +186,39 @@ class ProductionOnboardingRequest(BaseModel):
     members: list[MemberCreate] = Field(default_factory=list, max_length=20)
 
 
+class AccountBalanceAdjustmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actual_balance_paise: int
+    reason: str = Field(min_length=1, max_length=240)
+    occurred_at: datetime
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("reason cannot be blank")
+        return normalized
+
+
+class ManagedAccountUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=80)
+    credit_limit_paise: int | None = Field(default=None, ge=0)
+    statement_day: int | None = Field(default=None, ge=1, le=31)
+    payment_due_day: int | None = Field(default=None, ge=1, le=31)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("account name cannot be blank")
+        return normalized
+
+
 class ProductionSplit(BaseModel):
     member_id: UUID
     amount_paise: int = Field(gt=0)
@@ -351,19 +384,26 @@ async def owner_member(
     return owner
 
 
-async def account_rows(client: SupabaseRestClient, household_id: str) -> list[dict[str, Any]]:
+async def account_rows(
+    client: SupabaseRestClient,
+    household_id: str,
+    *,
+    include_archived: bool = False,
+) -> list[dict[str, Any]]:
+    params = {
+        "household_id": f"eq.{household_id}",
+        "select": (
+            "id,name,account_type,currency,opening_balance_paise,"
+            "credit_limit_paise,statement_day,payment_due_day,is_archived,created_at"
+        ),
+        "order": "created_at.asc,id.asc",
+    }
+    if not include_archived:
+        params["is_archived"] = "eq.false"
     accounts = await client.request(
         "GET",
         "accounts",
-        params={
-            "household_id": f"eq.{household_id}",
-            "is_archived": "eq.false",
-            "select": (
-                "id,name,account_type,currency,opening_balance_paise,"
-                "credit_limit_paise,statement_day,payment_due_day,is_archived,created_at"
-            ),
-            "order": "created_at.asc,id.asc",
-        },
+        params=params,
     )
     balances = await client.rpc("get_account_balances", {"p_household_id": household_id})
     balance_by_id = {str(row["account_id"]): int(row["balance_paise"]) for row in balances}
@@ -394,10 +434,136 @@ async def health() -> dict[str, str]:
 
 
 @router.get("/api/v1/accounts", tags=["accounts"])
-async def list_accounts(client: ClientDependency) -> list[dict[str, Any]]:
+async def list_accounts(
+    client: ClientDependency,
+    auth: AuthDependency,
+    include_archived: bool = Query(False),
+) -> list[dict[str, Any]]:
     household_id = await current_household(client)
     assert household_id is not None
-    return await account_rows(client, household_id)
+    await owner_member(client, household_id, auth.user_id)
+    return await account_rows(client, household_id, include_archived=include_archived)
+
+
+async def refreshed_account(
+    client: SupabaseRestClient,
+    household_id: str,
+    account_id: str,
+) -> dict[str, Any]:
+    accounts = await account_rows(client, household_id, include_archived=True)
+    account = next((row for row in accounts if str(row["id"]) == account_id), None)
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "account not found")
+    return account
+
+
+@router.post("/api/v1/accounts", status_code=status.HTTP_201_CREATED, tags=["accounts"])
+async def create_managed_account(
+    payload: AccountCreate,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    created = await client.rpc("create_managed_account", {
+        "p_household_id": household_id, "p_name": payload.name,
+        "p_account_type": payload.kind.value,
+        "p_opening_balance_paise": payload.opening_balance_paise,
+        "p_credit_limit_paise": payload.credit_limit_paise,
+        "p_statement_day": payload.statement_day,
+        "p_payment_due_day": payload.payment_due_day,
+        "p_idempotency_key": idempotency_key,
+    })
+    return await refreshed_account(client, household_id, str(created["id"]))
+
+
+@router.patch("/api/v1/accounts/{account_id}", tags=["accounts"])
+async def update_managed_account(
+    account_id: UUID,
+    payload: ManagedAccountUpdateRequest,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    await client.rpc("update_managed_account", {
+        "p_household_id": household_id, "p_account_id": str(account_id),
+        "p_name": payload.name, "p_credit_limit_paise": payload.credit_limit_paise,
+        "p_statement_day": payload.statement_day,
+        "p_payment_due_day": payload.payment_due_day,
+        "p_idempotency_key": idempotency_key,
+    })
+    return await refreshed_account(client, household_id, str(account_id))
+
+
+async def change_managed_account_archive_status(
+    account_id: UUID,
+    archived: bool,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    await client.rpc("set_managed_account_archived", {
+        "p_household_id": household_id, "p_account_id": str(account_id),
+        "p_archived": archived, "p_idempotency_key": idempotency_key,
+    })
+    return await refreshed_account(client, household_id, str(account_id))
+
+
+@router.post("/api/v1/accounts/{account_id}/archive", tags=["accounts"])
+async def archive_managed_account(
+    account_id: UUID,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    return await change_managed_account_archive_status(
+        account_id, True, idempotency_key, client, auth
+    )
+
+
+@router.post("/api/v1/accounts/{account_id}/restore", tags=["accounts"])
+async def restore_managed_account(
+    account_id: UUID,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    return await change_managed_account_archive_status(
+        account_id, False, idempotency_key, client, auth
+    )
+
+
+@router.post("/api/v1/accounts/{account_id}/adjustments", tags=["accounts"])
+async def reconcile_account_balance(
+    account_id: UUID,
+    payload: AccountBalanceAdjustmentRequest,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    await client.rpc(
+        "create_balance_adjustment",
+        {
+            "p_household_id": household_id,
+            "p_account_id": str(account_id),
+            "p_actual_balance_paise": payload.actual_balance_paise,
+            "p_reason": payload.reason,
+            "p_occurred_at": payload.occurred_at.isoformat(),
+            "p_idempotency_key": idempotency_key,
+        },
+    )
+    return await refreshed_account(client, household_id, str(account_id))
 
 
 @router.get(
