@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, LogOut, RefreshCw } from 'lucide-react'
 import { Shell } from './components/Shell'
 import { demoDashboard, demoTransactions } from './data/demo'
-import { ApiError, bootstrapDemo, confirmDraft, getDashboard, getMembers, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding } from './lib/api'
+import { ApiError, bootstrapDemo, confirmDraft, createSettlement, getCaptureContext, getDashboard, getMembers, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding, updateTransaction, voidTransaction } from './lib/api'
+import type { LedgerCursor } from './lib/api'
 import { isDemoMode, useAuth } from './lib/auth'
 import { useRouter } from './lib/router'
 import { HomePage } from './pages/HomePage'
@@ -14,7 +15,7 @@ import { SharedPage } from './pages/SharedPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { AssistantPage } from './pages/AssistantPage'
 import { SettingsPage } from './pages/SettingsPage'
-import type { AccountSetupInput, Dashboard, Transaction, TransactionDraft, UserProfile } from './types'
+import type { AccountSetupInput, CaptureCategory, Dashboard, EntityId, LedgerAccount, Transaction, TransactionDraft, UserProfile } from './types'
 
 const SETUP_KEY = 'artha.setup.complete'
 const PROFILE_KEY = 'artha.profile'
@@ -159,6 +160,9 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   const [profile, setProfile] = useState<UserProfile>(() => loadProfile(profileKey))
   const [dashboard, setDashboard] = useState<Dashboard>(() => localDemo ? demoDashboard : emptyDashboard)
   const [transactions, setTransactions] = useState<Transaction[]>(() => localDemo ? demoTransactions : [])
+  const [transactionCursor, setTransactionCursor] = useState<LedgerCursor | null>(null)
+  const [accounts, setAccounts] = useState<LedgerAccount[]>([])
+  const [categories, setCategories] = useState<CaptureCategory[]>([])
   const [loadingLedger, setLoadingLedger] = useState(setupComplete)
   const [ledgerIssue, setLedgerIssue] = useState<LedgerLoadIssue | null>(null)
 
@@ -185,9 +189,12 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
     setLoadingLedger(true)
     setLedgerIssue(null)
     try {
-      const [dashboardResponse, transactionsResponse] = await Promise.all([getDashboard(), getTransactions()])
+      const [dashboardResponse, transactionsResponse, captureContext] = await Promise.all([getDashboard(), getTransactions(), getCaptureContext()])
       setDashboard(dashboardResponse.data)
       setTransactions(transactionsResponse.data)
+      setTransactionCursor(transactionsResponse.nextCursor ?? null)
+      setAccounts(captureContext.accounts)
+      setCategories(captureContext.categories)
     } catch (error) {
       setLedgerIssue(ledgerLoadIssue(error, 'ledger'))
     } finally {
@@ -233,6 +240,35 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
     return transaction
   }
 
+  async function correctTransaction(id: string, draft: TransactionDraft, reason: string) {
+    await updateTransaction(id, draft, reason, crypto.randomUUID())
+    await refreshLedger()
+  }
+
+  async function removeTransaction(id: string, reason: string) {
+    await voidTransaction(id, reason, crypto.randomUUID())
+    await refreshLedger()
+  }
+
+  async function searchTransactions(query: string) {
+    return (await getTransactions(query)).data
+  }
+
+  async function loadMoreTransactions() {
+    if (!transactionCursor) return
+    const response = await getTransactions('', transactionCursor)
+    setTransactions((current) => {
+      const seen = new Set(current.map((transaction) => transaction.id))
+      return [...current, ...response.data.filter((transaction) => !seen.has(transaction.id))]
+    })
+    setTransactionCursor(response.nextCursor ?? null)
+  }
+
+  async function settleBalance(input: { memberId: EntityId; accountId: EntityId; amountPaise: number; settledAt: string; note: string }) {
+    await createSettlement(input, crypto.randomUUID())
+    await refreshLedger()
+  }
+
   if (checkingSetup) return <SessionLoadingPage />
   if (setupIssue) return <LedgerLoadError issue={setupIssue} onRetry={checkSetup} onSignOut={onSignOut} />
   if (!setupComplete) return <OnboardingPage onSave={finishSetup} onExploreDemo={exploreDemo} onRestored={checkSetup} allowDemo={localDemo} />
@@ -241,8 +277,21 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
 
   const demoMode = isDemoExperience(localDemo, profile)
   let page = <HomePage dashboard={dashboard} demoMode={demoMode} profile={profile} />
-  if (path === '/transactions') page = <TransactionsPage transactions={transactions} demoMode={demoMode} />
-  if (path === '/shared') page = <SharedPage transactions={transactions} sharedBalancePaise={dashboard.sharedBalancePaise} memberBalances={dashboard.memberBalances} demoMode={demoMode} profile={profile} />
+  if (path === '/transactions') page = (
+    <TransactionsPage
+      transactions={transactions}
+      demoMode={demoMode}
+      selectedTransactionId={(state as { selectedTransactionId?: string } | null)?.selectedTransactionId}
+      accounts={accounts}
+      categories={categories}
+      onSearch={searchTransactions}
+      hasMore={transactionCursor !== null}
+      onLoadMore={loadMoreTransactions}
+      onUpdate={correctTransaction}
+      onVoid={removeTransaction}
+    />
+  )
+  if (path === '/shared') page = <SharedPage transactions={transactions} sharedBalancePaise={dashboard.sharedBalancePaise} memberBalances={dashboard.memberBalances} demoMode={demoMode} profile={profile} accounts={accounts} onSettle={settleBalance} />
   if (path === '/add') page = <QuickAddPage onConfirm={addTransaction} members={profile.members} />
   if (path === '/assistant') page = <AssistantPage initialHandoff={state as { initialQuestion?: string; handoffId?: string } | null} />
   if (path === '/settings') page = <SettingsPage />

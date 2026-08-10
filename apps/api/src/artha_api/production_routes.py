@@ -344,6 +344,59 @@ class ProductionDraft(BaseModel):
         return self
 
 
+class ProductionCorrectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    replacement: ProductionDraft
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, reason: str) -> str:
+        normalized = " ".join(reason.split())
+        if not normalized:
+            raise ValueError("correction reason cannot be blank")
+        return normalized
+
+    @model_validator(mode="after")
+    def require_explicit_date(self) -> ProductionCorrectionRequest:
+        if self.replacement.occurred_at is None:
+            raise ValueError("correction date is required for safe retry")
+        return self
+
+
+class ProductionVoidRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, reason: str) -> str:
+        normalized = " ".join(reason.split())
+        if not normalized:
+            raise ValueError("removal reason cannot be blank")
+        return normalized
+
+
+class ProductionSettlementRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    member_id: UUID
+    account_id: UUID
+    amount_paise: int = Field(gt=0)
+    settled_at: datetime
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, note: str | None) -> str | None:
+        if note is None:
+            return None
+        normalized = " ".join(note.split())
+        return normalized or None
+
+
 async def current_household(client: SupabaseRestClient, *, required: bool = True) -> str | None:
     household_id = await client.rpc("get_current_household")
     if household_id is None and required:
@@ -776,6 +829,33 @@ async def transaction_rows(
     return list(rows or [])
 
 
+async def shared_balance_rows(
+    client: SupabaseRestClient,
+    household_id: str,
+    members: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    balances = list(
+        await client.rpc(
+            "get_member_balances",
+            {"p_household_id": household_id},
+        )
+        or []
+    )
+    members_by_id = {str(member["id"]): member for member in members}
+    return [
+        {
+            "member_id": row["member_id"],
+            "member_name": members_by_id.get(str(row["member_id"]), {}).get(
+                "display_name", "Household member"
+            ),
+            "balance_paise": int(row["balance_paise"]),
+            "status": "owes you" if int(row["balance_paise"]) > 0 else "you owe",
+        }
+        for row in balances
+        if int(row["balance_paise"]) != 0
+    ]
+
+
 async def ledger_activity_rows(
     client: SupabaseRestClient,
     household_id: str,
@@ -847,17 +927,231 @@ async def list_transactions(
     client: ClientDependency,
     auth: AuthDependency,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
-    offset: Annotated[int, Query(ge=0, le=2000)] = 0,
-) -> list[dict[str, Any]]:
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+    q: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    before_occurred_at: datetime | None = None,
+    before_created_at: datetime | None = None,
+    before_id: UUID | None = None,
+) -> dict[str, Any]:
     household_id = await current_household(client)
     assert household_id is not None
     await owner_member(client, household_id, auth.user_id)
-    return await ledger_activity_rows(
-        client,
-        household_id,
-        limit=limit,
-        offset=offset,
+    if q is not None:
+        rows = await client.rpc(
+            "search_ledger_activity",
+            {
+                "p_household_id": household_id,
+                "p_query": q,
+                "p_limit": limit,
+            },
+        )
+        return {"items": list(rows or []), "next_cursor": None}
+    if offset:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Use the stable ledger cursor instead of an offset.",
+        )
+    cursor_values = (before_occurred_at, before_created_at, before_id)
+    if any(value is not None for value in cursor_values) and not all(
+        value is not None for value in cursor_values
+    ):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "The ledger cursor is incomplete.",
+        )
+    rows = list(
+        await client.rpc(
+            "list_ledger_activity_page",
+            {
+                "p_household_id": household_id,
+                "p_limit": limit + 1,
+                "p_before_occurred_at": (
+                    before_occurred_at.isoformat() if before_occurred_at else None
+                ),
+                "p_before_created_at": (
+                    before_created_at.isoformat() if before_created_at else None
+                ),
+                "p_before_id": str(before_id) if before_id else None,
+            },
+        )
+        or []
     )
+    page = rows[:limit]
+    last = page[-1] if len(rows) > limit and page else None
+    return {
+        "items": page,
+        "next_cursor": (
+            {
+                "occurred_at": last["occurred_at"],
+                "created_at": last["created_at"],
+                "id": last["id"],
+            }
+            if last
+            else None
+        ),
+    }
+
+
+def correction_replacement_payload(
+    draft: ProductionDraft,
+    *,
+    owner_id: str,
+    category_name: str | None,
+) -> dict[str, Any]:
+    occurred_at = draft.occurred_at or datetime.now(UTC)
+    if draft.kind == "transfer":
+        return {
+            "kind": "transfer",
+            "source_account_id": str(draft.source_account_id),
+            "destination_account_id": str(draft.destination_account_id),
+            "amount_paise": draft.amount_paise,
+            "currency": "INR",
+            "occurred_at": occurred_at.isoformat().replace("+00:00", "Z"),
+            "note": draft.notes,
+        }
+
+    assert category_name is not None
+    splits = [split.model_dump(mode="json") for split in draft.splits]
+    if draft.personal_share_paise:
+        splits.append({"member_id": owner_id, "amount_paise": draft.personal_share_paise})
+    metadata = {
+        "source": "artha-api",
+        **(
+            {
+                "version": 1,
+                "platform": draft.platform,
+                "subcategory": draft.subcategory,
+                "evidence": draft.metadata.model_dump(mode="json")["evidence"],
+                "attributes": draft.metadata.model_dump(mode="json")["attributes"],
+                "tags": [tag.model_dump(mode="json") for tag in draft.tags],
+            }
+            if draft.metadata is not None
+            else {}
+        ),
+    }
+    return {
+        "kind": draft.kind,
+        "account_id": str(draft.source_account_id),
+        "category_name": category_name,
+        "paid_by_member_id": str(draft.paid_by_member_id or owner_id),
+        "amount_paise": draft.amount_paise,
+        "currency": "INR",
+        "occurred_at": occurred_at.isoformat().replace("+00:00", "Z"),
+        "splits": splits,
+        "merchant": draft.description,
+        "note": draft.notes,
+        "metadata": metadata,
+    }
+
+
+def correction_response_view(
+    draft: ProductionDraft,
+    *,
+    replacement_id: str,
+    owner_id: str,
+    corrected_at: str,
+) -> dict[str, Any]:
+    occurred_at = draft.occurred_at or datetime.now(UTC)
+    shared_splits = [
+        split.model_dump(mode="json")
+        for split in draft.splits
+        if str(split.member_id) != owner_id
+    ]
+    return {
+        "id": replacement_id,
+        "kind": draft.kind,
+        "amount_paise": draft.amount_paise,
+        "personal_share_paise": draft.personal_share_paise,
+        "description": draft.description,
+        "category": "Transfer" if draft.kind == "transfer" else draft.category,
+        "paid_by_member_id": (
+            None if draft.kind == "transfer" else str(draft.paid_by_member_id or owner_id)
+        ),
+        "source_account_id": str(draft.source_account_id),
+        "destination_account_id": (
+            str(draft.destination_account_id) if draft.destination_account_id else None
+        ),
+        "settlement_member_id": None,
+        "settlement_direction": None,
+        "occurred_at": occurred_at.isoformat(),
+        "notes": draft.notes,
+        "splits": shared_splits,
+        "is_deleted": False,
+        "created_at": corrected_at,
+        "updated_at": corrected_at,
+        "account_delta_paise": (
+            0
+            if draft.kind == "transfer"
+            else draft.amount_paise * (1 if draft.kind == "income" else -1)
+        ),
+        "member_balance_deltas": shared_splits,
+    }
+
+
+@router.patch("/api/v1/transactions/{transaction_id}", tags=["transactions"])
+async def update_transaction(
+    transaction_id: UUID,
+    payload: ProductionCorrectionRequest,
+    client: ClientDependency,
+    auth: AuthDependency,
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
+    ],
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    owner = await owner_member(client, household_id, auth.user_id)
+    category_name = (
+        payload.replacement.category
+        if payload.replacement.kind != "transfer"
+        else None
+    )
+
+    result = await client.rpc(
+        "replace_transaction",
+        {
+            "p_household_id": household_id,
+            "p_transaction_id": str(transaction_id),
+            "p_replacement": correction_replacement_payload(
+                payload.replacement,
+                owner_id=str(owner["id"]),
+                category_name=category_name,
+            ),
+            "p_reason": payload.reason,
+            "p_idempotency_key": idempotency_key,
+        },
+    )
+    return correction_response_view(
+        payload.replacement,
+        replacement_id=str(result["replacement_transaction_id"]),
+        owner_id=str(owner["id"]),
+        corrected_at=str(result["corrected_at"]),
+    )
+
+
+@router.delete("/api/v1/transactions/{transaction_id}", tags=["transactions"])
+async def delete_transaction(
+    transaction_id: UUID,
+    payload: ProductionVoidRequest,
+    client: ClientDependency,
+    auth: AuthDependency,
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
+    ],
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    result = await client.rpc(
+        "void_ledger_activity",
+        {
+            "p_household_id": household_id,
+            "p_activity_id": str(transaction_id),
+            "p_reason": payload.reason,
+            "p_idempotency_key": idempotency_key,
+        },
+    )
+    return dict(result)
 
 
 @router.post(
@@ -959,7 +1253,10 @@ async def confirm_transaction(
 
 
 def member_balances(
-    rows: list[dict[str, Any]], members: list[dict[str, Any]], owner_id: str
+    rows: list[dict[str, Any]],
+    members: list[dict[str, Any]],
+    owner_id: str,
+    settlements: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     balances: dict[str, int] = defaultdict(int)
     for row in rows:
@@ -982,6 +1279,14 @@ def member_balances(
                 0,
             )
             balances[paid_by] -= owner_share
+    for settlement in settlements or []:
+        payer_id = str(settlement.get("payer_member_id"))
+        payee_id = str(settlement.get("payee_member_id"))
+        amount_paise = int(settlement.get("amount_paise") or 0)
+        if payer_id == owner_id and payee_id != owner_id:
+            balances[payee_id] += amount_paise
+        elif payee_id == owner_id and payer_id != owner_id:
+            balances[payer_id] -= amount_paise
     return [
         {
             "member_id": member["id"],
@@ -994,16 +1299,46 @@ def member_balances(
     ]
 
 
+@router.post(
+    "/api/v1/settlements",
+    status_code=status.HTTP_201_CREATED,
+    tags=["shared"],
+)
+async def create_settlement(
+    payload: ProductionSettlementRequest,
+    client: ClientDependency,
+    auth: AuthDependency,
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
+    ],
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    result = await client.rpc(
+        "settle_member_balance",
+        {
+            "p_household_id": household_id,
+            "p_member_id": str(payload.member_id),
+            "p_account_id": str(payload.account_id),
+            "p_amount_paise": payload.amount_paise,
+            "p_settled_at": payload.settled_at.isoformat(),
+            "p_idempotency_key": idempotency_key,
+            "p_note": payload.note,
+        },
+    )
+    return dict(result)
+
+
 @router.get("/api/v1/dashboard", tags=["dashboard"])
 async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str, Any]:
     household_id = await current_household(client)
     assert household_id is not None
-    owner = await owner_member(client, household_id, auth.user_id)
-    owner_id = str(owner["id"])
+    await owner_member(client, household_id, auth.user_id)
     members = await member_rows(client, household_id)
     accounts = await account_rows(client, household_id)
-    rows = await transaction_rows(client, household_id, limit=1000)
     views = await ledger_activity_rows(client, household_id, limit=1000)
+    balances = await shared_balance_rows(client, household_id, members)
     now = datetime.now(UTC)
     month_key = now.strftime("%Y-%m")
     current = [view for view in views if str(view["occurred_at"]).startswith(month_key)]
@@ -1047,7 +1382,7 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
             * (1 if view["kind"] == "income" else -1 if view["kind"] == "expense" else 0)
             for view in views
         ),
-        "member_balances": member_balances(rows, members, owner_id),
+        "member_balances": balances,
         "accounts": accounts,
         "spend_by_category": [
             {"category": name, "amount_paise": amount}

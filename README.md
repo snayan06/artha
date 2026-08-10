@@ -13,8 +13,9 @@ shared family expenses consistent.
 > [!IMPORTANT]
 > **Production status:** Artha is live for personal testing. The designated demo
 > account uses sample data; ordinary accounts use their own isolated ledger.
-> Keep real financial data out until the remaining two-owner isolation, restore,
-> and provider-privacy acceptance checks are signed off.
+> Production database isolation and encrypted-recovery contracts pass. Keep
+> real financial text out of AI features until paid-service privacy terms and
+> explicit owner approval are in place; manual entry remains the private path.
 
 ## Product at a glance
 
@@ -24,7 +25,8 @@ shared family expenses consistent.
 | **Problem** | Logging is tedious, transfers get mistaken for spending, and shared bills distort personal totals |
 | **Promise** | Capture a transaction in seconds, see exactly what Artha understood, and save only after explicit confirmation |
 | **Current scope** | A private personal ledger with non-login participants for expense splits |
-| **Next scope** | Transaction correction, shared settlements and invited family access |
+| **Current release candidate** | Transaction detail, audited correction/removal, complete-ledger search and shared repayments |
+| **Next scope** | Private-data AI approval, member-paid expenses and invited family access |
 | **Live app** | [Web app](https://artha-web-one.vercel.app) · [API health](https://artha-api-mu.vercel.app/health) |
 
 ## Why Artha?
@@ -312,8 +314,9 @@ The current ordered status and named blockers are in the
 
 ## Roadmap
 
-- Complete final-domain encrypted restore and two-household isolation drills.
-- Participant management, audited transaction corrections and shared settlements.
+- Complete the final-domain encrypted-restore UI drill; database isolation and
+  rollback-safe recovery contracts already pass on the exact production project.
+- Participant management, member-paid shared expenses and invited family access.
 - Member invitations and collaborative household access.
 - Optional WhatsApp or Telegram draft capture.
 - Investments, liabilities and net-worth tracking.

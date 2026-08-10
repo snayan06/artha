@@ -8,7 +8,7 @@ import { CaptureDraftUnavailableError, getCaptureContext, isCaptureClarification
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import { localDateOffset } from '../lib/date'
 import { useRouter } from '../lib/router'
-import type { CaptureCategory, CaptureChoice, CaptureClarification, CaptureContext, HouseholdMember, LedgerAccount, Transaction, TransactionDraft, TransactionKind } from '../types'
+import type { CaptureCategory, CaptureChoice, CaptureClarification, CaptureContext, CaptureTransactionKind, HouseholdMember, LedgerAccount, Transaction, TransactionDraft } from '../types'
 
 export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: TransactionDraft, idempotencyKey?: string) => Promise<Transaction>; members: HouseholdMember[] }) {
   const { state, navigate, back } = useRouter()
@@ -153,7 +153,7 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
     }
   }
 
-  function changeKind(kind: TransactionKind) {
+  function changeKind(kind: CaptureTransactionKind) {
     invalidatePendingParse()
     setDraft((current) => {
       if (!current) return current
@@ -238,8 +238,9 @@ export function QuickAddPage({ onConfirm, members }: { onConfirm: (draft: Transa
           {success.memberSplits.length > 0 && <div className="mt-4 flex flex-wrap justify-center gap-2">{success.memberSplits.map((split) => <p key={split.memberId} className="inline-flex items-center gap-1.5 rounded-xl bg-moss-50 px-3 py-2 text-xs font-semibold text-moss-800"><UsersRound className="h-4 w-4" aria-hidden="true" /> {split.memberName}: {formatMoney(split.amountPaise)}</p>)}</div>}
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
             <Button variant="secondary" onClick={restart} icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}>Add another</Button>
-            <Button onClick={() => navigate('/')}>Back home <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button>
+            <Button onClick={() => navigate('/transactions', { selectedTransactionId: success.id })}>View transaction <ChevronRight className="h-4 w-4" aria-hidden="true" /></Button>
           </div>
+          <button onClick={() => navigate('/')} className="mt-4 min-h-11 rounded-xl px-4 text-sm font-semibold text-[#68756e] underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400">Back home</button>
         </Card>
       </div>
     )
@@ -412,7 +413,7 @@ function accountForId(context: CaptureContext | null, id: TransactionDraft['sour
   return context?.accounts.find((account) => sameEntityId(account.id, id))
 }
 
-function categoriesForKind(context: CaptureContext | null, kind: TransactionKind): CaptureCategory[] {
+function categoriesForKind(context: CaptureContext | null, kind: CaptureTransactionKind): CaptureCategory[] {
   if (!context || kind === 'transfer') return []
   const direction = kind === 'credit' ? 'income' : 'expense'
   return context.categories.filter((category) => category.kind === direction || category.kind === 'both')

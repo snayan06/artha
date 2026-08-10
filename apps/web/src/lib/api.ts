@@ -271,20 +271,36 @@ function mapSplits(raw: unknown, memberNames: Map<string, string>): Transaction[
 
 function mapTransaction(raw: JsonObject, accountNames: Map<string, string> = new Map(), memberNames: Map<string, string> = new Map()): Transaction {
   const apiKind = stringValue(raw.kind, 'expense')
+  const movementDirectionRaw = stringValue(raw.settlement_direction, '')
+  const movementDirection = movementDirectionRaw.endsWith('_in')
+    ? 'in'
+    : movementDirectionRaw.endsWith('_out')
+      ? 'out'
+      : undefined
   const amountPaise = numberValue(raw.amount_paise ?? raw.amountPaise)
   const memberSplits = mapSplits(raw.splits, memberNames)
   const memberTotalPaise = memberSplits.reduce((sum, split) => sum + split.amountPaise, 0)
+  const kind: Transaction['kind'] = apiKind === 'transfer'
+    ? 'transfer'
+    : apiKind === 'settlement'
+      ? 'settlement'
+      : apiKind === 'adjustment'
+        ? 'adjustment'
+        : apiKind === 'income' || apiKind === 'credit'
+          ? 'credit'
+          : 'debit'
   return {
     id: typeof raw.id === 'number' ? String(raw.id) : stringValue(raw.id, crypto.randomUUID()),
-    kind: apiKind === 'transfer' ? 'transfer' : apiKind === 'income' || apiKind === 'credit' ? 'credit' : 'debit',
+    kind,
     amountPaise,
-    personalSharePaise: numberValue(raw.personal_share_paise ?? raw.personalSharePaise, amountPaise - memberTotalPaise),
+    personalSharePaise: numberValue(raw.personal_share_paise ?? raw.personalSharePaise, kind === 'settlement' || kind === 'adjustment' ? 0 : amountPaise - memberTotalPaise),
     merchant: stringValue(raw.description ?? raw.merchant, 'Transaction'),
     category: stringValue(raw.category, 'Other'),
     account: stringValue(raw.account_name ?? raw.account, accountNames.get(String(entityId(raw.source_account_id) ?? '')) ?? (raw.source_account_id ? 'Primary account' : 'Account')),
     sourceAccountId: entityId(raw.source_account_id),
     destinationAccount: stringValue(raw.destination_account_name, accountNames.get(String(entityId(raw.destination_account_id) ?? '')) ?? '') || undefined,
     destinationAccountId: entityId(raw.destination_account_id),
+    movementDirection,
     occurredAt: stringValue(raw.occurred_at ?? raw.occurredAt, new Date().toISOString()).slice(0, 10),
     note: typeof (raw.notes ?? raw.note) === 'string' ? String(raw.notes ?? raw.note) : undefined,
     memberSplits,
@@ -984,20 +1000,51 @@ export async function getDashboard(): Promise<{ data: Dashboard; demo: boolean }
   }
 }
 
-export async function getTransactions(): Promise<{ data: Transaction[]; demo: boolean }> {
+export interface LedgerCursor {
+  occurredAt: string
+  createdAt: string
+  id: EntityId
+}
+
+export async function getTransactions(
+  query = '',
+  cursor?: LedgerCursor
+): Promise<{ data: Transaction[]; demo: boolean; nextCursor: LedgerCursor | null }> {
   try {
-    const [raw, accounts, members] = await Promise.all([
-      request<unknown>('/api/v1/transactions'),
+    const normalizedQuery = query.trim().slice(0, 120)
+    const cursorQuery = cursor
+      ? `&before_occurred_at=${encodeURIComponent(cursor.occurredAt)}&before_created_at=${encodeURIComponent(cursor.createdAt)}&before_id=${encodeURIComponent(String(cursor.id))}`
+      : ''
+    const transactionPath = normalizedQuery
+      ? `/api/v1/transactions?limit=200&q=${encodeURIComponent(normalizedQuery)}`
+      : `/api/v1/transactions?limit=200${cursorQuery}`
+    const [response, accounts, members] = await Promise.all([
+      request<unknown>(transactionPath),
       request<unknown>('/api/v1/accounts'),
       request<unknown>('/api/v1/members')
     ])
-    const rows = Array.isArray(raw) ? raw : Array.isArray((raw as JsonObject)?.items) ? (raw as JsonObject).items as unknown[] : []
+    const pageRows = (raw: unknown) => Array.isArray(raw)
+      ? raw
+      : Array.isArray((raw as JsonObject)?.items)
+        ? (raw as JsonObject).items as unknown[]
+        : []
+    const rows = pageRows(response)
+    const responseObject = isJsonObject(response) ? response : null
+    const nextRaw = responseObject && isJsonObject(responseObject.next_cursor)
+      ? responseObject.next_cursor
+      : null
+    const nextId = nextRaw ? entityId(nextRaw.id) : null
+    const nextCursor = nextRaw && nextId
+      && typeof nextRaw.occurred_at === 'string'
+      && typeof nextRaw.created_at === 'string'
+      ? { occurredAt: nextRaw.occurred_at, createdAt: nextRaw.created_at, id: nextId }
+      : null
     const names = accountNameMap(accounts)
     const memberNames = memberNameMap(members)
-    return { data: rows.map((item) => mapTransaction(item as JsonObject, names, memberNames)), demo: false }
+    return { data: rows.map((item) => mapTransaction(item as JsonObject, names, memberNames)), demo: false, nextCursor }
   } catch (error) {
     if (!DEMO_MODE) throw error
-    return { data: demoTransactions, demo: true }
+    return { data: demoTransactions, demo: true, nextCursor: null }
   }
 }
 
@@ -1067,4 +1114,61 @@ export async function confirmDraft(draft: TransactionDraft, idempotencyKey: stri
       status: 'confirmed'
     }
   }
+}
+
+export async function updateTransaction(
+  transactionId: EntityId,
+  draft: TransactionDraft,
+  reason: string,
+  idempotencyKey: string = crypto.randomUUID()
+): Promise<Transaction> {
+  const raw = await request<JsonObject>(`/api/v1/transactions/${encodeURIComponent(String(transactionId))}`, {
+    method: 'PATCH',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ replacement: toApiDraft(draft), reason })
+  })
+  return {
+    ...mapTransaction(raw),
+    account: draft.account,
+    sourceAccountId: draft.sourceAccountId,
+    destinationAccount: draft.destinationAccount,
+    destinationAccountId: draft.destinationAccountId,
+    memberSplits: draft.memberSplits
+  }
+}
+
+export async function voidTransaction(
+  transactionId: EntityId,
+  reason: string,
+  idempotencyKey: string = crypto.randomUUID()
+): Promise<void> {
+  const raw = await request<JsonObject>(`/api/v1/transactions/${encodeURIComponent(String(transactionId))}`, {
+    method: 'DELETE',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ reason })
+  })
+  if (raw.deleted !== true || String(raw.id ?? '') !== String(transactionId)) {
+    throw new Error('Artha returned an invalid transaction removal response.')
+  }
+}
+
+export async function createSettlement(
+  input: { memberId: EntityId; accountId: EntityId; amountPaise: number; settledAt: string; note: string },
+  idempotencyKey: string = crypto.randomUUID()
+): Promise<{ balancePaise: number }> {
+  const raw = await request<JsonObject>('/api/v1/settlements', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({
+      member_id: input.memberId,
+      account_id: input.accountId,
+      amount_paise: input.amountPaise,
+      settled_at: input.settledAt,
+      note: input.note.trim() || null
+    })
+  })
+  if (!entityId(raw.id) || String(raw.member_id) !== String(input.memberId) || typeof raw.balance_paise !== 'number') {
+    throw new Error('Artha returned an invalid settlement response.')
+  }
+  return { balancePaise: raw.balance_paise }
 }

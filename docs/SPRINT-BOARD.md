@@ -38,12 +38,15 @@ Sprint 1 dependency.
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Done for owner | Add/edit, card details, zero-balance archive/restore and audited reconciliation are live; participant maintenance and invitations remain separate slices |
-| Production acceptance | In progress | Public production and fictional routed-flow QA passed; signed-in user acceptance of the new entry flow, two-owner isolation, fresh-household encrypted restore and real provider-unavailable recovery remain |
+| Daily-use transaction controls | Local release candidate | Stable keyset history paging, bounded database search across the complete owner ledger, detail/correction/removal, post-confirm recovery and atomic shared repayments are implemented; publication gates remain |
+| Production acceptance | In progress | Rollback-safe production isolation and encrypted-recovery database contracts now pass. Publication, signed-in daily-use acceptance, provider-unavailable recovery and private-data AI approval remain |
 
 ## Senior product audit — net-new additions
 
 The full journey review is in
 [`artifacts/product/2026-08-08-senior-product-usability-audit.md`](artifacts/product/2026-08-08-senior-product-usability-audit.md).
+The daily-use V1 decision update is in
+[`artifacts/product/2026-08-10-daily-use-v1-senior-product-review.md`](artifacts/product/2026-08-10-daily-use-v1-senior-product-review.md).
 Existing isolation, recovery, Accounts & family, correction, settlement,
 invitation and assistant-evidence tasks remain unchanged; this table contains
 only additions that were missing from the board.
@@ -52,7 +55,7 @@ only additions that were missing from the board.
 | --- | --- | --- | --- | --- |
 | PA-01 | Done — implementation/automated | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
 | PA-02 | Done — implementation/automated | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
-| PA-03 | Planned | First Sprint 2 slice; real-data gate | Post-confirm **View transaction** recovery entry point | Reuses audited edit/soft-delete; balances recalculate atomically; retries are idempotent |
+| PA-03 | Done locally — publication pending | Daily-use V1 | Post-confirm **View transaction**, audited correction and removal | Balances recalculate atomically; logical transfers stay paired; retries are idempotent |
 | PA-04 | Done — implementation/automated | Demo-data hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Demo/test-data restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
 | PA-05 | Done — implementation/automated | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
 | PA-06 | Done | Published release | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
@@ -61,11 +64,23 @@ only additions that were missing from the board.
 | PA-09 | Planned | Sprint 2 measurement | Privacy-safe activation/capture/reliability events | No text, amounts, balances, emails, account/member names or assistant questions are emitted |
 | PA-10 | Later | After daily capture is proven | Optional missing-transaction reminder and weekly review | User-controlled cadence; no financial content in notifications; dismissal/snooze supported |
 
-PA-01, PA-02, PA-04 and PA-05 are deployed and covered by automated checks.
+PA-01, PA-02, PA-04 and PA-05 are deployed and covered by automated checks;
+PA-03 is implemented in the daily-use release candidate.
 Expense, Income, Transfer and provider-unavailable recovery still require the
 remaining named final-domain acceptance drills. Real family-finance data also
-remains blocked on privacy approval, isolation, restore and log-redaction
-evidence.
+remains blocked on private-data AI approval and the named final-domain release
+acceptance checks.
+
+## Next sprint plan — after daily-use V1 is accepted
+
+| Order | Product slice | Why it is next | Acceptance gate |
+| --- | --- | --- | --- |
+| 1 | Private-data AI approval and owner control | Real financial text must never enter unpaid/sample-only AI processing | Paid-service data terms, explicit owner control, export/delete and hosted privacy verification |
+| 2 | Member-paid shared expenses | A family member can pay without moving the owner's account | Payable/receivable updates correctly; later repayment clears it without income/spend |
+| 3 | Participant maintenance | Real households change over time | Add/rename/deactivate with history preserved and no cross-household access |
+| 4 | Email invitations and **Shared with me** | Separate users need a safe, limited shared view | Invited user sees only shared items, never the owner's private accounts or balances |
+| 5 | Evidence-backed Ask Artha analytics | The assistant should explain numbers, not only return a card | Date range, source count and matching transactions accompany every answer |
+| 6 | Investments discovery | Mutual funds and stocks need portfolio-specific concepts | Product/schema brief for holdings, transactions, valuation and returns before implementation |
 
 ## Sprint 1 — trust and capture foundation
 
@@ -198,7 +213,8 @@ Detailed schema and privacy rules: [`artifacts/architecture/private-ai-learning-
 - [x] Define a versioned export bundle with schema version and checksums.
 - [x] Add client-side encrypted export; the passphrase never reaches Artha.
 - [x] Restore first into a new or empty household with a full preview and atomic validation.
-- [ ] Add correction, soft-delete, settlement and dedicated per-account activity UI.
+- [x] Add correction, soft-delete and existing-participant settlement UI.
+- [ ] Add a dedicated per-account activity page beyond the existing account filter.
 - [x] Prove restored balances, transfers, splits and audit facts match in local SQL round-trip acceptance.
 - [ ] Repeat the encrypted export/restore drill with fictional data on the final domain.
 
@@ -286,13 +302,15 @@ session before implementation.
 
 - [x] Final-domain new/returning login, fresh app load and sign-out/re-login pass.
 - [ ] Session survives a full browser process close and reopen.
-- [ ] Two independent owners cannot read or write each other's households.
+- [x] Rollback-only production database contract proves two owners cannot read
+  or write each other's households; separate browser-identity acceptance remains.
 - [x] Multi-account/card onboarding, a transfer, a backdated expense and family splits pass end to end with fictional data.
 - [ ] Repeat setup with the owner's complete four-bank/multiple-card configuration.
 - [x] All six primary pages fit at 320 px, 390 px and 1440 px; explicit theme switching passes.
 - [ ] Browser/API logs contain no tokens or financial payloads.
 - [x] Security headers are enabled and verified.
-- [ ] Encrypted export/restore reconstructs the ledger successfully.
+- [x] Rollback-only production database recovery reconstructs the ledger successfully.
+- [ ] Repeat encrypted restore through the final-domain UI.
 - [ ] Real family-finance text is approved only after a reviewed privacy configuration.
 - [x] The combined capture/message/unified-entry follow-up is merged, deployed
   and passes automated plus isolated fictional browser acceptance.

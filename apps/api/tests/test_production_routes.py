@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -306,6 +308,9 @@ class FakeProductionClient:
     ) -> None:
         self.confirm_payload: dict[str, Any] | None = None
         self.transfer_payload: dict[str, Any] | None = None
+        self.correction_payload: dict[str, Any] | None = None
+        self.void_payload: dict[str, Any] | None = None
+        self.settlement_payload: dict[str, Any] | None = None
         self.activity_payload: dict[str, Any] | None = None
         self.rpc_names: list[str] = []
         self.categories = (
@@ -348,8 +353,29 @@ class FakeProductionClient:
                 "transfer_out_transaction_id": "00000000-0000-0000-0000-000000000108",
                 "transfer_in_transaction_id": "00000000-0000-0000-0000-000000000109",
             }]
+        if name == "replace_transaction":
+            self.correction_payload = payload
+            return {
+                "original_transaction_id": TRANSACTION_ID,
+                "replacement_transaction_id": TRANSACTION_ID,
+                "replacement_row_id": "00000000-0000-0000-0000-000000000108",
+                "corrected_at": "2026-08-10T12:00:00+00:00",
+            }
+        if name == "void_ledger_activity":
+            self.void_payload = payload
+            return {"id": TRANSACTION_ID, "deleted": True, "status": "voided"}
+        if name == "settle_member_balance":
+            self.settlement_payload = payload
+            return {
+                "id": "00000000-0000-0000-0000-000000000110",
+                "member_id": MEMBER_ID,
+                "amount_paise": 2_500,
+                "balance_paise": 1_500,
+            }
         if name == "get_account_balances":
             return [{"account_id": ACCOUNT_ID, "balance_paise": 50_000}]
+        if name == "get_member_balances":
+            return [{"member_id": MEMBER_ID, "balance_paise": 4_000}]
         if name == "list_ledger_activity":
             self.activity_payload = payload
             return [{
@@ -372,6 +398,44 @@ class FakeProductionClient:
                 "updated_at": "2026-08-04T12:00:00+00:00",
                 "account_delta_paise": 0,
                 "member_balance_deltas": [],
+            }]
+        if name == "list_ledger_activity_page":
+            self.activity_payload = payload
+            first = {
+                "id": TRANSACTION_ID,
+                "kind": "transfer",
+                "amount_paise": 2_500_000,
+                "personal_share_paise": 2_500_000,
+                "description": "Self transfer",
+                "category": "Transfer",
+                "paid_by_member_id": None,
+                "source_account_id": ACCOUNT_ID,
+                "destination_account_id": DESTINATION_ACCOUNT_ID,
+                "settlement_member_id": None,
+                "settlement_direction": None,
+                "occurred_at": "2026-08-04T12:00:00+00:00",
+                "notes": "Self transfer",
+                "splits": [],
+                "is_deleted": False,
+                "created_at": "2026-08-04T12:00:00+00:00",
+                "updated_at": "2026-08-04T12:00:00+00:00",
+                "account_delta_paise": 0,
+                "member_balance_deltas": [],
+            }
+            older = {
+                **first,
+                "id": "00000000-0000-0000-0000-000000000111",
+                "occurred_at": "2026-08-03T12:00:00+00:00",
+                "created_at": "2026-08-03T12:00:00+00:00",
+            }
+            return [first, older] if payload and payload["p_before_id"] is None else [older]
+        if name == "search_ledger_activity":
+            self.activity_payload = payload
+            return [{
+                "id": TRANSACTION_ID,
+                "kind": "expense",
+                "description": "Late night Zomato",
+                "notes": "Team dinner",
             }]
         raise AssertionError(f"unexpected RPC: {name}")
 
@@ -1551,14 +1615,62 @@ def test_member_balance_projection_handles_owner_and_member_paid_expenses() -> N
         {"id": MEMBER_ID, "display_name": "Family member"},
     ]
 
-    assert member_balances(rows, members, OWNER_ID) == [
+    settlements = [{
+        "payer_member_id": MEMBER_ID,
+        "payee_member_id": OWNER_ID,
+        "amount_paise": 1_000,
+    }]
+
+    assert member_balances(rows, members, OWNER_ID, settlements) == [
         {
             "member_id": MEMBER_ID,
             "member_name": "Family member",
-            "balance_paise": 1_500,
+            "balance_paise": 500,
             "status": "owes you",
         }
     ]
+
+
+async def test_shared_balance_settlement_uses_one_atomic_database_command() -> None:
+    fake = FakeProductionClient()
+
+    result = await production_routes.create_settlement(
+        production_routes.ProductionSettlementRequest(
+            member_id=UUID(MEMBER_ID),
+            account_id=UUID(ACCOUNT_ID),
+            amount_paise=2_500,
+            settled_at=datetime.fromisoformat("2026-08-10T12:00:00+00:00"),
+            note="Partial repayment",
+        ),
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "settlement-key-0001",
+    )
+    replay = await production_routes.create_settlement(
+        production_routes.ProductionSettlementRequest(
+            member_id=UUID(MEMBER_ID),
+            account_id=UUID(ACCOUNT_ID),
+            amount_paise=2_500,
+            settled_at=datetime.fromisoformat("2026-08-10T12:00:00+00:00"),
+            note="Partial repayment",
+        ),
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "settlement-key-0001",
+    )
+
+    assert fake.settlement_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_member_id": MEMBER_ID,
+        "p_account_id": ACCOUNT_ID,
+        "p_amount_paise": 2_500,
+        "p_settled_at": "2026-08-10T12:00:00+00:00",
+        "p_idempotency_key": "settlement-key-0001",
+        "p_note": "Partial repayment",
+    }
+    assert result["balance_paise"] == 1_500
+    assert replay == result
+    assert fake.rpc_names.count("settle_member_balance") == 2
 
 
 async def test_transaction_history_pages_logical_activity_in_database() -> None:
@@ -1567,16 +1679,176 @@ async def test_transaction_history_pages_logical_activity_in_database() -> None:
     result = await list_transactions(
         cast(SupabaseRestClient, fake),
         AuthContext(user_id=USER_ID),
-        limit=25,
-        offset=50,
+        limit=1,
     )
 
     assert fake.activity_payload == {
         "p_household_id": HOUSEHOLD_ID,
-        "p_limit": 25,
-        "p_offset": 50,
+        "p_limit": 2,
+        "p_before_occurred_at": None,
+        "p_before_created_at": None,
+        "p_before_id": None,
     }
-    assert result[0]["kind"] == "transfer"
-    assert result[0]["source_account_id"] == ACCOUNT_ID
-    assert result[0]["destination_account_id"] == DESTINATION_ACCOUNT_ID
-    assert result[0]["account_delta_paise"] == 0
+    assert result["items"][0]["kind"] == "transfer"
+    assert result["items"][0]["source_account_id"] == ACCOUNT_ID
+    assert result["items"][0]["destination_account_id"] == DESTINATION_ACCOUNT_ID
+    assert result["items"][0]["account_delta_paise"] == 0
+    assert result["next_cursor"] == {
+        "occurred_at": "2026-08-04T12:00:00+00:00",
+        "created_at": "2026-08-04T12:00:00+00:00",
+        "id": TRANSACTION_ID,
+    }
+
+
+async def test_transaction_search_runs_inside_database_over_notes() -> None:
+    fake = FakeProductionClient()
+
+    result = await list_transactions(
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        limit=50,
+        q="team dinner",
+    )
+
+    assert fake.activity_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_query": "team dinner",
+        "p_limit": 50,
+    }
+    assert result["items"][0]["notes"] == "Team dinner"
+    assert result["next_cursor"] is None
+
+
+async def test_production_transaction_correction_uses_atomic_rpc_and_returns_replacement() -> None:
+    fake = FakeProductionClient()
+    payload = production_routes.ProductionCorrectionRequest(
+        replacement=ProductionDraft(
+            kind="transfer",
+            amount_paise=2_500_000,
+            description="Move to savings",
+            category=None,
+            personal_share_paise=2_500_000,
+            source_account_id=ACCOUNT_ID,
+            destination_account_id=DESTINATION_ACCOUNT_ID,
+            occurred_at="2026-08-09T12:00:00+00:00",
+            notes="Corrected transfer",
+        ),
+        reason="Corrected the destination account",
+    )
+
+    result = await production_routes.update_transaction(
+        UUID(TRANSACTION_ID),
+        payload,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "daily-correction-key",
+    )
+    fake.categories[0]["is_archived"] = True
+    replay = await production_routes.update_transaction(
+        UUID(TRANSACTION_ID),
+        payload,
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "daily-correction-key",
+    )
+
+    assert fake.correction_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_transaction_id": TRANSACTION_ID,
+        "p_replacement": {
+            "kind": "transfer",
+            "source_account_id": ACCOUNT_ID,
+            "destination_account_id": DESTINATION_ACCOUNT_ID,
+            "amount_paise": 2_500_000,
+            "currency": "INR",
+            "occurred_at": "2026-08-09T12:00:00Z",
+            "note": "Corrected transfer",
+        },
+        "p_reason": "Corrected the destination account",
+        "p_idempotency_key": "daily-correction-key",
+    }
+    assert result["id"] == TRANSACTION_ID
+    assert result["kind"] == "transfer"
+    assert result == replay
+    assert result["created_at"] == "2026-08-10T12:00:00+00:00"
+    assert result["updated_at"] == "2026-08-10T12:00:00+00:00"
+
+
+def test_production_correction_requires_an_explicit_date_for_exact_replay() -> None:
+    with pytest.raises(ValidationError, match="correction date is required"):
+        production_routes.ProductionCorrectionRequest(
+            replacement=ProductionDraft(
+                kind="expense",
+                amount_paise=1_000,
+                description="Coffee",
+                category="Groceries",
+                personal_share_paise=1_000,
+                source_account_id=ACCOUNT_ID,
+            ),
+            reason="Corrected details",
+        )
+
+
+async def test_cashflow_correction_replay_resolves_the_original_archived_category() -> None:
+    fake = FakeProductionClient(categories=[
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "name": "Groceries",
+            "category_type": "expense",
+            "is_archived": True,
+        },
+        {
+            "id": CATEGORY_ID,
+            "name": "Groceries",
+            "category_type": "expense",
+            "is_archived": False,
+        },
+    ])
+    payload = production_routes.ProductionCorrectionRequest(
+        replacement=ProductionDraft(
+            kind="expense",
+            amount_paise=1_000,
+            description="Coffee",
+            category="Groceries",
+            personal_share_paise=1_000,
+            source_account_id=ACCOUNT_ID,
+            occurred_at="2026-08-09T12:00:00+00:00",
+        ),
+        reason="Corrected merchant",
+    )
+
+    first = await production_routes.update_transaction(
+        UUID(TRANSACTION_ID), payload, cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID), "daily-cashflow-correction-key",
+    )
+    replay = await production_routes.update_transaction(
+        UUID(TRANSACTION_ID), payload, cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID), "daily-cashflow-correction-key",
+    )
+
+    assert replay == first
+    assert fake.correction_payload is not None
+    assert fake.correction_payload["p_replacement"]["category_name"] == "Groceries"
+    assert "category_id" not in fake.correction_payload["p_replacement"]
+
+
+async def test_production_transaction_removal_uses_audited_void_rpc() -> None:
+    fake = FakeProductionClient()
+
+    result = await production_routes.delete_transaction(
+        UUID(TRANSACTION_ID),
+        production_routes.ProductionVoidRequest(reason="Duplicate transaction"),
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+        "daily-removal-key",
+    )
+
+    assert fake.void_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_activity_id": TRANSACTION_ID,
+        "p_reason": "Duplicate transaction",
+        "p_idempotency_key": "daily-removal-key",
+    }
+    assert result["id"] == TRANSACTION_ID
+    assert result["deleted"] is True
+    assert result["status"] == "voided"

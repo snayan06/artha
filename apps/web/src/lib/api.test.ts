@@ -96,6 +96,190 @@ describe('FastAPI adapter', () => {
     )
   })
 
+  it('sends a complete reviewed correction with a stable idempotency key', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: 'replacement-1', kind: 'expense', amount_paise: 125000,
+      personal_share_paise: 125000, description: 'Corrected dinner',
+      category: 'Food & Dining', source_account_id: 'account-1',
+      occurred_at: '2026-08-09T12:00:00Z', splits: []
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { updateTransaction } = await import('./api')
+    const draft: TransactionDraft = {
+      kind: 'debit', amountPaise: 125000, merchant: 'Corrected dinner',
+      category: 'Food & Dining', account: 'ICICI Bank', sourceAccountId: 'account-1',
+      occurredAt: '2026-08-09', note: '', memberSplits: [], confidence: 'review', sourceText: ''
+    }
+
+    const result = await updateTransaction('original-1', draft, 'Wrong amount', 'correction-key-1')
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.artha.test/api/v1/transactions/original-1')
+    expect(init.method).toBe('PATCH')
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('correction-key-1')
+    expect(JSON.parse(String(init.body))).toEqual({
+      replacement: expect.objectContaining({
+        kind: 'expense', amount_paise: 125000, description: 'Corrected dinner',
+        source_account_id: 'account-1'
+      }),
+      reason: 'Wrong amount'
+    })
+    expect(result).toMatchObject({ id: 'replacement-1', account: 'ICICI Bank' })
+  })
+
+  it('removes a transaction with an audited reason and retry key', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: 'transaction-1', deleted: true
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { voidTransaction } = await import('./api')
+
+    await expect(voidTransaction('transaction-1', 'Duplicate', 'remove-key-1')).resolves.toBeUndefined()
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.artha.test/api/v1/transactions/transaction-1')
+    expect(init.method).toBe('DELETE')
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('remove-key-1')
+    expect(JSON.parse(String(init.body))).toEqual({ reason: 'Duplicate' })
+  })
+
+  it('runs transaction text search in the database instead of downloading history', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const json = (value: unknown) => new Response(JSON.stringify(value), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (url.endsWith('/api/v1/accounts')) return json([{ id: 'account-1', name: 'ICICI Bank' }])
+      if (url.endsWith('/api/v1/members')) return json([])
+      if (url.endsWith('/api/v1/transactions?limit=200&q=team%20dinner')) return json([{
+        id: 'old-transaction', kind: 'expense', amount_paise: 500,
+        description: 'Old purchase', category: 'Other', source_account_id: 'account-1',
+        notes: 'Team dinner', occurred_at: '2025-01-01T12:00:00Z', splits: []
+      }])
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { getTransactions } = await import('./api')
+
+    const result = await getTransactions('team dinner')
+
+    expect(result.data).toHaveLength(1)
+    expect(result.data[0]).toMatchObject({ id: 'old-transaction', merchant: 'Old purchase' })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('loads older history with an opaque stable cursor', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const json = (value: unknown) => new Response(JSON.stringify(value), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (url.endsWith('/api/v1/accounts')) return json([{ id: 'account-1', name: 'ICICI Bank' }])
+      if (url.endsWith('/api/v1/members')) return json([])
+      if (url.includes('before_occurred_at=2026-08-04T12%3A00%3A00Z') && url.includes('before_id=transaction-1')) {
+        return json({
+          items: [{
+            id: 'older-1', kind: 'expense', amount_paise: 500,
+            description: 'Older purchase', category: 'Other', source_account_id: 'account-1',
+            occurred_at: '2025-01-01T12:00:00Z', created_at: '2025-01-01T12:01:00Z', splits: []
+          }],
+          next_cursor: {
+            occurred_at: '2025-01-01T12:00:00Z',
+            created_at: '2025-01-01T12:01:00Z',
+            id: 'older-1'
+          }
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { getTransactions } = await import('./api')
+
+    const result = await getTransactions('', {
+      occurredAt: '2026-08-04T12:00:00Z',
+      createdAt: '2026-08-04T12:01:00Z',
+      id: 'transaction-1'
+    })
+
+    expect(result.data[0]).toMatchObject({ id: 'older-1', merchant: 'Older purchase' })
+    expect(result.nextCursor).toEqual({
+      occurredAt: '2025-01-01T12:00:00Z',
+      createdAt: '2025-01-01T12:01:00Z',
+      id: 'older-1'
+    })
+  })
+
+  it('keeps settlements and balance corrections distinct from spending and income', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const json = (value: unknown) => new Response(JSON.stringify(value), {
+      status: 200, headers: { 'Content-Type': 'application/json' }
+    })
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/accounts')) return json([{ id: 'account-1', name: 'ICICI Bank' }])
+      if (url.endsWith('/api/v1/members')) return json([{ id: 'member-1', name: 'Harmi' }])
+      if (url.includes('/api/v1/transactions?limit=200')) return json({ items: [
+        {
+          id: 'settlement-transaction', kind: 'settlement', amount_paise: 2_500,
+          description: 'Repayment from Harmi', category: 'Shared repayment',
+          source_account_id: 'account-1', settlement_member_id: 'member-1',
+          settlement_direction: 'settlement_in', occurred_at: '2026-08-10T12:00:00Z', splits: []
+        },
+        {
+          id: 'adjustment-transaction', kind: 'adjustment', amount_paise: 1_234,
+          description: 'Balance correction', category: 'Balance correction',
+          source_account_id: 'account-1', settlement_direction: 'adjustment_out',
+          occurred_at: '2026-08-10T11:00:00Z', splits: []
+        }
+      ], next_cursor: null })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { getTransactions } = await import('./api')
+
+    const result = await getTransactions()
+
+    expect(result.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'settlement-transaction', kind: 'settlement', movementDirection: 'in' }),
+      expect.objectContaining({ id: 'adjustment-transaction', kind: 'adjustment', movementDirection: 'out' })
+    ]))
+  })
+
+  it('records a reviewed shared settlement with an explicit retry key', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: 'settlement-1', member_id: 'member-1', amount_paise: 2_500, balance_paise: 1_500
+    }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { createSettlement } = await import('./api')
+
+    await expect(createSettlement({
+      memberId: 'member-1', accountId: 'account-1', amountPaise: 2_500,
+      settledAt: '2026-08-10T12:00:00+05:30', note: 'Partial repayment'
+    }, 'settlement-key-0001')).resolves.toEqual({ balancePaise: 1_500 })
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.artha.test/api/v1/settlements')
+    expect(init.method).toBe('POST')
+    expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('settlement-key-0001')
+    expect(JSON.parse(String(init.body))).toEqual({
+      member_id: 'member-1', account_id: 'account-1', amount_paise: 2_500,
+      settled_at: '2026-08-10T12:00:00+05:30', note: 'Partial repayment'
+    })
+  })
+
   it('rejects an invalid capture-context category kind', async () => {
     vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
     vi.stubEnv('VITE_DEMO_MODE', 'false')

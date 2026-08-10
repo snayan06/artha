@@ -11,25 +11,28 @@ const categoryEmoji: Record<string, string> = {
   Entertainment: '🎬'
 }
 
-export function TransactionRow({ transaction, compact = false }: { transaction: Transaction; compact?: boolean }) {
+export function TransactionRow({ transaction, compact = false, onSelect }: { transaction: Transaction; compact?: boolean; onSelect?: () => void }) {
   const isIncome = transaction.kind === 'credit'
   const isTransfer = transaction.kind === 'transfer'
+  const isSettlement = transaction.kind === 'settlement'
+  const isAdjustment = transaction.kind === 'adjustment'
+  const isIncoming = isIncome || ((isSettlement || isAdjustment) && transaction.movementDirection === 'in')
   const date = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(`${transaction.occurredAt}T12:00:00`))
-  return (
-    <article className={`flex items-center gap-3 ${compact ? 'py-3' : 'py-4'}`}>
-      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-lg ${isIncome ? 'bg-moss-100 text-moss-800' : 'bg-[#f2f3ef] dark:bg-night-raised'}`} aria-hidden>
-        {isTransfer ? <ArrowLeftRight className="h-5 w-5" aria-hidden="true" /> : categoryEmoji[transaction.category] ?? <ReceiptText className="h-5 w-5" aria-hidden="true" />}
+  const content = (
+    <>
+      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-lg ${isIncoming ? 'bg-moss-100 text-moss-800' : 'bg-[#f2f3ef] dark:bg-night-raised'}`} aria-hidden>
+        {isTransfer ? <ArrowLeftRight className="h-5 w-5" aria-hidden="true" /> : isSettlement ? <UsersRound className="h-5 w-5" aria-hidden="true" /> : categoryEmoji[transaction.category] ?? <ReceiptText className="h-5 w-5" aria-hidden="true" />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <p className="truncate text-[15px] font-semibold text-ink">{transaction.merchant}</p>
-          <p className={`shrink-0 text-[15px] font-bold ${isIncome ? 'text-moss-700' : 'text-ink'}`}>
-            {isTransfer ? '' : isIncome ? '+' : '−'}{formatMoney(transaction.amountPaise)}
+          <p className={`shrink-0 text-[15px] font-bold ${isIncoming ? 'text-moss-700' : 'text-ink'}`}>
+            {isTransfer ? '' : isIncoming ? '+' : '−'}{formatMoney(transaction.amountPaise)}
           </p>
         </div>
         <div className="mt-1 flex items-center justify-between gap-2 text-xs text-[#748079] tone-muted">
           <p className="flex min-w-0 items-center gap-1.5 truncate">
-            {isTransfer ? <ArrowLeftRight className="h-3 w-3" aria-hidden="true" /> : isIncome ? <ArrowDownLeft className="h-3 w-3" aria-hidden="true" /> : <ArrowUpRight className="h-3 w-3" aria-hidden="true" />}
+            {isTransfer ? <ArrowLeftRight className="h-3 w-3" aria-hidden="true" /> : isIncoming ? <ArrowDownLeft className="h-3 w-3" aria-hidden="true" /> : <ArrowUpRight className="h-3 w-3" aria-hidden="true" />}
             <span className="truncate">{isTransfer ? `${transaction.account} → ${transaction.destinationAccount ?? 'Destination account'}` : `${transaction.category} · ${transaction.account}`}</span>
           </p>
           <span className="shrink-0">{date}</span>
@@ -40,6 +43,21 @@ export function TransactionRow({ transaction, compact = false }: { transaction: 
           </div>
         )}
       </div>
-    </article>
+    </>
   )
+
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`flex w-full items-center gap-3 rounded-xl text-left transition hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:hover:bg-night-raised ${compact ? 'py-3' : 'px-2 py-4'}`}
+        aria-label={`View ${transaction.merchant} transaction details`}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return <article className={`flex items-center gap-3 ${compact ? 'py-3' : 'py-4'}`}>{content}</article>
 }
