@@ -330,6 +330,8 @@ class FakeProductionClient:
 
     async def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
         self.rpc_names.append(name)
+        if name == "setup_household":
+            return None
         if name == "get_current_household":
             return HOUSEHOLD_ID
         if name == "confirm_transaction":
@@ -1093,6 +1095,37 @@ async def test_profile_hydrates_server_owned_household_and_participants() -> Non
             }
         ],
     }
+
+
+async def test_setup_onboarding_returns_only_split_candidates() -> None:
+    fake = FakeProductionClient()
+
+    result = await production_routes.setup_onboarding(
+        production_routes.ProductionOnboardingRequest.model_validate(
+            {
+                "display_name": "Owner",
+                "household_name": "Test household",
+                "accounts": [
+                    {
+                        "name": "Known Bank",
+                        "kind": "bank",
+                        "opening_balance_paise": 50_000,
+                    }
+                ],
+                "members": [{"name": "Family member"}],
+            }
+        ),
+        cast(SupabaseRestClient, fake),
+    )
+
+    assert result["members"] == [
+        {
+            "id": MEMBER_ID,
+            "name": "Family member",
+            "is_archived": False,
+            "created_at": "2026-08-04T00:00:01+00:00",
+        }
+    ]
 
 
 async def test_profile_marks_only_the_configured_authenticated_uuid_as_demo(
