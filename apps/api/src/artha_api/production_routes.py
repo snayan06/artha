@@ -753,9 +753,14 @@ async def setup_onboarding(
     )
     household_id = await current_household(client)
     assert household_id is not None
+    members = await member_rows(client, household_id)
     return {
         "accounts": await account_rows(client, household_id),
-        "members": [public_member(row) for row in await member_rows(client, household_id)],
+        "members": [
+            public_member(member)
+            for member in members
+            if str(member.get("role")) != "owner"
+        ],
     }
 
 
