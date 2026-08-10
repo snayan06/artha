@@ -25,10 +25,10 @@ Sprint 1 dependency.
 | AI-primary release | Deployed | PR #20 merged as `69e44a8`; production capture and assistant are model-only, and both web/API Vercel deployments are ready |
 | V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
 | Message UX and metadata | Deployed | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are live from `e32b5b6` |
-| Public repository and CI | Done for current release | Main CI `31332275508` and CodeQL `31332275498` passed for `41b53b8` |
+| Public repository and CI | Done for current release | Main CI `31408304984` and CodeQL `31408301066` passed for production `cc7934c` |
 | Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
-| Persistent production login | Done for one fictional identity | New-user link, returning-user link, persisted session and sign-out/re-login passed on the final domain |
-| Server-owned onboarding/profile | Done for one fictional identity | Profile, household and participants returned from the server without repeating onboarding |
+| Persistent production login | Production accepted with a disposable identity | Password login, persisted session and signed-in route hydration passed; full browser-process reopen remains |
+| Server-owned onboarding/profile | Production accepted | Profile, household and split candidates returned from the server; PR #32 prevents the authenticated owner appearing as their own split candidate |
 | ₹25k self-transfer flow | Production verified | `25k` mapped to ₹25,000 with ordered ICICI → HDFC accounts; totals remained unchanged |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
 | Structured Gemini features | Production verified | Grounded capture and read-only metric/chart responses passed; hosted fictional gates remain 50/50, 30/30 and 24/24 |
@@ -38,8 +38,8 @@ Sprint 1 dependency.
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
 | Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Done for owner | Add/edit, card details, zero-balance archive/restore and audited reconciliation are live; participant maintenance and invitations remain separate slices |
-| Daily-use transaction controls | Local release candidate | Stable keyset history paging, bounded database search across the complete owner ledger, detail/correction/removal, post-confirm recovery and atomic shared repayments are implemented; publication gates remain |
-| Production acceptance | In progress | Rollback-safe production isolation and encrypted-recovery database contracts now pass. Publication, signed-in daily-use acceptance, provider-unavailable recovery and private-data AI approval remain |
+| Daily-use transaction controls | Deployed and accepted | PR #30 (`1531968`) published stable keyset history, bounded database search, detail/correction/removal, post-confirm recovery and atomic shared repayments; live-fix PRs #31/#32 are deployed |
+| Production acceptance | Daily-use fictional QA passed | Exact-project migration, rollback SQL, main CI/CodeQL, exact-SHA deployments and signed-in mobile/desktop acceptance passed. Final-domain restore, second-identity persistence/isolation, provider-unavailable recovery and private-data AI approval remain |
 
 ## Senior product audit — net-new additions
 
@@ -55,7 +55,7 @@ only additions that were missing from the board.
 | --- | --- | --- | --- | --- |
 | PA-01 | Done — implementation/automated | Current hardening; real-data gate | Manual Expense/Income/Transfer recovery and safe type correction | Exact text survives AI failure; all three types reach valid review; no write before confirm |
 | PA-02 | Done — implementation/automated | Current hardening; real-data gate | Server-owned category correction control | Only direction-valid household categories can be submitted; unavailable state retries without losing the draft |
-| PA-03 | Done locally — publication pending | Daily-use V1 | Post-confirm **View transaction**, audited correction and removal | Balances recalculate atomically; logical transfers stay paired; retries are idempotent |
+| PA-03 | Done and deployed | Daily-use V1 | Post-confirm **View transaction**, audited correction and removal | Balances recalculate atomically; logical transfers stay paired; retries are idempotent |
 | PA-04 | Done — implementation/automated | Demo-data hardening; real-data privacy gate | In-product AI provider/data-use disclosure | Demo/test-data restriction is visible; real data waits for an approved privacy configuration; telemetry stores no content |
 | PA-05 | Done — implementation/automated | Current hardening | Quick Add account-context error and retry state | Failure explains disabled confirmation; retry preserves text/draft; no unhandled error |
 | PA-06 | Done | Published release | Remove stale active-QA deterministic fallback claims | QA matches Gemini-only interpretation, exact-text manual recovery and honest assistant unavailability |
@@ -64,14 +64,14 @@ only additions that were missing from the board.
 | PA-09 | Planned | Sprint 2 measurement | Privacy-safe activation/capture/reliability events | No text, amounts, balances, emails, account/member names or assistant questions are emitted |
 | PA-10 | Later | After daily capture is proven | Optional missing-transaction reminder and weekly review | User-controlled cadence; no financial content in notifications; dismissal/snooze supported |
 
-PA-01, PA-02, PA-04 and PA-05 are deployed and covered by automated checks;
-PA-03 is implemented in the daily-use release candidate.
+PA-01 through PA-06 are deployed and covered by automated checks plus signed-in
+fictional production acceptance.
 Expense, Income, Transfer and provider-unavailable recovery still require the
 remaining named final-domain acceptance drills. Real family-finance data also
 remains blocked on private-data AI approval and the named final-domain release
 acceptance checks.
 
-## Next sprint plan — after daily-use V1 is accepted
+## Next sprint plan
 
 | Order | Product slice | Why it is next | Acceptance gate |
 | --- | --- | --- | --- |

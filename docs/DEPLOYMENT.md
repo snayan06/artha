@@ -135,9 +135,10 @@ is a failed release even when `supabase migration list --linked` is synchronized
 
 ## Acceptance before calling production green
 
-Current status: **AI-primary and capture hardening are deployed at `c4ae0dc`;
-final-domain fictional acceptance passed; real-data acceptance remains
-pending**.
+Current status: **daily-use V1 is deployed at `cc7934c`; signed-in fictional
+acceptance passed across login/onboarding, capture/detail/correction/search,
+shared repayment, Ask Artha, Settings and mobile/desktop layout. Real-data AI
+acceptance remains pending**.
 Do not enter real financial data until every unchecked item passes.
 
 - [x] Magic-link login works on the final PWA domain.
