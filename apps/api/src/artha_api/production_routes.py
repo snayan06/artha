@@ -388,6 +388,26 @@ class ProductionSettlementRequest(BaseModel):
     settled_at: datetime
     note: str | None = Field(default=None, max_length=500)
 
+    @field_validator("member_id", "account_id", mode="before")
+    @classmethod
+    def parse_uuid_wire_value(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        try:
+            return UUID(value)
+        except ValueError:
+            return value
+
+    @field_validator("settled_at", mode="before")
+    @classmethod
+    def parse_datetime_wire_value(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+
     @field_validator("note")
     @classmethod
     def normalize_note(cls, note: str | None) -> str | None:

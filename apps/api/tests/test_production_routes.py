@@ -1673,6 +1673,39 @@ async def test_shared_balance_settlement_uses_one_atomic_database_command() -> N
     assert fake.rpc_names.count("settle_member_balance") == 2
 
 
+async def test_shared_balance_settlement_accepts_json_wire_values() -> None:
+    fake = FakeProductionClient()
+    app = FastAPI()
+    app.include_router(production_routes.router)
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id=USER_ID)
+    app.dependency_overrides[production_routes.production_client] = lambda: fake
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/settlements",
+            headers={"Idempotency-Key": "settlement-wire-0001"},
+            json={
+                "member_id": MEMBER_ID,
+                "account_id": ACCOUNT_ID,
+                "amount_paise": 2_500,
+                "settled_at": "2026-08-10T06:30:00.000Z",
+                "note": "Browser repayment",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["balance_paise"] == 1_500
+    assert fake.settlement_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_member_id": MEMBER_ID,
+        "p_account_id": ACCOUNT_ID,
+        "p_amount_paise": 2_500,
+        "p_settled_at": "2026-08-10T06:30:00+00:00",
+        "p_idempotency_key": "settlement-wire-0001",
+        "p_note": "Browser repayment",
+    }
+
+
 async def test_transaction_history_pages_logical_activity_in_database() -> None:
     fake = FakeProductionClient()
 

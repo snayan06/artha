@@ -1156,9 +1156,6 @@ export async function createSettlement(
   input: { memberId: EntityId; accountId: EntityId; amountPaise: number; settledAt: string; note: string },
   idempotencyKey: string = crypto.randomUUID()
 ): Promise<{ balancePaise: number }> {
-  const settledAt = /^\d{4}-\d{2}-\d{2}$/.test(input.settledAt)
-    ? `${input.settledAt}T12:00:00Z`
-    : input.settledAt
   const raw = await request<JsonObject>('/api/v1/settlements', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
@@ -1166,7 +1163,7 @@ export async function createSettlement(
       member_id: input.memberId,
       account_id: input.accountId,
       amount_paise: input.amountPaise,
-      settled_at: settledAt,
+      settled_at: input.settledAt,
       note: input.note.trim() || null
     })
   })
