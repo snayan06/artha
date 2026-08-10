@@ -267,7 +267,7 @@ describe('FastAPI adapter', () => {
 
     await expect(createSettlement({
       memberId: 'member-1', accountId: 'account-1', amountPaise: 2_500,
-      settledAt: '2026-08-10T12:00:00+05:30', note: 'Partial repayment'
+      settledAt: '2026-08-10', note: 'Partial repayment'
     }, 'settlement-key-0001')).resolves.toEqual({ balancePaise: 1_500 })
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit
@@ -276,7 +276,7 @@ describe('FastAPI adapter', () => {
     expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('settlement-key-0001')
     expect(JSON.parse(String(init.body))).toEqual({
       member_id: 'member-1', account_id: 'account-1', amount_paise: 2_500,
-      settled_at: '2026-08-10T12:00:00+05:30', note: 'Partial repayment'
+      settled_at: '2026-08-10T12:00:00Z', note: 'Partial repayment'
     })
   })
 
