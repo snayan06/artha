@@ -243,10 +243,11 @@ begin
   end if;
 
   begin
-    perform * from public.void_transaction(
+    perform public.void_ledger_activity(
       '51000000-1000-4000-8000-000000000001',
       v_original.id,
-      'Archived account must remain balanced'
+      'Archived account must remain balanced',
+      'archived-account-void-0001'
     );
     raise exception 'void changed the balance of an archived account';
   exception

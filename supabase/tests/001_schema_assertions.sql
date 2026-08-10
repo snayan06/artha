@@ -171,7 +171,17 @@ begin
   ) or not has_function_privilege(
     'authenticated', 'public.setup_household(text,text,jsonb,jsonb)', 'EXECUTE'
   ) or not has_function_privilege(
-    'authenticated', 'public.void_transaction(uuid,uuid,text)', 'EXECUTE'
+    'authenticated',
+    'public.replace_transaction(uuid,uuid,jsonb,text,text)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.void_ledger_activity(uuid,uuid,text,text)',
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    'public.settle_member_balance(uuid,uuid,uuid,bigint,timestamptz,text,text)',
+    'EXECUTE'
   ) or not has_function_privilege(
     'authenticated',
     'public.list_ledger_activity(uuid,integer,integer)',
@@ -186,6 +196,9 @@ begin
      )
      or has_function_privilege(
        'anon', 'public.void_transaction(uuid,uuid,text)', 'EXECUTE'
+     )
+     or has_function_privilege(
+       'authenticated', 'public.void_transaction(uuid,uuid,text)', 'EXECUTE'
      )
      or has_function_privilege(
        'service_role', 'public.get_current_household()', 'EXECUTE'
