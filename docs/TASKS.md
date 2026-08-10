@@ -11,9 +11,9 @@ For the current ordered delivery view, blockers and user actions, see
 ## Live launch status
 
 **Current stage:** V1, AI-primary, unified entry and owner account/card
-maintenance are live at merge `41b53b8`. Final-domain signed-in QA passed, but do not enter real financial
-data until every remaining P0 security, recovery and privacy item below is
-complete.
+maintenance are live on production `main` at `85fd966`. A daily-use transaction
+release candidate is under final verification. Do not send real financial text
+to AI until the remaining private-data approval is complete.
 
 **Current account release:** PRs #27 and #28 add post-onboarding account/card
 maintenance, audited balance reconciliation and clear recoverable uniqueness
@@ -28,19 +28,20 @@ signed-in Settings acceptance are green.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
 - [x] Create the fresh `artha-production` Supabase project in Mumbai.
 - [x] Apply all migrations and pass hosted catalog/RLS schema assertions.
-- [ ] Complete anonymous-denial and two-household behavioural isolation on the hosted database.
+- [x] Complete anonymous-denial and rollback-only two-household behavioural isolation on the hosted database.
 - [x] Create and configure the `artha-api` and `artha-web` Vercel projects.
 - [x] Pass final-domain authentication, financial-flow and responsive-layout acceptance with fictional data.
 - [ ] Verify authentication survives a full browser-process close and reopen.
-- [ ] Pass two-owner isolation and encrypted restore acceptance.
+- [x] Pass the hosted two-owner database isolation and encrypted recovery SQL contracts.
+- [ ] Repeat encrypted restore through the final-domain UI into a fresh household.
 - [ ] Record sanitized browser/API log-redaction and authenticated cold/warm
   latency evidence.
 - [ ] Approve the real-data privacy configuration and re-run all fresh hosted
   fictional gates for the hardening follow-up.
 
-**Next action:** prove two-owner isolation, restore the encrypted fictional
-backup into a fresh household and exercise real provider-unavailable recovery
-without losing the submitted text.
+**Next action:** publish and accept the daily-use release candidate, repeat the
+encrypted restore through the final-domain UI and exercise real
+provider-unavailable recovery without losing the submitted text.
 
 ## Current execution queue
 
@@ -79,7 +80,13 @@ without losing the submitted text.
 
 - [x] Add a versioned 60-case sample capture/parser dataset and CI contract checker.
 - [x] Add deterministic and hosted-provider scoring runners with sanitized accuracy/error slices.
-- [ ] Add edit, correction and soft-delete controls to the UI for the existing API operations.
+- [x] Add audited edit/correction and remove-from-totals controls, with atomic
+  server replacement/void operations and canonical refresh.
+- [x] Add post-confirm **View transaction** and open history rows into detail.
+- [x] Search across the complete owner ledger in Postgres while returning a
+  bounded first 200 relevant matches instead of downloading every page.
+- [x] Add existing-participant repayment recording without counting settlement
+  as spending or income.
 - [ ] Show assistant evidence date range, source count and matching transactions.
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
 - [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the production model.

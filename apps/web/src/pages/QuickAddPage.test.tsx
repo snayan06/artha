@@ -78,6 +78,9 @@ describe('QuickAddPage', () => {
     await user.click(screen.getByRole('button', { name: /confirm and add transaction/i }))
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
     expect(await screen.findByText(/added to your artha/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /view transaction/i }))
+    expect(window.location.pathname).toBe('/transactions')
+    expect(window.history.state).toEqual({ selectedTransactionId: 'new-transaction' })
   })
 
   it('does not discard an unsaved draft when a later message routes to Ask Artha', async () => {

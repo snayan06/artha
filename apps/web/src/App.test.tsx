@@ -18,6 +18,10 @@ const api = vi.hoisted(() => ({
   setupOnboarding: vi.fn(),
   getDashboard: vi.fn(),
   getTransactions: vi.fn(),
+  getCaptureContext: vi.fn(),
+  createSettlement: vi.fn(),
+  updateTransaction: vi.fn(),
+  voidTransaction: vi.fn(),
   confirmDraft: vi.fn()
 }))
 
@@ -32,6 +36,7 @@ describe('first-run gate', () => {
     api.getMembers.mockResolvedValue([{ id: '7', name: 'Demo member' }])
     api.getDashboard.mockResolvedValue({ data: demoDashboard, demo: true })
     api.getTransactions.mockResolvedValue({ data: demoTransactions, demo: true })
+    api.getCaptureContext.mockResolvedValue({ accounts: [], categories: [] })
   })
   afterEach(() => {
     cleanup()

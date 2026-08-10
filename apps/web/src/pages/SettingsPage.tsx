@@ -28,15 +28,19 @@ export function SettingsPage() {
       <section aria-labelledby="ai-data-use-heading" className="mt-7 rounded-[24px] border border-line bg-white p-4 shadow-card dark:border-night-border dark:bg-night-surface sm:p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-moss-700">Privacy controls</p>
         <h2 id="ai-data-use-heading" className="font-display mt-1 text-lg font-bold">AI and data use</h2>
-        <div className="mt-3 space-y-3 text-sm leading-6 text-[#66746d] tone-muted">
-          <p>Provider: {provider}, configured server-side.</p>
-          <p>Purpose: create reviewable capture drafts and answer read-only Ask Artha ledger questions using bounded household context.</p>
-          <p>Natural-language capture and Ask Artha send the submitted text or question, plus bounded household context, to the configured AI provider through the Artha server.</p>
-          <p>Artha sends Gemini Interactions requests with store=false. This describes the request setting only; it is not a broader provider-retention claim and does not approve real family-finance data.</p>
-          <p>Gemini cannot write to your ledger. Every capture requires review and confirmation.</p>
-          <p><strong className="text-ink">Private-data AI access:</strong> {assistantStatus?.personalDataEnabled ? 'enabled for this deployment under its configured provider policy.' : assistantStatus?.isDemo ? 'this is the configured sample-data demo account.' : 'not enabled for this deployment; manual entry remains available.'}</p>
-          <p>Vercel analytics receives no financial text, amounts, emails, account or member names, or assistant questions.</p>
+        <div className="mt-4 rounded-2xl bg-moss-50 p-4 text-sm leading-6 text-moss-900 dark:bg-night-raised dark:text-night-ink">
+          <p className="font-bold">{assistantStatus?.personalDataEnabled ? 'AI is enabled for this account.' : assistantStatus?.isDemo ? 'AI is enabled for sample data.' : 'Private financial text is not sent to AI.'}</p>
+          <p className="mt-1">{assistantStatus?.personalDataEnabled || assistantStatus?.isDemo ? 'AI can prepare capture drafts and read-only answers. It cannot write to your ledger; every transaction still requires your confirmation.' : 'Manual entry remains available. This protection is controlled by the server policy, not a browser switch.'}</p>
         </div>
+        <details className="mt-4 rounded-2xl border border-line px-4 py-3 text-sm text-[#66746d] tone-muted">
+          <summary className="min-h-11 cursor-pointer py-2 font-semibold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400">Provider and data details</summary>
+          <div className="space-y-3 pb-2 pt-2 leading-6">
+            <p>Provider: {provider}, configured server-side.</p>
+            <p>When enabled, capture sends your submitted text and relevant account, category and household choices. Ask Artha sends your question with a limited ledger summary.</p>
+            <p>Requests use <code>store=false</code>. This request setting is not a broader provider-retention guarantee.</p>
+            <p>Vercel analytics receives no financial text, amounts, emails, account or member names, or assistant questions.</p>
+          </div>
+        </details>
       </section>
       <AccountManagementPanel />
       <div className="mt-7"><RecoveryExportPanel /></div>

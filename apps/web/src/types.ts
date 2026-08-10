@@ -72,7 +72,8 @@ export interface TransactionSplit {
   amountPaise: Paise
 }
 
-export type TransactionKind = 'debit' | 'credit' | 'transfer'
+export type CaptureTransactionKind = 'debit' | 'credit' | 'transfer'
+export type TransactionKind = CaptureTransactionKind | 'settlement' | 'adjustment'
 
 export interface Transaction {
   id: string
@@ -85,6 +86,7 @@ export interface Transaction {
   sourceAccountId?: EntityId
   destinationAccount?: string
   destinationAccountId?: EntityId
+  movementDirection?: 'in' | 'out'
   occurredAt: string
   note?: string
   memberSplits: TransactionSplit[]
@@ -92,7 +94,7 @@ export interface Transaction {
 }
 
 export interface TransactionDraft {
-  kind: TransactionKind
+  kind: CaptureTransactionKind
   amountPaise: Paise
   merchant: string
   category: string

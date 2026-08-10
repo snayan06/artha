@@ -24,12 +24,11 @@ describe('SettingsPage', () => {
     render(<RouterProvider><SettingsPage /></RouterProvider>)
 
     const notice = screen.getByRole('region', { name: /AI and data use/i })
-    await waitFor(() => expect(within(notice).getByText(/Gemini · gemini-3.5-flash-lite/i)).toBeVisible())
-    expect(within(notice).getByText(/Purpose:/i)).toHaveTextContent(/reviewable capture drafts.*read-only Ask Artha/i)
-    expect(within(notice).getByText(/Natural-language capture and Ask Artha/i)).toHaveTextContent(/submitted text or question.*bounded household context.*configured AI provider.*Artha server/i)
-    expect(within(notice).getByText(/store=false/i)).toHaveTextContent(/Gemini Interactions requests.*store=false/i)
-    expect(within(notice).getByText(/Gemini cannot write to your ledger/i)).toHaveTextContent(/every capture requires review and confirmation/i)
-    expect(within(notice).getByText(/Private-data AI access/i).closest('p')).toHaveTextContent(/enabled for this deployment/i)
+    await waitFor(() => expect(within(notice).getByText('AI is enabled for this account.')).toBeVisible())
+    expect(within(notice).getByText(/cannot write to your ledger/i)).toHaveTextContent(/requires your confirmation/i)
+    expect(within(notice).getByText(/Provider and data details/i)).toBeVisible()
+    expect(within(notice).getByText(/Gemini · gemini-3.5-flash-lite/i)).toBeInTheDocument()
+    expect(within(notice).getByText(/store=false/i)).toBeInTheDocument()
     expect(notice).not.toHaveTextContent(/fictional|pilot/i)
     expect(within(notice).getByText(/Vercel analytics receives no/i)).toHaveTextContent(/financial text, amounts, emails, account or member names, or assistant questions/i)
   })
@@ -48,7 +47,8 @@ describe('SettingsPage', () => {
     render(<RouterProvider><SettingsPage /></RouterProvider>)
 
     const notice = screen.getByRole('region', { name: /AI and data use/i })
-    expect((await within(notice).findByText(/Private-data AI access/i)).closest('p')).toHaveTextContent(/not enabled.*manual entry remains available/i)
+    expect(await within(notice).findByText('Private financial text is not sent to AI.')).toBeVisible()
+    expect(within(notice).getByText(/Manual entry remains available/i)).toHaveTextContent(/server policy.*not a browser switch/i)
   })
 
   it('shows every account balance with a reconciliation action', async () => {

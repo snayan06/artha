@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 10 August 2026, 01:15 IST
+Updated: 10 August 2026
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,26 +20,28 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: owner account/card maintenance and audited balance reconciliation are
-deployed from production `main` at `41b53b8`. PRs #27 and #28, main CI, CodeQL,
-both Vercel deployments, production database contracts, public smoke checks and
-signed-in Settings acceptance are green.**
+**Status: production `main` remains `85fd966`. A daily-use V1 release candidate
+is being verified on `codex/release-complete`; it adds complete-ledger search,
+transaction detail/correction/removal, post-confirm recovery, shared repayments
+and concise privacy status. It is not yet merged or deployed.**
 
-Do not enter real financial data yet. New and returning login, onboarding,
+Do not send real financial text to AI yet. New and returning login, onboarding,
 financial flows, Gemini capture/assistant behavior, encrypted export, manual
 Expense/Income/Transfer recovery and the responsive page sweep passed on the
-final domain. Two-owner isolation, a final-domain restore into a fresh
-household, a real provider-unavailable exercise and privacy approval remain
-release guards.
+final domain. Rollback-only production database isolation and encrypted-recovery
+contracts now pass. Publication, signed-in daily-use acceptance, a real
+provider-unavailable exercise and private-data AI approval remain release
+guards.
 
 | Surface | Current state |
 | --- | --- |
 | Combined message, metadata and unified-entry release | Deployed from `e32b5b6`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, strict text-only intent routing, shared composer and one-time Ask Artha handoff are live |
 | Accounts and cards | Deployed and accepted from `41b53b8`; add/edit, card details, zero-balance archive/restore, available credit and append-only audited balance reconciliation passed signed-in production acceptance |
+| Daily-use transaction candidate | Bounded database search across the complete owner ledger, detail, atomic correction, audited removal, post-confirm recovery and existing-participant repayment are implemented locally; publication pending |
 | Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
 | V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
-| Production `main` | Merge `41b53b8`; account release PRs [#27](https://github.com/snayan06/artha/pull/27) and [#28](https://github.com/snayan06/artha/pull/28) are merged with the earlier V1 releases |
+| Production `main` | `85fd966`; account release documentation PR [#29](https://github.com/snayan06/artha/pull/29) is merged with the earlier V1 releases |
 | GitHub checks | Main CI run [31332275508](https://github.com/snayan06/artha/actions/runs/31332275508) passed Web/API/runtime SQL; CodeQL run [31332275498](https://github.com/snayan06/artha/actions/runs/31332275498) passed JavaScript/TypeScript and Python analysis for `41b53b8` |
 | Vercel | Both production deployments completed for `41b53b8`; the public web, Settings and API health URLs return `200` |
 | Supabase RPC catalog | The exact `artha-production` project now resolves balances, logical activity, encrypted export and atomic restore RPCs |
@@ -48,7 +50,7 @@ release guards.
 | Financial journey | Backdated split expense, `25k` income, `25k` transfer, card expense, filters and live dashboard/member updates passed |
 | Gemini production | Final-domain expense, `25k` income, `25k` transfer and read-only balance assistant were manually verified with fictional data after `c4ae0dc`; hosted fictional gates remain 50/50, 30/30 and 24/24 |
 | Responsive/theme | Home, Transactions, Quick Add, Shared, Assistant and Settings have no horizontal overflow at 320, 390 or 1440 CSS px; light/dark switching and mobile/desktop dark UI passed |
-| Remaining gate | User acceptance of the newly routed flow while signed in; two-owner isolation; full browser-process reopen; final-domain encrypted restore; real provider-unavailable recovery; sanitized log/latency evidence; real-data privacy approval; fresh hosted capture rerun; all Sprint 2+ features |
+| Remaining gate | Daily-use PR/CI/merge/migration/deployment and signed-in acceptance; full browser-process reopen; real provider-unavailable recovery; sanitized log/latency evidence; private-data AI approval; fresh hosted capture rerun |
 
 ## Resume checklist
 
@@ -59,7 +61,7 @@ release guards.
   endpoints resolve through PostgREST instead of returning `PGRST202`.
 - [x] Complete authenticated login, reopen, sign-out, transfer and account-filter
   smoke tests using fictional data.
-- [ ] Complete two-owner hosted isolation.
+- [x] Complete rollback-only two-owner production database isolation.
 - [x] Complete the final-domain 320 px, 390 px and 1440 px primary-page sweep.
 - [x] Implement client-side encrypted export/restore with an empty-household
   restore guard and local SQL round-trip contract.
@@ -81,9 +83,11 @@ release guards.
   for the hardening follow-up.
 - [ ] Verify session persistence across a full browser process close and reopen.
 - [x] Download a client-side encrypted final-domain backup with fictional data.
-- [ ] Restore that backup into a fresh/empty production household and compare totals.
+- [x] Pass the rollback-only encrypted recovery round-trip contract in the exact production database.
+- [ ] Repeat restore through the final-domain UI into a fresh/empty production household.
 - [ ] Approve a real-data privacy configuration before entering real family-finance text.
 - [x] Deploy and accept S2-01 through S2-04 owner account/card maintenance and audited reconciliation.
+- [ ] Publish and accept the daily-use transaction release candidate.
 
 ## Completed in the deployed release and local hardening follow-up
 
@@ -114,8 +118,9 @@ release guards.
 ## Verification checkpoint
 
 ```text
-Current production release web: 20 files, 208 tests passed
+Current production release web: 208 tests passed
 Current production release API: 280 tests passed
+Daily-use candidate: 221 web + 286 API tests, PWA build, 13 migrations, 7 SQL contracts and 60/30/24/49 keyless AI contracts pass
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 12 migrations, seed and 6 SQL contract tests parsed; runtime account behavior contracts passed locally, in PR CI and against production
@@ -123,10 +128,11 @@ AI contracts: 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases v
 Fresh hosted Gemini gate: intent routing completed 49/49 with 48/49 exact, 100% safety accuracy and zero false captures; combined capture rerun remains
 Hardening recovery: focused automated Expense/Income/Transfer, category allow-list, context-retry and provider-unavailable tests pass; final-domain manual Expense/Income/Transfer recovery passed; real provider unavailability remains
 Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
-Production release: PRs #27 and #28 merged as 41b53b8; main CI 31332275508, CodeQL 31332275498 and both web/API Vercel deployments are green
+Production release: main is 85fd966; the daily-use candidate is not yet published
 Release acceptance: isolated fictional browser QA passed routed capture, Ask Artha and mixed-intent choice at 390 px and 1440 px; signed-in final-domain user acceptance remains
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
+Daily-use trust: rollback-only production isolation and encrypted-recovery SQL contracts passed on the exact project; all fictional rows rolled back
 Telemetry: Vercel Web Analytics and Speed Insights are mounted with tested query/fragment redaction
 Authenticated production: new/returning magic link, persisted session, sign-out/re-login and server-owned onboarding passed
 Financial production: expense, income, transfer, card, backdate, split, filters and live chart/member updates passed
