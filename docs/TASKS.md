@@ -10,10 +10,11 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** V1, AI-primary, unified entry and owner account/card
-maintenance are live on production `main` at `85fd966`. A daily-use transaction
-release candidate is under final verification. Do not send real financial text
-to AI until the remaining private-data approval is complete.
+**Current stage:** daily-use V1, AI-primary unified entry, owner account/card
+maintenance and transaction controls are live on production `main` at
+`cc7934c`. PRs #30-#32 passed main CI/CodeQL, exact-SHA deployment and signed-in
+fictional acceptance. Do not send real financial text to AI until the remaining
+private-data approval is complete.
 
 **Current account release:** PRs #27 and #28 add post-onboarding account/card
 maintenance, audited balance reconciliation and clear recoverable uniqueness
@@ -39,9 +40,9 @@ signed-in Settings acceptance are green.
 - [ ] Approve the real-data privacy configuration and re-run all fresh hosted
   fictional gates for the hardening follow-up.
 
-**Next action:** publish and accept the daily-use release candidate, repeat the
-encrypted restore through the final-domain UI and exercise real
-provider-unavailable recovery without losing the submitted text.
+**Next action:** approve the private-data AI mode or keep private capture manual,
+repeat encrypted restore through the final-domain UI, then complete the
+second-identity/browser-process isolation and provider-unavailable drills.
 
 ## Current execution queue
 
