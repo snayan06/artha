@@ -25,6 +25,7 @@ build:
 
 check: lint test build check-sql
 	python scripts/check_capture_evals.py
+	python scripts/check_agent_evals.py
 	$(MAKE) eval-capture-validate
 	$(MAKE) eval-feature-validate
 

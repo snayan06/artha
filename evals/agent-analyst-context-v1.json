@@ -1,0 +1,113 @@
+{
+  "schema_version": "agent-analyst-context-v1",
+  "fixture_notice": "Entirely fictional INR ledger for deterministic agent evaluation. The account snapshot may include history before the bounded transaction window.",
+  "clock": {
+    "today": "2026-08-11",
+    "now": "2026-08-11T21:00:00+05:30",
+    "timezone": "Asia/Kolkata"
+  },
+  "currency": "INR",
+  "policy": {
+    "calculation_basis": "personal_share",
+    "exclude_from_spending": ["income", "transfer", "settlement", "adjustment", "voided"],
+    "maximum_analysis_months": 13,
+    "maximum_evidence_rows": 50
+  },
+  "accounts": [
+    {
+      "id": "acct_river_bank",
+      "name": "River Bank",
+      "kind": "bank",
+      "current_balance_paise": 12000000
+    },
+    {
+      "id": "acct_coastal_bank",
+      "name": "Coastal Bank",
+      "kind": "bank",
+      "current_balance_paise": 8000000
+    },
+    {
+      "id": "acct_cash",
+      "name": "Cash",
+      "kind": "cash",
+      "current_balance_paise": 500000
+    },
+    {
+      "id": "acct_river_card",
+      "name": "River Card",
+      "kind": "credit_card",
+      "current_balance_paise": -3000000,
+      "credit_limit_paise": 10000000,
+      "statement_day": 18,
+      "payment_due_day": 25,
+      "statement_amount_due_paise": null
+    }
+  ],
+  "categories": [
+    {"id": "cat_salary", "name": "Salary", "kind": "income"},
+    {"id": "cat_housing", "name": "Housing", "kind": "expense"},
+    {"id": "cat_entertainment", "name": "Entertainment", "kind": "expense"},
+    {"id": "cat_groceries", "name": "Groceries", "kind": "expense"},
+    {"id": "cat_bills", "name": "Bills", "kind": "expense"},
+    {"id": "cat_food", "name": "Food & Dining", "kind": "expense"},
+    {"id": "cat_transport", "name": "Transport", "kind": "expense"},
+    {"id": "cat_transfer", "name": "Transfer", "kind": "both"}
+  ],
+  "members": [
+    {"id": "member_avery", "name": "Avery", "balance_paise": 150000}
+  ],
+  "transactions": [
+    {"id":"T001","occurred_on":"2026-06-01","created_at":"2026-06-01T09:00:00+05:30","kind":"income","amount_paise":10000000,"personal_share_paise":10000000,"description":"Fictional salary","category_id":"cat_salary","source_account_id":"acct_coastal_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T002","occurred_on":"2026-06-02","created_at":"2026-06-02T09:00:00+05:30","kind":"expense","amount_paise":3000000,"personal_share_paise":3000000,"description":"Fictional rent","category_id":"cat_housing","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T003","occurred_on":"2026-06-05","created_at":"2026-06-05T09:00:00+05:30","kind":"expense","amount_paise":64900,"personal_share_paise":64900,"description":"StreamFlix","category_id":"cat_entertainment","source_account_id":"acct_river_card","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T004","occurred_on":"2026-06-07","created_at":"2026-06-07T09:00:00+05:30","kind":"expense","amount_paise":400000,"personal_share_paise":400000,"description":"Fresh Basket","category_id":"cat_groceries","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T005","occurred_on":"2026-06-10","created_at":"2026-06-10T09:00:00+05:30","kind":"expense","amount_paise":250000,"personal_share_paise":250000,"description":"Electricity","category_id":"cat_bills","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T006","occurred_on":"2026-06-12","created_at":"2026-06-12T09:00:00+05:30","kind":"expense","amount_paise":80000,"personal_share_paise":80000,"description":"Zomato order","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":"Zomato","member_splits":[]},
+    {"id":"T007","occurred_on":"2026-06-17","created_at":"2026-06-17T09:00:00+05:30","kind":"expense","amount_paise":60000,"personal_share_paise":60000,"description":"Burger Barn","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":"Zomato","member_splits":[]},
+    {"id":"T008","occurred_on":"2026-06-21","created_at":"2026-06-21T09:00:00+05:30","kind":"expense","amount_paise":350000,"personal_share_paise":350000,"description":"Fresh Basket","category_id":"cat_groceries","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T009","occurred_on":"2026-07-01","created_at":"2026-07-01T09:00:00+05:30","kind":"income","amount_paise":10000000,"personal_share_paise":10000000,"description":"Fictional salary","category_id":"cat_salary","source_account_id":"acct_coastal_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T010","occurred_on":"2026-07-02","created_at":"2026-07-02T09:00:00+05:30","kind":"expense","amount_paise":3000000,"personal_share_paise":3000000,"description":"Fictional rent","category_id":"cat_housing","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T011","occurred_on":"2026-07-03","created_at":"2026-07-03T09:00:00+05:30","kind":"expense","amount_paise":90000,"personal_share_paise":90000,"description":"Burger Barn","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":"Zomato","member_splits":[]},
+    {"id":"T012","occurred_on":"2026-07-05","created_at":"2026-07-05T09:00:00+05:30","kind":"expense","amount_paise":64900,"personal_share_paise":64900,"description":"StreamFlix","category_id":"cat_entertainment","source_account_id":"acct_river_card","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T013","occurred_on":"2026-07-07","created_at":"2026-07-07T09:00:00+05:30","kind":"expense","amount_paise":450000,"personal_share_paise":450000,"description":"Fresh Basket","category_id":"cat_groceries","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T014","occurred_on":"2026-07-10","created_at":"2026-07-10T09:00:00+05:30","kind":"expense","amount_paise":270000,"personal_share_paise":270000,"description":"Electricity","category_id":"cat_bills","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T015","occurred_on":"2026-07-12","created_at":"2026-07-12T09:00:00+05:30","kind":"expense","amount_paise":100000,"personal_share_paise":100000,"description":"Zomato order","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":"Zomato","member_splits":[]},
+    {"id":"T016","occurred_on":"2026-07-15","created_at":"2026-07-15T09:00:00+05:30","kind":"transfer","amount_paise":2500000,"personal_share_paise":2500000,"description":"Self transfer","category_id":"cat_transfer","source_account_id":"acct_coastal_bank","destination_account_id":"acct_river_bank","platform":null,"member_splits":[]},
+    {"id":"T017","occurred_on":"2026-07-18","created_at":"2026-07-18T09:00:00+05:30","kind":"expense","amount_paise":200000,"personal_share_paise":200000,"description":"City Cab","category_id":"cat_transport","source_account_id":"acct_coastal_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T018","occurred_on":"2026-07-21","created_at":"2026-07-21T09:00:00+05:30","kind":"expense","amount_paise":400000,"personal_share_paise":400000,"description":"Fresh Basket","category_id":"cat_groceries","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T019","occurred_on":"2026-07-23","created_at":"2026-07-23T09:00:00+05:30","kind":"expense","amount_paise":110000,"personal_share_paise":110000,"description":"The Garden Table","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T020","occurred_on":"2026-08-01","created_at":"2026-08-01T09:00:00+05:30","kind":"income","amount_paise":10000000,"personal_share_paise":10000000,"description":"Fictional salary","category_id":"cat_salary","source_account_id":"acct_coastal_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T021","occurred_on":"2026-08-02","created_at":"2026-08-02T09:00:00+05:30","kind":"expense","amount_paise":3000000,"personal_share_paise":3000000,"description":"Fictional rent","category_id":"cat_housing","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T022","occurred_on":"2026-08-03","created_at":"2026-08-03T09:00:00+05:30","kind":"expense","amount_paise":90000,"personal_share_paise":90000,"description":"Burger Barn","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":"Zomato","member_splits":[]},
+    {"id":"T023","occurred_on":"2026-08-05","created_at":"2026-08-05T09:00:00+05:30","kind":"expense","amount_paise":64900,"personal_share_paise":64900,"description":"StreamFlix","category_id":"cat_entertainment","source_account_id":"acct_river_card","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T024","occurred_on":"2026-08-07","created_at":"2026-08-07T09:00:00+05:30","kind":"expense","amount_paise":500000,"personal_share_paise":500000,"description":"Fresh Basket","category_id":"cat_groceries","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T025","occurred_on":"2026-08-08","created_at":"2026-08-08T09:00:00+05:30","kind":"transfer","amount_paise":1500000,"personal_share_paise":1500000,"description":"Card payment","category_id":"cat_transfer","source_account_id":"acct_river_bank","destination_account_id":"acct_river_card","platform":null,"member_splits":[]},
+    {"id":"T026","occurred_on":"2026-08-09","created_at":"2026-08-09T09:00:00+05:30","kind":"expense","amount_paise":300000,"personal_share_paise":150000,"description":"Shared groceries","category_id":"cat_groceries","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[{"member_id":"member_avery","amount_paise":150000}]},
+    {"id":"T027","occurred_on":"2026-08-10","created_at":"2026-08-10T09:00:00+05:30","kind":"expense","amount_paise":260000,"personal_share_paise":260000,"description":"Electricity","category_id":"cat_bills","source_account_id":"acct_river_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T028","occurred_on":"2026-08-10","created_at":"2026-08-10T20:00:00+05:30","kind":"expense","amount_paise":120000,"personal_share_paise":120000,"description":"Zomato order","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":"Zomato","member_splits":[]},
+    {"id":"T029","occurred_on":"2026-08-11","created_at":"2026-08-11T18:00:00+05:30","kind":"expense","amount_paise":220000,"personal_share_paise":220000,"description":"City Cab","category_id":"cat_transport","source_account_id":"acct_coastal_bank","destination_account_id":null,"platform":null,"member_splits":[]},
+    {"id":"T030","occurred_on":"2026-08-11","created_at":"2026-08-11T20:00:00+05:30","kind":"expense","amount_paise":160000,"personal_share_paise":160000,"description":"The Garden Table","category_id":"cat_food","source_account_id":"acct_river_card","destination_account_id":null,"platform":null,"member_splits":[]}
+  ],
+  "expected_aggregates": {
+    "liquid_balance_paise": 20500000,
+    "net_position_paise": 17500000,
+    "credit_card_outstanding_paise": 3000000,
+    "monthly_personal_spend_paise": {
+      "2026-06": 4204900,
+      "2026-07": 4684900,
+      "2026-08-through-11": 4564900
+    },
+    "monthly_income_paise": {
+      "2026-06": 10000000,
+      "2026-07": 10000000,
+      "2026-08-through-11": 10000000
+    },
+    "observed_monthly_commitment_base_paise": 3324900
+  },
+  "recurrence_expectations": [
+    {"fact_id":"recurring.rent","description":"Fictional rent","occurrences":3,"cadence":"monthly","median_amount_paise":3000000,"range_paise":[3000000,3000000],"evidence_ids":["T002","T010","T021"]},
+    {"fact_id":"recurring.streaming","description":"StreamFlix","occurrences":3,"cadence":"monthly","median_amount_paise":64900,"range_paise":[64900,64900],"evidence_ids":["T003","T012","T023"]},
+    {"fact_id":"recurring.electricity","description":"Electricity","occurrences":3,"cadence":"monthly","median_amount_paise":260000,"range_paise":[250000,270000],"evidence_ids":["T005","T014","T027"]},
+    {"fact_id":"recurring.groceries","description":"Fresh Basket","occurrences":5,"cadence":"approximately_fortnightly","median_amount_paise":400000,"range_paise":[350000,500000],"evidence_ids":["T004","T008","T013","T018","T024"]}
+  ]
+}

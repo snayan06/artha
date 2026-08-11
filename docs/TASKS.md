@@ -88,7 +88,8 @@ second-identity/browser-process isolation and provider-unavailable drills.
   bounded first 200 relevant matches instead of downloading every page.
 - [x] Add existing-participant repayment recording without counting settlement
   as spending or income.
-- [ ] Show assistant evidence date range, source count and matching transactions.
+- [x] Show assistant evidence date range, source count and matching transactions,
+  with exact owner-scoped drill-down and honest recent-sample/cap messaging.
 - [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
 - [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the production model.
 - [x] Select Gemini 3.5 Flash-Lite for sample-data evaluation and configure it server-side only.
@@ -162,10 +163,22 @@ work. Full rationale and acceptance criteria:
   examples (`25k`, transfers and custom accounts) or replace it with a clearly
   manual-only offline demo contract.
 - [ ] Add optional WhatsApp or Telegram capture.
+- [ ] Build the post-August 13 private WhatsApp **history import** from the
+  [review-before-write plan](artifacts/product/2026-08-11-private-whatsapp-history-import-plan.md):
+  parse the ZIP locally, stage structured rows, block ambiguous/member-paid
+  entries, deduplicate replays and commit only an explicitly confirmed atomic
+  batch. Never upload or commit the personal source export.
 - [ ] Add a future **Investments** tab, starting with mutual funds and stocks;
   approve the detailed tracking, valuation and import scope during sprint planning.
-- [ ] Plan the future bounded agentic evolution of Ask Artha in a dedicated
-  sprint; do not add a multi-step agent runtime to the current messaging release.
+- [x] Plan the bounded agentic evolution of Ask Artha: typed read-only tools,
+  deterministic scenarios, evidence-linked generative UI, authority limits,
+  operational budgets and system-level evaluations are specified in the
+  [Artha Analyst plan](artifacts/architecture/2026-08-11-artha-analyst-agent-plan.md).
+- [ ] Build the bounded multi-step analyst behind the demo/test-account flag;
+  do not expose write tools or real-data scenarios until the privacy and eval
+  gates pass.
+- [x] Select Google ADK for the demo/test-account analyst runtime and trajectory
+  evals; retain the direct Gemini production assistant until the ADK gates pass.
 - [ ] Normalize reusable household tags and aliases in relational tables, then
   add merchant/platform/category analytics through canonical assistant bundles.
 
@@ -282,11 +295,15 @@ work. Full rationale and acceptance criteria:
   Ollama for development; retire hosted alternate providers from active runtime.
 - [x] Add analytics assistant with user-scoped read-only summaries.
 - [x] Return validated metric, chart and transaction-table schemas.
-- [ ] Show evidence date range, source count and matching transactions.
+- [x] Show evidence date range, source count and matching transactions, including
+  local/demo and production exact-entry recovery.
 - [ ] Add evaluation cases for totals, comparisons and affordability questions.
-- [ ] Hold a dedicated sprint-planning session for agentic Ask Artha: define its
-  read-only tool catalogue, deterministic evidence contract, generative UI,
-  authority limits, privacy/audit model, cost/latency budgets and evaluations.
+- [x] Define the agentic Ask Artha read-only tool catalogue, deterministic
+  evidence contract, scenario semantics, generative UI, authority limits,
+  privacy/audit model, cost/latency budgets and evaluations.
+- [ ] Benchmark Gemini 3.5 Flash-Lite and Gemini 3.6 Flash on the versioned
+  planner, calculation, evidence, follow-up, scenario and safety suites before
+  selecting the analyst model.
 - [x] Build versioned fictional capture, auto-tag and assistant benchmarks and select Gemini for production from measured results.
 - [ ] Add optional Telegram/WhatsApp capture adapter.
 - [ ] Add a top-level **Investments** tab for mutual funds and stocks first;

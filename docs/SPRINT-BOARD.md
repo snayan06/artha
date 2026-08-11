@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 10 August 2026
+Updated: 11 August 2026
 Goal: make personal production use trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -81,6 +81,18 @@ acceptance checks.
 | 4 | Email invitations and **Shared with me** | Separate users need a safe, limited shared view | Invited user sees only shared items, never the owner's private accounts or balances |
 | 5 | Evidence-backed Ask Artha analytics | The assistant should explain numbers, not only return a card | Date range, source count and matching transactions accompany every answer |
 | 6 | Investments discovery | Mutual funds and stocks need portfolio-specific concepts | Product/schema brief for holdings, transactions, valuation and returns before implementation |
+
+Agentic follow-up is now specified in the
+[Artha Analyst plan](artifacts/architecture/2026-08-11-artha-analyst-agent-plan.md).
+The current release adds evidence to the safe fixed-intent assistant; the next
+sprint benchmarks a demo-only bounded analyst with typed read-only tools,
+deterministic scenario arithmetic and end-to-end agent evaluations.
+
+Post-August 13, historical WhatsApp data is a separate review-before-write
+import slice, not part of the live messaging-channel release. Its local-only
+parser, ambiguity handling, duplicate contract, participant-payer dependency
+and atomic confirmation gate are defined in the
+[private WhatsApp history import plan](artifacts/product/2026-08-11-private-whatsapp-history-import-plan.md).
 
 ## Sprint 1 — trust and capture foundation
 
@@ -242,10 +254,23 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 - [x] Add deterministic and hosted-model scoring runners for the 60-case dataset.
 - [ ] Publish separate amount/date/account/transfer/split/Hinglish error slices.
 - [x] Select hosted Gemini for sample-data traffic after all critical-field gates pass.
-- [ ] Show assistant evidence range, source count and matching transactions.
+- [x] Show assistant evidence range, source count and matching transactions;
+  exact-entry drill-down is owner-scoped and works outside the loaded page.
 - [ ] Prove assistant totals equal deterministic database calculations.
 
 ## Sprint 4 — optional channels and net-worth foundation
+
+### Historical WhatsApp import (post-August 13)
+
+- [ ] Parse WhatsApp ZIP/text exports in the browser without uploading the raw
+  archive or sending it to an LLM.
+- [ ] Map timezone, senders and accounts; stage every candidate for review and
+  block ambiguous or unsupported member-paid rows.
+- [ ] Add household-scoped fingerprinting, replay detection and an atomic,
+  explicitly confirmed import RPC using only structured reviewed drafts.
+- [ ] Pass synthetic parser, duplicate, rollback, isolation, recovery and
+  responsive UI acceptance from the
+  [import plan](artifacts/product/2026-08-11-private-whatsapp-history-import-plan.md).
 
 ### Messaging capture (independent release gate)
 
