@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff and release guard.
 
-Updated: 10 August 2026
+Updated: 11 August 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
@@ -11,8 +11,10 @@ For the current ordered delivery view, blockers and user actions, see
 ## Live launch status
 
 **Current stage:** daily-use V1, AI-primary unified entry, owner account/card
-maintenance and transaction controls are live on production `main` at
-`cc7934c`. PRs #30-#32 passed main CI/CodeQL, exact-SHA deployment and signed-in
+maintenance, transaction controls and evidence-backed Ask Artha are live on
+production `main` at `b61858c`. PR #37 passed main CI/CodeQL, exact-SHA
+deployment, exact-project database acceptance and signed-in non-mutating
+production smoke checks. PRs #30-#32 previously passed signed-in
 fictional acceptance. Do not send real financial text to AI until the remaining
 private-data approval is complete.
 
@@ -90,7 +92,9 @@ second-identity/browser-process isolation and provider-unavailable drills.
   as spending or income.
 - [x] Show assistant evidence date range, source count and matching transactions,
   with exact owner-scoped drill-down and honest recent-sample/cap messaging.
-- [ ] Add representative assistant evaluation cases for totals, comparisons and affordability.
+- [x] Add a 30-case fictional bounded-analyst acceptance dataset for totals,
+  comparisons, affordability, refusal, evidence and scenario arithmetic. The
+  runtime/model trajectory benchmark remains a next-sprint task.
 - [x] Run capture, auto-tag and assistant hosted benchmarks before selecting the production model.
 - [x] Select Gemini 3.5 Flash-Lite for sample-data evaluation and configure it server-side only.
 - [x] Remove deterministic production language parsing and fail into exact-text manual review without saving.
@@ -130,7 +134,7 @@ work. Full rationale and acceptance criteria:
   type correction and exact-text preservation.
 - [x] Replace free-text category correction with server-owned, direction-valid
   category selection and explicit unavailable/retry states.
-- [ ] Add an immediate **View transaction** recovery entry point after confirm;
+- [x] Add an immediate **View transaction** recovery entry point after confirm;
   reuse the planned audited correction/soft-delete workflow rather than adding
   another mutation path.
 - [x] Show an in-product Gemini/provider data-use disclosure and keep the
@@ -140,7 +144,7 @@ work. Full rationale and acceptance criteria:
   and explicit disabled-confirm reason without losing the draft.
 - [ ] Approve a privacy configuration for real family-finance text; the current
   implementation and disclosure authorize sample data only.
-- [ ] Remove stale active-QA claims of deterministic production capture or
+- [x] Remove stale active-QA claims of deterministic production capture or
   assistant fallback; keep provider benchmarks historical.
 
 **Sprint 2 product quality:**
