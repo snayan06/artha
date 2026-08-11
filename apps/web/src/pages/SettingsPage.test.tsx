@@ -10,7 +10,7 @@ describe('SettingsPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows the server-owned private-data policy and analytics notice', async () => {
+  it('keeps the server-owned private-data policy in a compact disclosure', async () => {
     vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
       configured: true,
@@ -23,14 +23,22 @@ describe('SettingsPage', () => {
     })
     render(<RouterProvider><SettingsPage /></RouterProvider>)
 
-    const notice = screen.getByRole('region', { name: /AI and data use/i })
-    await waitFor(() => expect(within(notice).getByText('AI is enabled for this account.')).toBeVisible())
-    expect(within(notice).getByText(/cannot write to your ledger/i)).toHaveTextContent(/requires your confirmation/i)
-    expect(within(notice).getByText(/Provider and data details/i)).toBeVisible()
-    expect(within(notice).getByText(/Gemini · gemini-3.5-flash-lite/i)).toBeInTheDocument()
-    expect(within(notice).getByText(/store=false/i)).toBeInTheDocument()
+    const summary = screen.getByText('Privacy & AI')
+    const notice = summary.closest('details')
+    expect(notice).not.toBeNull()
+    expect(screen.queryByText('Privacy controls')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI is enabled for this account.')).not.toBeInTheDocument()
+    expect(within(notice as HTMLElement).getByText('How Artha uses AI and analytics')).toBeVisible()
+    await waitFor(() => expect(within(notice as HTMLElement).getByText(/Gemini · gemini-3.5-flash-lite/i)).toBeInTheDocument())
+    expect(within(notice as HTMLElement).getByText(/Gemini · gemini-3.5-flash-lite/i)).not.toBeVisible()
+
+    fireEvent.click(summary)
+
+    await waitFor(() => expect(within(notice as HTMLElement).getByText(/Gemini · gemini-3.5-flash-lite/i)).toBeVisible())
+    expect(within(notice as HTMLElement).getByText(/cannot write to your ledger/i)).toHaveTextContent(/requires your confirmation/i)
+    expect(within(notice as HTMLElement).getByText(/store=false/i)).toBeVisible()
     expect(notice).not.toHaveTextContent(/fictional|pilot/i)
-    expect(within(notice).getByText(/Vercel analytics receives no/i)).toHaveTextContent(/financial text, amounts, emails, account or member names, or assistant questions/i)
+    expect(within(notice as HTMLElement).getByText(/Vercel analytics receives no/i)).toHaveTextContent(/financial text, amounts, emails, account or member names, or assistant questions/i)
   })
 
   it('explains sample-only policy without claiming personal AI is available', async () => {
@@ -46,9 +54,12 @@ describe('SettingsPage', () => {
     })
     render(<RouterProvider><SettingsPage /></RouterProvider>)
 
-    const notice = screen.getByRole('region', { name: /AI and data use/i })
-    expect(await within(notice).findByText('Private financial text is not sent to AI.')).toBeVisible()
-    expect(within(notice).getByText(/Manual entry remains available/i)).toHaveTextContent(/server policy.*not a browser switch/i)
+    const summary = screen.getByText('Privacy & AI')
+    const notice = summary.closest('details')
+    expect(notice).not.toBeNull()
+    fireEvent.click(summary)
+    expect(await within(notice as HTMLElement).findByText('Private financial text is not sent to AI.')).toBeVisible()
+    expect(within(notice as HTMLElement).getByText(/Manual entry remains available/i)).toHaveTextContent(/server policy.*not a browser switch/i)
   })
 
   it('shows every account balance with a reconciliation action', async () => {
