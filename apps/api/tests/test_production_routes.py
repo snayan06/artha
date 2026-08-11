@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -12,12 +12,16 @@ from pydantic import ValidationError
 from artha_api import production_routes
 from artha_api.assistant import (
     AssistantChatRequest,
+    AssistantChatResponse,
+    AssistantCompletion,
+    AssistantIntent,
     AssistantStatus,
     CaptureClarification,
     CaptureDraftInterpretation,
     CaptureInterpretationResponse,
     LlmProvider,
     LocalFinancialAssistant,
+    MetricWidget,
     TagSuggestion,
     TagSuggestionRequest,
     TagSuggestionResponse,
@@ -31,6 +35,7 @@ from artha_api.production_routes import (
     assistant_status,
     assistant_tag_suggestion,
     confirm_transaction,
+    get_transaction,
     list_transactions,
     member_balances,
     parse_draft,
@@ -298,6 +303,407 @@ async def test_production_assistant_routes_return_503_when_provider_is_disabled(
     )
 
 
+async def test_production_assistant_attaches_server_owned_ledger_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now().astimezone()
+    occurred_at = now.isoformat()
+
+    async def evidence_dashboard(
+        _client: object, _auth: AuthContext
+    ) -> dict[str, object]:
+        return {
+            "total_balance_paise": 100_000,
+            "spend_paise": 18_400,
+            "income_paise": 0,
+            "member_balances": [],
+            "spend_by_category": [
+                {"category": "Food & Dining", "amount_paise": 18_400}
+            ],
+            "monthly": [],
+            "current_month_transaction_count": 1,
+            "six_month_transaction_count": 1,
+            "ledger_activity_capped": False,
+            "recent_transactions": [
+                {
+                    "id": TRANSACTION_ID,
+                    "occurred_at": occurred_at,
+                    "kind": "expense",
+                    "personal_share_paise": 18_400,
+                    "amount_paise": 18_400,
+                    "description": "Zomato",
+                    "category": "Food & Dining",
+                    "splits": [],
+                }
+            ],
+        }
+
+    class EvidenceAssistant:
+        async def chat(self, _message: str, _context: object) -> AssistantChatResponse:
+            return AssistantChatResponse(
+                provider=LlmProvider.GEMINI,
+                model="test-model",
+                mode="model",
+                result=AssistantCompletion(
+                    message="Here is your spending overview.",
+                    intent=AssistantIntent.SPENDING,
+                    widgets=[
+                        MetricWidget(
+                            type="metric",
+                            title="Spending this month",
+                            value_paise=18_400,
+                            tone="warning",
+                        )
+                    ],
+                ),
+            )
+
+    monkeypatch.setattr("artha_api.production_routes.dashboard", evidence_dashboard)
+    monkeypatch.setattr(
+        "artha_api.production_routes.LocalFinancialAssistant", EvidenceAssistant
+    )
+
+    response = await assistant_chat(
+        AssistantChatRequest(message="Where did I spend the most?"),
+        cast(SupabaseRestClient, FakeProductionClient()),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert response.evidence is not None
+    assert response.evidence.period == "Current month"
+    assert response.evidence.source_count == 1
+    assert response.evidence.basis == (
+        "Confirmed personal expense shares in the current calendar month; "
+        "transfers and settlements excluded."
+    )
+    assert response.evidence.transactions[0].id == TRANSACTION_ID
+    assert response.evidence.transactions[0].label == "Zomato"
+
+
+def test_assistant_evidence_filters_periods_and_preserves_zero_personal_share() -> None:
+    current_month = datetime.now(UTC).strftime("%Y-%m")
+    current_expense = {
+        "id": TRANSACTION_ID,
+        "occurred_at": f"{current_month}-02T12:00:00+00:00",
+        "kind": "expense",
+        "personal_share_paise": 0,
+        "amount_paise": 50_000,
+        "description": "Shared dinner",
+        "category": "Food & Dining",
+        "splits": [{"member_id": MEMBER_ID, "amount_paise": 50_000}],
+    }
+    previous_year_expense = {
+        **current_expense,
+        "id": "00000000-0000-0000-0000-000000000119",
+        "occurred_at": "2025-01-02T12:00:00+00:00",
+        "personal_share_paise": 20_000,
+        "amount_paise": 20_000,
+        "description": "Old dinner",
+    }
+    summary: dict[str, object] = {
+        "recent_transactions": [current_expense, previous_year_expense],
+        "current_month_expense_count": 1,
+        "six_month_transaction_count": 1,
+        "ledger_activity_capped": True,
+    }
+
+    spending = production_routes.assistant_evidence(
+        AssistantIntent.SPENDING, summary
+    )
+    cashflow = production_routes.assistant_evidence(
+        AssistantIntent.CASHFLOW, summary
+    )
+
+    assert spending.source_count == 1
+    assert spending.capped is True
+    assert [item.label for item in spending.transactions] == ["Shared dinner"]
+    assert spending.transactions[0].amount_paise == 0
+    assert [item.label for item in cashflow.transactions] == ["Shared dinner"]
+
+
+def test_recent_activity_evidence_matches_the_model_visible_activity_kinds() -> None:
+    occurred_at = f"{datetime.now(UTC).strftime('%Y-%m')}-02T12:00:00+00:00"
+    summary: dict[str, object] = {
+        "recent_transactions": [
+            {
+                "id": "00000000-0000-0000-0000-000000000118",
+                "occurred_at": occurred_at,
+                "kind": "adjustment",
+                "personal_share_paise": 0,
+                "amount_paise": 50_000,
+                "description": "Balance correction",
+            },
+            {
+                "id": TRANSACTION_ID,
+                "occurred_at": occurred_at,
+                "kind": "expense",
+                "personal_share_paise": 18_400,
+                "amount_paise": 18_400,
+                "description": "Zomato",
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000117",
+                "occurred_at": occurred_at,
+                "kind": "transfer",
+                "personal_share_paise": 0,
+                "amount_paise": 2_500_000,
+                "description": "Move to savings",
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000116",
+                "occurred_at": occurred_at,
+                "kind": "settlement",
+                "personal_share_paise": 0,
+                "amount_paise": 50_000,
+                "description": "Repayment from Harmi",
+            },
+        ],
+        "latest_activity_count": 3,
+        "ledger_activity_capped": True,
+    }
+
+    evidence = production_routes.assistant_evidence(
+        AssistantIntent.TRANSACTIONS, summary
+    )
+
+    assert evidence.source_count == 3
+    assert evidence.capped is False
+    assert [item.label for item in evidence.transactions] == [
+        "Zomato",
+        "Move to savings",
+        "Repayment from Harmi",
+    ]
+    assert [item.amount_paise for item in evidence.transactions] == [
+        18_400,
+        2_500_000,
+        50_000,
+    ]
+
+
+def test_shared_evidence_counts_and_links_settlement_activity() -> None:
+    summary: dict[str, object] = {
+        "recent_transactions": [
+            {
+                "id": TRANSACTION_ID,
+                "occurred_at": "2026-08-11T12:00:00+00:00",
+                "kind": "settlement",
+                "personal_share_paise": 0,
+                "amount_paise": 50_000,
+                "description": "Repayment from Harmi",
+                "splits": [],
+            }
+        ],
+        "shared_source_count": 7,
+        "ledger_activity_capped": False,
+    }
+
+    evidence = production_routes.assistant_evidence(AssistantIntent.SHARED, summary)
+
+    assert evidence.source_count == 7
+    assert evidence.transactions[0].id == TRANSACTION_ID
+    assert evidence.transactions[0].amount_paise == 50_000
+
+
+@pytest.mark.parametrize(
+    ("intent", "expected_period", "expected_source_count"),
+    [
+        (AssistantIntent.SUMMARY, "Current balances and current month", 3),
+        (AssistantIntent.SPENDING, "Current month", 2),
+        (AssistantIntent.INCOME, "Current month", 1),
+        (AssistantIntent.CASHFLOW, "Last 6 calendar months", 4),
+        (AssistantIntent.SHARED, "Current household position", 3),
+        (AssistantIntent.TRANSACTIONS, "Latest ledger activity", 6),
+        (AssistantIntent.CLARIFICATION, "No ledger range selected", 0),
+        (AssistantIntent.UNSUPPORTED, "No ledger range selected", 0),
+    ],
+)
+def test_assistant_evidence_uses_server_derived_source_counts(
+    intent: AssistantIntent,
+    expected_period: str,
+    expected_source_count: int,
+) -> None:
+    summary: dict[str, object] = {
+        "recent_transactions": [],
+        "current_month_transaction_count": 3,
+        "current_month_expense_count": 2,
+        "current_month_income_count": 1,
+        "six_month_transaction_count": 4,
+        "shared_source_count": 3,
+        "latest_activity_count": 6,
+        "ledger_activity_capped": False,
+    }
+
+    evidence = production_routes.assistant_evidence(intent, summary)
+
+    assert evidence.period == expected_period
+    assert evidence.source_count == expected_source_count
+
+
+@pytest.mark.parametrize("has_overflow", [False, True])
+async def test_dashboard_reports_activity_cap_only_when_an_extra_row_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    has_overflow: bool,
+) -> None:
+    calls: list[int] = []
+    current_month = datetime.now(UTC).strftime("%Y-%m")
+    row = {
+        "id": TRANSACTION_ID,
+        "kind": "expense",
+        "amount_paise": 1,
+        "personal_share_paise": 1,
+        "category": "Other",
+        "occurred_at": f"{current_month}-01T00:00:00+00:00",
+        "splits": [],
+    }
+
+    async def fake_current_household(
+        _client: object, *, required: bool = True
+    ) -> str | None:
+        del required
+        return HOUSEHOLD_ID
+
+    async def fake_owner_member(
+        _client: object, _household_id: str, _user_id: str
+    ) -> dict[str, object]:
+        return {"id": OWNER_ID}
+
+    async def fake_member_rows(
+        _client: object, _household_id: str
+    ) -> list[dict[str, object]]:
+        return []
+
+    async def fake_account_rows(
+        _client: object,
+        _household_id: str,
+        *,
+        include_archived: bool = False,
+    ) -> list[dict[str, object]]:
+        del include_archived
+        return [{"current_balance_paise": 0}]
+
+    async def fake_shared_balance_rows(
+        _client: object,
+        _household_id: str,
+        _members: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        return []
+
+    async def fake_ledger_activity_rows(
+        _client: object,
+        _household_id: str,
+        *,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        calls.append(limit)
+        return [row] * (1001 if has_overflow else 1000)
+
+    monkeypatch.setattr(production_routes, "current_household", fake_current_household)
+    monkeypatch.setattr(production_routes, "owner_member", fake_owner_member)
+    monkeypatch.setattr(production_routes, "member_rows", fake_member_rows)
+    monkeypatch.setattr(production_routes, "account_rows", fake_account_rows)
+    monkeypatch.setattr(
+        production_routes, "shared_balance_rows", fake_shared_balance_rows
+    )
+    monkeypatch.setattr(
+        production_routes, "ledger_activity_rows", fake_ledger_activity_rows
+    )
+
+    result = await production_routes.dashboard(
+        cast(SupabaseRestClient, object()),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert calls == [1001]
+    assert result["ledger_activity_capped"] is has_overflow
+    assert result["current_month_expense_count"] == 1000
+
+
+async def test_dashboard_activity_reader_uses_settlement_aware_cursor_rpc() -> None:
+    class SettlementPageClient:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, dict[str, object] | None]] = []
+
+        async def rpc(
+            self, name: str, payload: dict[str, object] | None = None
+        ) -> object:
+            self.calls.append((name, payload))
+            return [
+                {
+                    "id": TRANSACTION_ID,
+                    "kind": "settlement",
+                    "amount_paise": 50_000,
+                    "personal_share_paise": 0,
+                    "occurred_at": "2026-08-11T12:00:00+00:00",
+                    "created_at": "2026-08-11T12:00:00+00:00",
+                }
+            ]
+
+    fake = SettlementPageClient()
+
+    rows = await production_routes.ledger_activity_rows(
+        cast(SupabaseRestClient, fake), HOUSEHOLD_ID, limit=1001
+    )
+
+    assert [row["kind"] for row in rows] == ["settlement"]
+    assert fake.calls == [
+        (
+            "list_ledger_activity_page",
+            {
+                "p_household_id": HOUSEHOLD_ID,
+                "p_limit": 201,
+                "p_before_occurred_at": None,
+                "p_before_created_at": None,
+                "p_before_id": None,
+            },
+        )
+    ]
+
+
+async def test_dashboard_activity_reader_advances_the_stable_cursor() -> None:
+    first_page = [
+        {
+            "id": f"activity-{index}",
+            "kind": "expense",
+            "occurred_at": "2026-08-11T12:00:00+00:00",
+            "created_at": f"2026-08-11T11:{index % 60:02d}:00+00:00",
+        }
+        for index in range(201)
+    ]
+    settlement = {
+        "id": TRANSACTION_ID,
+        "kind": "settlement",
+        "occurred_at": "2026-08-10T12:00:00+00:00",
+        "created_at": "2026-08-10T12:00:00+00:00",
+    }
+
+    class CursorPageClient:
+        def __init__(self) -> None:
+            self.payloads: list[dict[str, object]] = []
+
+        async def rpc(
+            self, _name: str, payload: dict[str, object] | None = None
+        ) -> object:
+            assert payload is not None
+            self.payloads.append(payload)
+            return first_page if len(self.payloads) == 1 else [settlement]
+
+    fake = CursorPageClient()
+
+    rows = await production_routes.ledger_activity_rows(
+        cast(SupabaseRestClient, fake), HOUSEHOLD_ID, limit=1001
+    )
+
+    assert len(rows) == 202
+    assert rows[-1]["kind"] == "settlement"
+    assert fake.payloads[1] == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_limit": 201,
+        "p_before_occurred_at": first_page[-1]["occurred_at"],
+        "p_before_created_at": first_page[-1]["created_at"],
+        "p_before_id": first_page[-1]["id"],
+    }
+
+
 class FakeProductionClient:
     def __init__(
         self,
@@ -431,6 +837,31 @@ class FakeProductionClient:
                 "created_at": "2026-08-03T12:00:00+00:00",
             }
             return [first, older] if payload and payload["p_before_id"] is None else [older]
+        if name == "get_ledger_activity":
+            self.activity_payload = payload
+            if payload and payload["p_activity_id"] == TRANSACTION_ID:
+                return {
+                    "id": TRANSACTION_ID,
+                    "kind": "transfer",
+                    "amount_paise": 2_500_000,
+                    "personal_share_paise": 2_500_000,
+                    "description": "Self transfer",
+                    "category": "Transfer",
+                    "paid_by_member_id": None,
+                    "source_account_id": ACCOUNT_ID,
+                    "destination_account_id": DESTINATION_ACCOUNT_ID,
+                    "settlement_member_id": None,
+                    "settlement_direction": None,
+                    "occurred_at": "2026-08-04T12:00:00+00:00",
+                    "notes": "Self transfer",
+                    "splits": [],
+                    "is_deleted": False,
+                    "created_at": "2026-08-04T12:00:00+00:00",
+                    "updated_at": "2026-08-04T12:00:00+00:00",
+                    "account_delta_paise": 0,
+                    "member_balance_deltas": [],
+                }
+            return None
         if name == "search_ledger_activity":
             self.activity_payload = payload
             return [{
@@ -1764,6 +2195,55 @@ async def test_transaction_history_pages_logical_activity_in_database() -> None:
         "created_at": "2026-08-04T12:00:00+00:00",
         "id": TRANSACTION_ID,
     }
+
+
+async def test_transaction_detail_uses_exact_owner_scoped_activity_rpc() -> None:
+    fake = FakeProductionClient()
+
+    result = await get_transaction(
+        UUID(TRANSACTION_ID),
+        cast(SupabaseRestClient, fake),
+        AuthContext(user_id=USER_ID),
+    )
+
+    assert fake.activity_payload == {
+        "p_household_id": HOUSEHOLD_ID,
+        "p_activity_id": TRANSACTION_ID,
+    }
+    assert result["id"] == TRANSACTION_ID
+    assert result["kind"] == "transfer"
+    assert result["destination_account_id"] == DESTINATION_ACCOUNT_ID
+
+
+async def test_transaction_detail_returns_404_for_unknown_or_foreign_activity() -> None:
+    fake = FakeProductionClient()
+
+    with pytest.raises(HTTPException) as error:
+        await get_transaction(
+            UUID("00000000-0000-0000-0000-000000000199"),
+            cast(SupabaseRestClient, fake),
+            AuthContext(user_id=USER_ID),
+        )
+
+    assert error.value.status_code == 404
+    assert error.value.detail == "transaction not found"
+
+
+async def test_transaction_detail_http_route_returns_canonical_activity() -> None:
+    fake = FakeProductionClient()
+    app = FastAPI()
+    app.include_router(production_routes.router)
+    app.dependency_overrides[get_auth_context] = lambda: AuthContext(user_id=USER_ID)
+    app.dependency_overrides[production_routes.production_client] = lambda: fake
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(f"/api/v1/transactions/{TRANSACTION_ID}")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == TRANSACTION_ID
+    assert response.json()["kind"] == "transfer"
 
 
 async def test_transaction_search_runs_inside_database_over_notes() -> None:

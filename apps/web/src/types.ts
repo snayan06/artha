@@ -195,10 +195,27 @@ export type AssistantWidget =
   | { type: 'table'; title: string; columns: string[]; rows: string[][] }
   | { type: 'clarification'; question: string; options: string[] }
 
+export interface AssistantEvidenceTransaction {
+  id: string
+  occurredOn: string
+  label: string
+  kind: 'expense' | 'income' | 'transfer' | 'settlement' | 'adjustment'
+  amountPaise: Paise
+}
+
+export interface AssistantEvidence {
+  period: string
+  basis: string
+  sourceCount: number
+  capped: boolean
+  transactions: AssistantEvidenceTransaction[]
+}
+
 export interface AssistantReply {
   message: string
   widgets: AssistantWidget[]
   provider: string
+  evidence: AssistantEvidence
 }
 
 export interface AssistantRuntimeStatus {

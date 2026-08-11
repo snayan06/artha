@@ -11,6 +11,19 @@ function assistantEnvelope(widget: Record<string, unknown>, overrides: Record<st
       intent: 'summary',
       widgets: [widget]
     },
+    evidence: {
+      period: 'Current month',
+      basis: 'Personal share; transfers excluded.',
+      source_count: 3,
+      capped: false,
+      transactions: [{
+        id: '00000000-0000-0000-0000-000000000106',
+        occurred_on: '2026-08-11',
+        label: 'Food & Dining',
+        kind: 'expense',
+        amount_paise: 12345
+      }]
+    },
     ...overrides
   }
 }
@@ -217,6 +230,36 @@ describe('FastAPI adapter', () => {
       createdAt: '2025-01-01T12:01:00Z',
       id: 'older-1'
     })
+  })
+
+  it('fetches one authenticated transaction by its exact ledger id', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.artha.test')
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const json = (value: unknown) => new Response(JSON.stringify(value), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (url.endsWith('/api/v1/accounts')) return json([{ id: 'account-1', name: 'ICICI Bank' }])
+      if (url.endsWith('/api/v1/members')) return json([])
+      if (url.endsWith('/api/v1/transactions/older-evidence')) return json({
+        id: 'older-evidence', kind: 'expense', amount_paise: 184000,
+        personal_share_paise: 184000, description: 'Older Zomato order',
+        category: 'Food & Dining', source_account_id: 'account-1',
+        occurred_at: '2025-01-01T12:00:00Z', splits: []
+      })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { getTransactionById } = await import('./api')
+
+    await expect(getTransactionById('older-evidence')).resolves.toMatchObject({
+      id: 'older-evidence',
+      merchant: 'Older Zomato order',
+      account: 'ICICI Bank'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
   it('keeps settlements and balance corrections distinct from spending and income', async () => {
@@ -636,7 +679,12 @@ describe('FastAPI adapter', () => {
         { type: 'metric', title: 'Spend', value_paise: 12345, caption: 'This month', tone: 'neutral' },
         { type: 'chart', title: 'Trend', chart_type: 'line', points: [{ label: 'Aug', value_paise: 5000 }] },
         { type: 'clarification', question: 'Which period?', choices: ['This month'] }
-      ] }
+      ] },
+      evidence: {
+        period: 'Current month', basis: 'Personal share; transfers excluded.',
+        source_count: 3, capped: false,
+        transactions: [{ id: 'txn-1', occurred_on: '2026-08-11', label: 'Zomato', kind: 'expense', amount_paise: 12345 }]
+      }
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
     const { chatAssistant } = await import('./api')
@@ -645,9 +693,58 @@ describe('FastAPI adapter', () => {
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ message: 'Show spending' })
     expect(reply.message).toBe('Here is your spending overview.')
     expect(reply.provider).toBe('gemini · gemini-3.5-flash-lite')
-    expect(Object.keys(reply).sort()).toEqual(['message', 'provider', 'widgets'])
+    expect(Object.keys(reply).sort()).toEqual(['evidence', 'message', 'provider', 'widgets'])
+    expect(reply.evidence).toEqual({
+      period: 'Current month',
+      basis: 'Personal share; transfers excluded.',
+      sourceCount: 3,
+      capped: false,
+      transactions: [{ id: 'txn-1', occurredOn: '2026-08-11', label: 'Zomato', kind: 'expense', amountPaise: 12345 }]
+    })
     expect(reply.widgets.map((widget) => widget.type)).toEqual(['metric', 'line_chart', 'clarification'])
     expect(JSON.stringify(reply)).not.toContain('onerror')
+  })
+
+  it('rejects assistant evidence containing unapproved fields or unsafe values', async () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope(
+      { type: 'metric', title: 'Balance', value_paise: 12345 },
+      { evidence: { period: 'Current month', basis: 'Ledger facts', source_count: -1, capped: false, transactions: [], sql: 'select *' } }
+    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid.')
+  })
+
+  it.each([
+    {
+      source_count: 0,
+      transactions: [{ id: 'txn-1', occurred_on: '2026-08-11', label: 'Zomato', kind: 'expense', amount_paise: 12345 }]
+    },
+    {
+      source_count: 2,
+      transactions: [
+        { id: 'txn-1', occurred_on: '2026-08-11', label: 'Zomato', kind: 'expense', amount_paise: 12345 },
+        { id: 'txn-1', occurred_on: '2026-08-10', label: 'Duplicate', kind: 'expense', amount_paise: 5000 }
+      ]
+    }
+  ])('rejects contradictory assistant evidence %#', async ({ source_count, transactions }) => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    const payload = assistantEnvelope(
+      { type: 'metric', title: 'Balance', value_paise: 12345 },
+      { evidence: { period: 'Current month', basis: 'Ledger facts', source_count, capped: false, transactions } }
+    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })))
+    const { chatAssistant } = await import('./api')
+
+    await expect(chatAssistant('Show my balance')).rejects.toThrow('Assistant response was invalid.')
   })
 
   it('accepts an empty optional metric caption and omits the UI detail', async () => {

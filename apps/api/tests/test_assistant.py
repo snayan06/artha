@@ -5,11 +5,13 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from google.genai._gaos.lib import compat_errors as interaction_errors
 from pydantic import ValidationError
 
 from artha_api.assistant import (
     ASSISTANT_INTENT_MESSAGES,
+    AssistantChatResponse,
     AssistantCompletion,
     AssistantFinancialContext,
     AssistantIntent,
@@ -32,6 +34,8 @@ from artha_api.assistant import (
     _allowed_widgets_for_intent,
     _ground_completion,
 )
+from artha_api.assistant_routes import compact_financial_context, get_assistant
+from artha_api.schemas import DashboardResponse
 
 
 class FakeGeminiInteractions:
@@ -126,9 +130,7 @@ def test_gemini_defaults_to_flash_lite_and_wins_auto_detection(
     monkeypatch.setenv("ARTHA_GEMINI_API_KEY", "gemini-test-key")
     monkeypatch.delenv("ARTHA_GEMINI_MODEL", raising=False)
 
-    direct = AssistantSettings(
-        provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
-    )
+    direct = AssistantSettings(provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key")
     from_env = AssistantSettings.from_env()
 
     assert direct.gemini_model == "gemini-3.5-flash-lite"
@@ -492,9 +494,7 @@ async def test_disabled_assistant_is_unavailable(
         "personal_data_enabled": False,
         "is_demo": False,
     }
-    with pytest.raises(
-        AssistantUnavailableError, match="AI assistant is unavailable"
-    ):
+    with pytest.raises(AssistantUnavailableError, match="AI assistant is unavailable"):
         await assistant.chat("How much did I spend?", financial_context)
 
 
@@ -510,9 +510,7 @@ async def test_gemini_uses_private_stateless_structured_output(
     gemini = FakeGeminiClient(json.dumps(completion))
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(
-            provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
-        ),
+        AssistantSettings(provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"),
         gemini_client=gemini,
     )
     response = await assistant.chat("Show spending", financial_context)
@@ -537,6 +535,8 @@ async def test_gemini_uses_private_stateless_structured_output(
     assert "tools" not in body
     assert "Allowed widget bundles by intent" in body["input"]
     assert '"spending":[{"type":"metric","title":"Spending this month"' in body["input"]
+    assert '"evidence"' not in body["input"]
+    assert "AssistantEvidence" not in json.dumps(body["response_format"])
 
 
 @pytest.mark.parametrize(
@@ -977,14 +977,10 @@ async def test_gemini_capture_interpretation_resolves_25k_transfer() -> None:
     gemini = FakeGeminiClient(json.dumps({"result": interpretation}))
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(
-            provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
-        ),
+        AssistantSettings(provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"),
         gemini_client=gemini,
     )
-    response = await assistant.interpret_capture(
-        "self transfer 25k ICICI -> HDFC", context
-    )
+    response = await assistant.interpret_capture("self transfer 25k ICICI -> HDFC", context)
 
     assert response is not None
     assert response.provider == "gemini"
@@ -1072,9 +1068,7 @@ async def test_interactions_rate_limit_is_sanitized_for_capture() -> None:
         ),
         (
             interaction_errors.APIConnectionError(
-                request=httpx.Request(
-                    "POST", "https://gemini.invalid/interactions"
-                )
+                request=httpx.Request("POST", "https://gemini.invalid/interactions")
             ),
             CaptureFailureKind.NETWORK,
         ),
@@ -1130,9 +1124,7 @@ async def test_capture_interpretation_rejects_invented_account_id() -> None:
             "confidence": 0.9,
             "warnings": [],
         }
-        return httpx.Response(
-            200, json={"message": {"content": json.dumps(interpretation)}}
-        )
+        return httpx.Response(200, json={"message": {"content": json.dumps(interpretation)}})
 
     assistant = LocalFinancialAssistant(
         AssistantSettings(provider=LlmProvider.OLLAMA),
@@ -1240,9 +1232,7 @@ async def test_invalid_model_payload_makes_assistant_unavailable(
         AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
-    with pytest.raises(
-        AssistantUnavailableError, match="AI assistant is unavailable"
-    ):
+    with pytest.raises(AssistantUnavailableError, match="AI assistant is unavailable"):
         await assistant.chat("Show spending", financial_context)
 
 
@@ -1258,9 +1248,7 @@ async def test_interactions_rate_limit_makes_assistant_unavailable(
         gemini_client=RateLimitedGeminiClient(),
     )
 
-    with pytest.raises(
-        AssistantUnavailableError, match="AI assistant is unavailable"
-    ):
+    with pytest.raises(AssistantUnavailableError, match="AI assistant is unavailable"):
         await assistant.chat("Show spending", financial_context)
 
 
@@ -1275,9 +1263,7 @@ async def test_gemini_tag_suggestion_is_grounded_in_allowed_categories() -> None
     gemini = FakeGeminiClient(json.dumps(suggestion))
 
     assistant = LocalFinancialAssistant(
-        AssistantSettings(
-            provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"
-        ),
+        AssistantSettings(provider=LlmProvider.GEMINI, gemini_api_key="gemini-test-key"),
         gemini_client=gemini,
     )
     response = await assistant.suggest_tag(
@@ -1302,8 +1288,7 @@ async def test_gemini_tag_suggestion_is_grounded_in_allowed_categories() -> None
 
 def test_tag_suggestion_request_accepts_production_category_capacity() -> None:
     categories = [
-        TagCategory(id=f"category-{index}", name=f"Category {index}")
-        for index in range(200)
+        TagCategory(id=f"category-{index}", name=f"Category {index}") for index in range(200)
     ]
 
     request = TagSuggestionRequest(
@@ -1346,9 +1331,7 @@ async def test_invented_tag_makes_category_suggestion_unavailable() -> None:
         AssistantSettings(provider=LlmProvider.OLLAMA),
         transport=httpx.MockTransport(handler),
     )
-    with pytest.raises(
-        AssistantUnavailableError, match="AI category suggestion is unavailable"
-    ):
+    with pytest.raises(AssistantUnavailableError, match="AI category suggestion is unavailable"):
         await assistant.suggest_tag(
             TagSuggestionRequest(
                 description="Unknown merchant",
@@ -1369,9 +1352,7 @@ async def test_interactions_rate_limit_makes_tag_suggestion_unavailable() -> Non
         gemini_client=RateLimitedGeminiClient(),
     )
 
-    with pytest.raises(
-        AssistantUnavailableError, match="AI category suggestion is unavailable"
-    ):
+    with pytest.raises(AssistantUnavailableError, match="AI category suggestion is unavailable"):
         await assistant.suggest_tag(
             TagSuggestionRequest(
                 description="Unknown merchant",
@@ -1415,9 +1396,69 @@ async def test_disabled_assistant_endpoints_return_503_without_changing_ledger(
     }
     assert tag_response.status_code == 503
     assert tag_response.json() == {
-        "detail": (
-            "AI category suggestion is temporarily unavailable; "
-            "the ledger was not changed."
-        )
+        "detail": ("AI category suggestion is temporarily unavailable; the ledger was not changed.")
     }
     assert before == after
+
+
+@pytest.mark.asyncio
+async def test_local_assistant_http_contract_always_includes_server_evidence(
+    app: FastAPI,
+    client: httpx.AsyncClient,
+    bootstrapped: dict[str, object],
+) -> None:
+    assert bootstrapped["created"] is True
+
+    class LocalEvidenceAssistant:
+        async def chat(
+            self, _message: str, _context: AssistantFinancialContext
+        ) -> AssistantChatResponse:
+            return AssistantChatResponse(
+                provider=LlmProvider.GEMINI,
+                model="test-model",
+                mode="model",
+                result=AssistantCompletion(
+                    message=ASSISTANT_INTENT_MESSAGES[AssistantIntent.SPENDING],
+                    intent=AssistantIntent.SPENDING,
+                    widgets=[
+                        MetricWidget(
+                            type="metric",
+                            title="Spending this month",
+                            value_paise=92_000,
+                            tone="warning",
+                        )
+                    ],
+                ),
+            )
+
+    app.dependency_overrides[get_assistant] = lambda: LocalEvidenceAssistant()
+    try:
+        response = await client.post("/api/v1/assistant/chat", json={"message": "Show my spending"})
+    finally:
+        app.dependency_overrides.pop(get_assistant, None)
+
+    assert response.status_code == 200
+    evidence = response.json()["evidence"]
+    assert evidence is not None
+    assert evidence["period"] == "Current month"
+    assert evidence["basis"].startswith("Server-calculated ledger totals")
+    assert evidence["source_count"] == len(evidence["transactions"])
+
+
+@pytest.mark.asyncio
+async def test_local_compact_context_ignores_adjustment_activity() -> None:
+    summary = DashboardResponse.model_construct(
+        total_balance_paise=0,
+        spend_paise=0,
+        income_paise=0,
+        net_cashflow_paise=0,
+        member_balances=[],
+        accounts=[],
+        spend_by_category=[],
+        monthly=[],
+        recent_transactions=[SimpleNamespace(kind=SimpleNamespace(value="adjustment"))],
+    )
+
+    context = await compact_financial_context(SimpleNamespace(), SimpleNamespace(), summary)
+
+    assert context.recent_transactions == []

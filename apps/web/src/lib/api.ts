@@ -1,5 +1,5 @@
 import { demoDashboard, demoTransactions } from '../data/demo'
-import type { AccountSetupInput, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, EntityId, HouseholdMember, LedgerAccount, ManagedAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
+import type { AccountSetupInput, AssistantEvidenceTransaction, AssistantReply, AssistantRuntimeStatus, AssistantWidget, CaptureAccount, CaptureCategory, CaptureClarification, CaptureContext, CaptureResult, Dashboard, EntityId, HouseholdMember, LedgerAccount, ManagedAccount, MemberBalance, MonthlyPoint, Transaction, TransactionDraft, UnifiedIntent, UserProfile } from '../types'
 import { parseCaptureLocally } from './capture'
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
@@ -892,12 +892,14 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
     body: JSON.stringify({ message })
   })
   if (
-    !hasExactKeys(response, ['provider', 'model', 'mode', 'result'], ['provider', 'model', 'mode', 'result'])
+    !hasExactKeys(response, ['provider', 'model', 'mode', 'result', 'evidence'], ['provider', 'model', 'mode', 'result', 'evidence'])
     || response.mode !== 'model'
     || !ASSISTANT_PROVIDERS.has(String(response.provider))
     || !isBoundedText(response.model, 80)
     || !isJsonObject(response.result)
     || !hasExactKeys(response.result, ['message', 'intent', 'widgets'], ['message', 'intent', 'widgets'])
+    || !isJsonObject(response.evidence)
+    || !hasExactKeys(response.evidence, ['period', 'basis', 'source_count', 'capped', 'transactions'], ['period', 'basis', 'source_count', 'capped', 'transactions'])
   ) {
     throw new Error('Assistant response was invalid.')
   }
@@ -918,12 +920,55 @@ export async function chatAssistant(message: string): Promise<AssistantReply> {
   const assistantMessage = rawMessage
   const widgets = rawWidgets.map(parseAssistantWidget)
   if (widgets.some((widget) => widget === null)) throw new Error('Assistant response was invalid.')
+  const rawEvidence = response.evidence
+  if (
+    !isBoundedText(rawEvidence.period, 80)
+    || !isBoundedText(rawEvidence.basis, 180)
+    || !Number.isSafeInteger(rawEvidence.source_count)
+    || Number(rawEvidence.source_count) < 0
+    || typeof rawEvidence.capped !== 'boolean'
+    || !Array.isArray(rawEvidence.transactions)
+    || rawEvidence.transactions.length > 8
+  ) throw new Error('Assistant response was invalid.')
+  const evidenceTransactions = rawEvidence.transactions.flatMap((item) => {
+    if (
+      !isJsonObject(item)
+      || !hasExactKeys(item, ['id', 'occurred_on', 'label', 'kind', 'amount_paise'], ['id', 'occurred_on', 'label', 'kind', 'amount_paise'])
+      || !isBoundedText(item.id, 80)
+      || typeof item.occurred_on !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}$/.test(item.occurred_on)
+      || !isBoundedText(item.label, 80)
+      || (item.kind !== 'expense' && item.kind !== 'income' && item.kind !== 'transfer' && item.kind !== 'settlement' && item.kind !== 'adjustment')
+      || !isSafePaise(item.amount_paise)
+    ) return []
+    return [{
+      id: item.id,
+      occurredOn: item.occurred_on,
+      label: item.label,
+      kind: item.kind as AssistantEvidenceTransaction['kind'],
+      amountPaise: item.amount_paise
+    }]
+  })
+  if (evidenceTransactions.length !== rawEvidence.transactions.length) {
+    throw new Error('Assistant response was invalid.')
+  }
+  const evidenceIds = new Set(evidenceTransactions.map((transaction) => transaction.id))
+  if (evidenceTransactions.length > Number(rawEvidence.source_count) || evidenceIds.size !== evidenceTransactions.length) {
+    throw new Error('Assistant response was invalid.')
+  }
   const provider = response.provider as 'gemini' | 'ollama'
   const model = response.model as string
   return {
     message: assistantMessage,
     widgets: widgets as AssistantWidget[],
-    provider: `${provider} · ${model}`
+    provider: `${provider} · ${model}`,
+    evidence: {
+      period: rawEvidence.period,
+      basis: rawEvidence.basis,
+      sourceCount: Number(rawEvidence.source_count),
+      capped: rawEvidence.capped,
+      transactions: evidenceTransactions
+    }
   }
 }
 
@@ -1045,6 +1090,25 @@ export async function getTransactions(
   } catch (error) {
     if (!DEMO_MODE) throw error
     return { data: demoTransactions, demo: true, nextCursor: null }
+  }
+}
+
+export async function getTransactionById(id: string): Promise<Transaction> {
+  const normalizedId = id.trim().slice(0, 80)
+  if (!normalizedId) throw new Error('Transaction id is required.')
+  try {
+    const [raw, accounts, members] = await Promise.all([
+      request<unknown>(`/api/v1/transactions/${encodeURIComponent(normalizedId)}`),
+      request<unknown>('/api/v1/accounts'),
+      request<unknown>('/api/v1/members')
+    ])
+    if (!isJsonObject(raw)) throw new Error('Transaction response was invalid.')
+    return mapTransaction(raw, accountNameMap(accounts), memberNameMap(members))
+  } catch (error) {
+    if (!DEMO_MODE) throw error
+    const transaction = demoTransactions.find((item) => item.id === normalizedId)
+    if (!transaction) throw new ApiError(404, 'This ledger entry is no longer available.')
+    return transaction
   }
 }
 

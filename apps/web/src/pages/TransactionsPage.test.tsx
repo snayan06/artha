@@ -89,6 +89,54 @@ describe('TransactionsPage account activity filter', () => {
     await waitFor(() => expect(onLoadMore).toHaveBeenCalledTimes(1))
   })
 
+  it('fetches and opens an evidence transaction outside the loaded page', async () => {
+    const user = userEvent.setup()
+    const older = {
+      ...transactions[0],
+      id: 'older-evidence',
+      merchant: 'Older Zomato order',
+      occurredAt: '2025-01-01'
+    }
+    const onFetchById = vi.fn().mockResolvedValue(older)
+
+    render(
+      <TransactionsPage
+        transactions={transactions}
+        demoMode={false}
+        selectedTransactionId="older-evidence"
+        onFetchById={onFetchById}
+      />
+    )
+
+    expect(await screen.findByRole('dialog', { name: /transaction details/i })).toBeInTheDocument()
+    expect(screen.getByText('Older Zomato order')).toBeInTheDocument()
+    expect(onFetchById).toHaveBeenCalledWith('older-evidence')
+    await user.click(screen.getByRole('button', { name: /close transaction details/i }))
+    expect(screen.queryByRole('dialog', { name: /transaction details/i })).not.toBeInTheDocument()
+  })
+
+  it('offers an explicit retry when an evidence transaction cannot be loaded', async () => {
+    const older = { ...transactions[0], id: 'older-evidence', merchant: 'Recovered entry' }
+    const onFetchById = vi.fn()
+      .mockRejectedValueOnce(new Error('temporary failure'))
+      .mockResolvedValueOnce(older)
+    const user = userEvent.setup()
+
+    render(
+      <TransactionsPage
+        transactions={transactions}
+        demoMode={false}
+        selectedTransactionId="older-evidence"
+        onFetchById={onFetchById}
+      />
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load this ledger entry')
+    await user.click(screen.getByRole('button', { name: 'Try loading entry again' }))
+    expect(await screen.findByText('Recovered entry')).toBeInTheDocument()
+    expect(onFetchById).toHaveBeenCalledTimes(2)
+  })
+
   it('opens a saved transaction and submits an explicit correction', async () => {
     const user = userEvent.setup()
     const onUpdate = vi.fn().mockResolvedValue(undefined)

@@ -8,9 +8,11 @@ describe('SettingsPage', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
   it('keeps the server-owned private-data policy in a compact disclosure', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
     vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
       configured: true,
@@ -42,6 +44,7 @@ describe('SettingsPage', () => {
   })
 
   it('explains sample-only policy without claiming personal AI is available', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
     vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
       configured: true,
@@ -62,7 +65,57 @@ describe('SettingsPage', () => {
     expect(within(notice as HTMLElement).getByText(/Manual entry remains available/i)).toHaveTextContent(/server policy.*not a browser switch/i)
   })
 
+  it('does not turn a loading status into a private-data guarantee', () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
+    vi.spyOn(api, 'getAssistantStatus').mockReturnValue(new Promise(() => undefined))
+
+    render(<RouterProvider><SettingsPage /></RouterProvider>)
+    const notice = screen.getByText('Privacy & AI').closest('details')
+    fireEvent.click(screen.getByText('Privacy & AI'))
+
+    expect(within(notice as HTMLElement).getByText('Checking AI configuration…')).toBeVisible()
+    expect(notice).not.toHaveTextContent('Private financial text is not sent to AI.')
+  })
+
+  it('reports an unavailable status without guessing the server policy', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
+    vi.spyOn(api, 'getAssistantStatus').mockRejectedValue(new Error('offline'))
+
+    render(<RouterProvider><SettingsPage /></RouterProvider>)
+    const notice = screen.getByText('Privacy & AI').closest('details')
+    fireEvent.click(screen.getByText('Privacy & AI'))
+
+    expect(await within(notice as HTMLElement).findByText('AI configuration could not be verified.')).toBeVisible()
+    expect(within(notice as HTMLElement).getByText(/Do not assume private financial text is blocked or enabled/i)).toBeVisible()
+    expect(notice).not.toHaveTextContent('Private financial text is not sent to AI.')
+  })
+
+  it('describes a demo runtime as sample-data use, not private-account AI', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
+    vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
+      configured: true,
+      provider: 'gemini',
+      model: 'gemini-3.5-flash-lite',
+      available: true,
+      dataPolicy: 'sample_only',
+      personalDataEnabled: false,
+      isDemo: true
+    })
+
+    render(<RouterProvider><SettingsPage /></RouterProvider>)
+    const notice = screen.getByText('Privacy & AI').closest('details')
+    fireEvent.click(screen.getByText('Privacy & AI'))
+
+    expect(await within(notice as HTMLElement).findByText('AI-assisted features are available for this sample-data experience.')).toBeVisible()
+    expect(notice).not.toHaveTextContent('available for this account')
+    expect(notice).not.toHaveTextContent('Private financial text is not sent to AI.')
+  })
+
   it('shows every account balance with a reconciliation action', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({
       configured: true,
       provider: 'gemini',
@@ -94,6 +147,7 @@ describe('SettingsPage', () => {
   })
 
   it('keeps account input and shows a recoverable create error', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({ configured: true, provider: 'gemini', model: 'test', available: true, dataPolicy: 'private_approved', personalDataEnabled: true, isDemo: false })
     vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([])
     vi.spyOn(api, 'createManagedAccount').mockRejectedValue(new Error('An account with this name already exists.'))

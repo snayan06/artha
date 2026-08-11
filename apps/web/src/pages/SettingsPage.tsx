@@ -2,24 +2,58 @@ import { ArrowLeft, ChevronDown, LockKeyhole } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { RecoveryExportPanel } from '../components/RecoveryPanel'
 import { getAssistantStatus } from '../lib/api'
+import { isDemoMode } from '../lib/auth'
 import { AppLink } from '../lib/router'
 import type { AssistantRuntimeStatus } from '../types'
 import { AccountManagementPanel } from '../components/AccountManagementPanel'
 
+type AssistantStatusState =
+  | { phase: 'loading' }
+  | { phase: 'ready'; value: AssistantRuntimeStatus }
+  | { phase: 'unavailable' }
+
 export function SettingsPage() {
-  const [assistantStatus, setAssistantStatus] = useState<AssistantRuntimeStatus | null>(null)
+  const [assistantStatus, setAssistantStatus] = useState<AssistantStatusState>({ phase: 'loading' })
 
   useEffect(() => {
     let active = true
     void getAssistantStatus()
-      .then((status) => { if (active) setAssistantStatus(status) })
-      .catch(() => { if (active) setAssistantStatus(null) })
+      .then((status) => { if (active) setAssistantStatus({ phase: 'ready', value: status }) })
+      .catch(() => { if (active) setAssistantStatus({ phase: 'unavailable' }) })
     return () => { active = false }
   }, [])
 
-  const provider = assistantStatus
-    ? `${assistantStatus.provider === 'gemini' ? 'Gemini' : assistantStatus.provider}${assistantStatus.model ? ` · ${assistantStatus.model}` : ''}`
-    : 'Checking configuration…'
+  const runtimeStatus = assistantStatus.phase === 'ready' ? assistantStatus.value : null
+  const demoExperience = isDemoMode() || runtimeStatus?.isDemo === true
+  const provider = assistantStatus.phase === 'loading'
+    ? 'Checking configuration…'
+    : assistantStatus.phase === 'unavailable'
+      ? 'Unavailable — configuration could not be verified'
+      : `${runtimeStatus?.provider === 'gemini' ? 'Gemini' : runtimeStatus?.provider}${runtimeStatus?.model ? ` · ${runtimeStatus.model}` : ''}${runtimeStatus?.available ? '' : ' (currently unavailable)'}`
+
+  let statusTitle = 'Checking AI configuration…'
+  let statusDetail = 'Artha is checking the server policy. No private-data claim is made until that check finishes.'
+  if (assistantStatus.phase === 'unavailable') {
+    statusTitle = 'AI configuration could not be verified.'
+    statusDetail = 'Do not assume private financial text is blocked or enabled. Manual entry remains available; check again when the connection returns.'
+  } else if (runtimeStatus && demoExperience) {
+    statusTitle = runtimeStatus.available
+      ? 'AI-assisted features are available for this sample-data experience.'
+      : 'AI-assisted features are currently unavailable for this sample-data experience.'
+    statusDetail = runtimeStatus.available
+      ? 'Quick Add and Ask Artha use limited sample context. AI cannot write to the ledger; every transaction still requires confirmation.'
+      : 'The sample ledger remains available, and manual entry does not require AI.'
+  } else if (runtimeStatus?.personalDataEnabled) {
+    statusTitle = runtimeStatus.available
+      ? 'AI-assisted features are available for this account.'
+      : 'AI-assisted features are configured but currently unavailable for this account.'
+    statusDetail = runtimeStatus.available
+      ? 'Quick Add and Ask Artha use limited, task-relevant context. AI cannot write to your ledger; every transaction still requires your confirmation.'
+      : 'Manual entry remains available. Try AI-assisted features again after the provider connection recovers.'
+  } else if (runtimeStatus) {
+    statusTitle = 'Private financial text is not sent to AI.'
+    statusDetail = 'Manual entry remains available. This protection is controlled by the server policy, not a browser switch.'
+  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -38,8 +72,8 @@ export function SettingsPage() {
         </summary>
         <div className="space-y-3 border-t border-line px-4 pb-4 pt-4 leading-6 dark:border-night-border">
           <div>
-            <p className="font-semibold text-ink">{assistantStatus?.personalDataEnabled ? 'AI-assisted features are available for this account.' : assistantStatus?.isDemo ? 'AI-assisted features are available for sample data.' : 'Private financial text is not sent to AI.'}</p>
-            <p className="mt-1">{assistantStatus?.personalDataEnabled || assistantStatus?.isDemo ? 'Quick Add and Ask Artha use limited, task-relevant context. AI cannot write to your ledger; every transaction still requires your confirmation.' : 'Manual entry remains available. This protection is controlled by the server policy, not a browser switch.'}</p>
+            <p className="font-semibold text-ink">{statusTitle}</p>
+            <p className="mt-1">{statusDetail}</p>
           </div>
           <p>Provider: {provider}, configured server-side.</p>
           <p>Requests use <code>store=false</code>. This request setting is not a broader provider-retention guarantee.</p>
