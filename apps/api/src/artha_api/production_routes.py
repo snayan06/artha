@@ -13,7 +13,10 @@ from .ai_policy import AiAccessPolicy
 from .assistant import (
     AssistantChatRequest,
     AssistantChatResponse,
+    AssistantEvidence,
+    AssistantEvidenceTransaction,
     AssistantFinancialContext,
+    AssistantIntent,
     AssistantStatus,
     AssistantUnavailableError,
     CaptureAccount,
@@ -886,22 +889,45 @@ async def ledger_activity_rows(
     household_id: str,
     *,
     limit: int,
-    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Page already-collapsed logical activity inside Postgres.
+    """Read complete logical activity through the settlement-aware cursor RPC.
 
-    Transfers use two transaction rows. The database RPC joins each pair before
-    applying limit/offset, so a page boundary can never hide half of a transfer.
+    The older offset RPC predates settlements and adjustments. The cursor RPC
+    collapses transfers and includes every supported logical movement before
+    pagination. Fetching one extra row lets aggregate callers report truncation
+    honestly without claiming that exactly 1,000 rows means more data exists.
     """
-    rows = await client.rpc(
-        "list_ledger_activity",
-        {
-            "p_household_id": household_id,
-            "p_limit": limit,
-            "p_offset": offset,
-        },
-    )
-    return list(rows or [])
+    rows: list[dict[str, Any]] = []
+    cursor: dict[str, Any] | None = None
+    while len(rows) < limit:
+        page_limit = min(201, limit - len(rows))
+        page = list(
+            await client.rpc(
+                "list_ledger_activity_page",
+                {
+                    "p_household_id": household_id,
+                    "p_limit": page_limit,
+                    "p_before_occurred_at": (
+                        cursor["occurred_at"] if cursor is not None else None
+                    ),
+                    "p_before_created_at": (
+                        cursor["created_at"] if cursor is not None else None
+                    ),
+                    "p_before_id": cursor["id"] if cursor is not None else None,
+                },
+            )
+            or []
+        )
+        rows.extend(page)
+        if len(page) < page_limit:
+            break
+        last = page[-1]
+        cursor = {
+            "occurred_at": last["occurred_at"],
+            "created_at": last["created_at"],
+            "id": last["id"],
+        }
+    return rows
 
 
 def transaction_view(
@@ -1015,6 +1041,27 @@ async def list_transactions(
             else None
         ),
     }
+
+
+@router.get("/api/v1/transactions/{transaction_id}", tags=["transactions"])
+async def get_transaction(
+    transaction_id: UUID,
+    client: ClientDependency,
+    auth: AuthDependency,
+) -> dict[str, Any]:
+    household_id = await current_household(client)
+    assert household_id is not None
+    await owner_member(client, household_id, auth.user_id)
+    result = await client.rpc(
+        "get_ledger_activity",
+        {
+            "p_household_id": household_id,
+            "p_activity_id": str(transaction_id),
+        },
+    )
+    if not isinstance(result, dict):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "transaction not found")
+    return result
 
 
 def correction_replacement_payload(
@@ -1362,7 +1409,9 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
     await owner_member(client, household_id, auth.user_id)
     members = await member_rows(client, household_id)
     accounts = await account_rows(client, household_id)
-    views = await ledger_activity_rows(client, household_id, limit=1000)
+    activity_window = await ledger_activity_rows(client, household_id, limit=1001)
+    activity_window_capped = len(activity_window) > 1000
+    views = activity_window[:1000]
     balances = await shared_balance_rows(client, household_id, members)
     now = datetime.now(UTC)
     month_key = now.strftime("%Y-%m")
@@ -1374,10 +1423,12 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
                 view["personal_share_paise"]
             )
     monthly: list[dict[str, Any]] = []
+    monthly_keys: list[str] = []
     for months_back in range(5, -1, -1):
         absolute = now.year * 12 + now.month - 1 - months_back
         year, month_index = divmod(absolute, 12)
         key = f"{year:04d}-{month_index + 1:02d}"
+        monthly_keys.append(key)
         matching = [view for view in views if str(view["occurred_at"]).startswith(key)]
         monthly.append(
             {
@@ -1402,6 +1453,32 @@ async def dashboard(client: ClientDependency, auth: AuthDependency) -> dict[str,
             for view in current
             if view["kind"] == "income"
         ),
+        "current_month_transaction_count": sum(
+            1 for view in current if view["kind"] in {"expense", "income"}
+        ),
+        "current_month_expense_count": sum(
+            1 for view in current if view["kind"] == "expense"
+        ),
+        "current_month_income_count": sum(
+            1 for view in current if view["kind"] == "income"
+        ),
+        "six_month_transaction_count": sum(
+            1
+            for view in views
+            if view["kind"] in {"expense", "income"}
+            and any(str(view["occurred_at"]).startswith(key) for key in monthly_keys)
+        ),
+        "shared_source_count": sum(
+            1
+            for view in views
+            if view["kind"] == "settlement" or bool(view.get("splits"))
+        ),
+        "latest_activity_count": sum(
+            1
+            for view in views[:8]
+            if view["kind"] in {"expense", "income", "transfer", "settlement"}
+        ),
+        "ledger_activity_capped": activity_window_capped,
         "net_cashflow_paise": sum(
             int(view["amount_paise"])
             * (1 if view["kind"] == "income" else -1 if view["kind"] == "expense" else 0)
@@ -1684,6 +1761,150 @@ def safe_label(value: Any, fallback: str = "Uncategorized") -> str:
     return printable.strip()[:40] or fallback
 
 
+def assistant_evidence(
+    intent: AssistantIntent,
+    summary: dict[str, Any],
+) -> AssistantEvidence:
+    supported_kinds = {"expense", "income", "transfer", "settlement"}
+    rows = [
+        row
+        for row in list(summary.get("recent_transactions") or [])[:8]
+        if str(row.get("kind")) in supported_kinds
+    ]
+    now = datetime.now(UTC)
+    current_month_key = now.strftime("%Y-%m")
+    six_month_keys = {
+        f"{year:04d}-{month_index + 1:02d}"
+        for months_back in range(6)
+        for year, month_index in [
+            divmod(now.year * 12 + now.month - 1 - months_back, 12)
+        ]
+    }
+
+    def in_months(row: dict[str, Any], month_keys: set[str]) -> bool:
+        occurred_on = str(row.get("occurred_at") or "")[:7]
+        return occurred_on in month_keys
+
+    evidence_rows: list[dict[str, Any]]
+    if intent is AssistantIntent.SPENDING:
+        period = "Current month"
+        basis = (
+            "Confirmed personal expense shares in the current calendar month; "
+            "transfers and settlements excluded."
+        )
+        evidence_rows = [
+            row
+            for row in rows
+            if row.get("kind") == "expense"
+            and in_months(row, {current_month_key})
+        ]
+        source_count = int(
+            summary.get("current_month_expense_count", len(evidence_rows))
+        )
+    elif intent is AssistantIntent.INCOME:
+        period = "Current month"
+        basis = (
+            "Confirmed income in the current calendar month; transfers and "
+            "settlements excluded."
+        )
+        evidence_rows = [
+            row
+            for row in rows
+            if row.get("kind") == "income"
+            and in_months(row, {current_month_key})
+        ]
+        source_count = int(
+            summary.get("current_month_income_count", len(evidence_rows))
+        )
+    elif intent is AssistantIntent.CASHFLOW:
+        period = "Last 6 calendar months"
+        basis = "Confirmed income and personal spending by month."
+        evidence_rows = [
+            row
+            for row in rows
+            if row.get("kind") in {"expense", "income"}
+            and in_months(row, six_month_keys)
+        ]
+        source_count = int(
+            summary.get("six_month_transaction_count", len(evidence_rows))
+        )
+    elif intent is AssistantIntent.SHARED:
+        period = "Current household position"
+        basis = "Confirmed shared expenses and settlements."
+        evidence_rows = [
+            row
+            for row in rows
+            if row.get("kind") == "settlement" or bool(row.get("splits"))
+        ]
+        source_count = int(summary.get("shared_source_count", len(evidence_rows)))
+    elif intent is AssistantIntent.TRANSACTIONS:
+        period = "Latest ledger activity"
+        basis = "Most recent confirmed ledger movements."
+        evidence_rows = rows
+        source_count = int(summary.get("latest_activity_count", len(rows)))
+    elif intent is AssistantIntent.SUMMARY:
+        period = "Current balances and current month"
+        basis = (
+            "Account balances are calculated separately; the source count covers "
+            "confirmed current-month income and personal expense movements."
+        )
+        evidence_rows = [
+            row
+            for row in rows
+            if row.get("kind") in {"expense", "income"}
+            and in_months(row, {current_month_key})
+        ]
+        source_count = int(
+            summary.get("current_month_transaction_count", len(evidence_rows))
+        )
+    else:
+        period = "No ledger range selected"
+        basis = "No ledger calculation was performed."
+        evidence_rows = []
+        source_count = 0
+
+    transactions = [
+        AssistantEvidenceTransaction(
+            id=str(row["id"]),
+            occurred_on=str(row["occurred_at"])[:10],
+            label=safe_label(
+                row.get("description") or row.get("category"),
+                "Ledger movement",
+            ),
+            kind=cast(
+                Literal[
+                    "expense", "income", "transfer", "settlement", "adjustment"
+                ],
+                str(row["kind"]),
+            ),
+            amount_paise=(
+                cast(int, row.get("personal_share_paise") or 0)
+                if row.get("kind") in {"expense", "income"}
+                else cast(int, row.get("amount_paise") or 0)
+            ),
+        )
+        for row in evidence_rows[:8]
+    ]
+    return AssistantEvidence(
+        period=period,
+        basis=basis,
+        source_count=source_count,
+        capped=(
+            bool(summary.get("ledger_activity_capped", False))
+            if intent
+            in {
+                AssistantIntent.SUMMARY,
+                AssistantIntent.SPENDING,
+                AssistantIntent.INCOME,
+                AssistantIntent.CASHFLOW,
+                AssistantIntent.SHARED,
+            }
+            else False
+        ),
+        transactions=transactions,
+    )
+
+
 @router.get("/api/v1/assistant/status", response_model=AssistantStatus, tags=["assistant"])
 async def assistant_status(auth: AuthDependency) -> AssistantStatus:
     status_response = await LocalFinancialAssistant().status()
@@ -1746,10 +1967,15 @@ async def assistant_chat(
                 category=safe_label(row.get("category")),
             )
             for row in list(summary["recent_transactions"])[:8]
+            if str(row.get("kind"))
+            in {"expense", "income", "transfer", "settlement"}
         ],
     )
     try:
-        return await LocalFinancialAssistant().chat(payload.message, context)
+        response = await LocalFinancialAssistant().chat(payload.message, context)
+        return response.model_copy(
+            update={"evidence": assistant_evidence(response.result.intent, summary)}
+        )
     except AssistantUnavailableError as error:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,

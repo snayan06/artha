@@ -70,6 +70,17 @@ near-neighbours, Hinglish, Indian English and prompt injection. A ledger
 question sent to transaction capture is a safety failure and is reported as a
 false capture.
 
+`agent-analyst-context-v1.json` and `agent-analyst-cases-v1.jsonl` define the
+30-case fictional acceptance set for the future bounded Artha Analyst. It
+covers exact tool arguments, evidence IDs, calculations, Hinglish, follow-up
+context, scenarios, failures and the zero-write boundary. This dataset is a
+versioned promotion contract; it does not mean the ADK runtime is currently
+enabled in production. Validate its structure and references with:
+
+```bash
+python scripts/check_agent_evals.py
+```
+
 Validate all three datasets without calling a model:
 
 ```bash

@@ -17,12 +17,14 @@ const api = vi.hoisted(() => ({
   getMembers: vi.fn(),
   setupOnboarding: vi.fn(),
   getDashboard: vi.fn(),
+  getTransactionById: vi.fn(),
   getTransactions: vi.fn(),
   getCaptureContext: vi.fn(),
   createSettlement: vi.fn(),
   updateTransaction: vi.fn(),
   voidTransaction: vi.fn(),
-  confirmDraft: vi.fn()
+  confirmDraft: vi.fn(),
+  chatAssistant: vi.fn()
 }))
 
 vi.mock('./lib/api', () => api)
@@ -62,6 +64,47 @@ describe('authenticated demo presentation', () => {
     expect(isDemoExperience(false, { displayName: 'Demo', householdName: 'Artha demo', members: [], isDemo: true })).toBe(true)
     expect(isDemoExperience(false, { displayName: 'Nayan', householdName: 'My household', members: [], isDemo: false })).toBe(false)
     expect(isDemoExperience(true, { displayName: 'Local', householdName: 'Local demo', members: [], isDemo: false })).toBe(true)
+  })
+})
+
+describe('assistant evidence navigation', () => {
+  afterEach(() => {
+    cleanup()
+    localStorage.clear()
+    window.history.replaceState(null, '', '/')
+    vi.clearAllMocks()
+  })
+
+  it('opens the exact supporting transaction from an assistant answer', async () => {
+    localStorage.setItem('artha.setup.complete', 'true')
+    localStorage.setItem('artha.profile', JSON.stringify({ displayName: 'Demo', householdName: 'Demo ledger', members: [], isDemo: true }))
+    window.history.replaceState(null, '', '/assistant')
+    api.getDashboard.mockResolvedValue({ data: demoDashboard, demo: true })
+    api.getTransactions.mockResolvedValue({ data: demoTransactions, demo: true, nextCursor: null })
+    api.getCaptureContext.mockResolvedValue({ accounts: [], categories: [] })
+    api.chatAssistant.mockResolvedValue({
+      message: 'Here is your spending overview.',
+      provider: 'Gemini · gemini-3.5-flash-lite',
+      widgets: [],
+      evidence: {
+        period: 'Current month',
+        basis: 'Personal share; transfers excluded.',
+        sourceCount: 1,
+        capped: false,
+        transactions: [{ id: 'tx-001', occurredOn: '2026-08-04', label: 'Groceries', kind: 'expense', amountPaise: 184_000 }]
+      }
+    })
+    const user = userEvent.setup()
+
+    render(<RouterProvider><App /></RouterProvider>)
+    expect(await screen.findByRole('heading', { name: 'Ask your Artha.' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Ask Artha'), 'Show my spending')
+    await user.click(screen.getByRole('button', { name: 'Send question' }))
+    await user.click(await screen.findByText('How this was calculated'))
+    await user.click(screen.getByRole('button', { name: /Open Groceries from 2026-08-04/i }))
+
+    expect(window.location.pathname).toBe('/transactions')
+    expect(await screen.findByRole('dialog', { name: /transaction details/i })).toBeInTheDocument()
   })
 })
 

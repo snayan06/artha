@@ -1,8 +1,9 @@
-import { Bot, ChartNoAxesCombined, LockKeyhole, Send, Sparkles } from 'lucide-react'
+import { Bot, ChartNoAxesCombined, ChevronDown, LockKeyhole, ReceiptText, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Badge, Button, Card } from '../components/ui'
 import { chatAssistant } from '../lib/api'
+import { formatMoney } from '../lib/money'
 import type { AssistantReply, AssistantWidget } from '../types'
 
 interface Exchange {
@@ -17,13 +18,29 @@ const progressMessages = [
   'Choosing the safest view for your question…',
   'Preparing verified numbers and charts…'
 ]
+const evidenceDateFormatter = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+function formatEvidenceDate(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? value : evidenceDateFormatter.format(date)
+}
+
+function formatEvidenceKind(value: string): string {
+  return value.length > 0 ? `${value[0].toUpperCase()}${value.slice(1)}` : value
+}
 
 export interface AssistantHandoff {
   initialQuestion?: string
   handoffId?: string
 }
 
-export function AssistantPage({ initialHandoff = null }: { initialHandoff?: AssistantHandoff | null }) {
+export function AssistantPage({
+  initialHandoff = null,
+  onOpenTransaction
+}: {
+  initialHandoff?: AssistantHandoff | null
+  onOpenTransaction?: (id: string) => void
+}) {
   const [message, setMessage] = useState('')
   const [history, setHistory] = useState<Exchange[]>([])
   const [loading, setLoading] = useState(false)
@@ -101,7 +118,7 @@ export function AssistantPage({ initialHandoff = null }: { initialHandoff?: Assi
         <div className="min-h-[280px] space-y-6 p-4 sm:p-6" aria-live="polite">
           {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
           {history.length === 0 && !pendingQuestion && <EmptyState onPick={setMessage} />}
-          {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} />)}
+          {history.map((exchange) => <ExchangeView key={exchange.id} exchange={exchange} onPick={setMessage} onOpenTransaction={onOpenTransaction} />)}
           {pendingQuestion && <section className="space-y-3"><p className="ml-auto w-fit max-w-[88%] break-words rounded-[20px] rounded-br-md bg-moss-900 px-4 py-3 text-sm leading-6 text-white dark:bg-[#27604e]">{pendingQuestion}</p><div role="status" aria-live="polite" className="flex items-center gap-3 text-sm text-[#718078] tone-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-moss-600 motion-reduce:animate-none" aria-hidden="true" /> {progressMessages[progressIndex]}</div></section>}
         </div>
         <form onSubmit={(event) => void send(event)} className="border-t border-line bg-[#fbfcfa] p-3 dark:bg-night-raised sm:p-4">
@@ -121,8 +138,59 @@ function EmptyState({ onPick }: { onPick: (value: string) => void }) {
   return <div className="py-5 text-center"><span className="mx-auto grid h-14 w-14 place-items-center rounded-[20px] bg-moss-50 text-moss-800"><ChartNoAxesCombined className="h-6 w-6" aria-hidden="true" /></span><h2 className="font-display mt-4 text-balance text-xl font-bold">Start with a ledger question</h2><div className="mx-auto mt-4 flex max-w-md flex-wrap justify-center gap-2">{suggestions.map((suggestion) => <button key={suggestion} onClick={() => onPick(suggestion)} className="min-h-11 rounded-full border border-line bg-white px-4 text-xs font-semibold text-[#5f6e67] tone-muted transition hover:border-moss-300 hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400">{suggestion}</button>)}</div></div>
 }
 
-function ExchangeView({ exchange, onPick }: { exchange: Exchange; onPick: (value: string) => void }) {
-  return <section className="space-y-3"><p className="ml-auto w-fit max-w-[88%] break-words rounded-[20px] rounded-br-md bg-moss-900 px-4 py-3 text-sm leading-6 text-white dark:bg-[#27604e]">{exchange.question}</p><div className="max-w-[96%] break-words rounded-[20px] rounded-bl-md bg-moss-50 p-4"><div className="mb-3 flex flex-wrap items-center gap-2"><Badge tone="green">AI response</Badge><span className="text-[11px] font-semibold text-[#76837c] tone-muted">{exchange.reply.provider}</span></div><p className="text-sm leading-6">{exchange.reply.message}</p>{exchange.reply.widgets.length > 0 && <div className="mt-4 grid gap-3 sm:grid-cols-2">{exchange.reply.widgets.map((widget, index) => <Widget key={`${widget.type}-${index}`} widget={widget} onPick={onPick} />)}</div>}</div></section>
+function ExchangeView({ exchange, onPick, onOpenTransaction }: { exchange: Exchange; onPick: (value: string) => void; onOpenTransaction?: (id: string) => void }) {
+  return <section className="space-y-3"><p className="ml-auto w-fit max-w-[88%] break-words rounded-[20px] rounded-br-md bg-moss-900 px-4 py-3 text-sm leading-6 text-white dark:bg-[#27604e]">{exchange.question}</p><div className="max-w-[96%] break-words rounded-[20px] rounded-bl-md bg-moss-50 p-4"><div className="mb-3 flex flex-wrap items-center gap-2"><Badge tone="green">AI response</Badge><span className="text-[11px] font-semibold text-[#76837c] tone-muted">{exchange.reply.provider}</span></div><p className="text-sm leading-6">{exchange.reply.message}</p>{exchange.reply.widgets.length > 0 && <div className="mt-4 grid gap-3 sm:grid-cols-2">{exchange.reply.widgets.map((widget, index) => <Widget key={`${widget.type}-${index}`} widget={widget} onPick={onPick} />)}</div>}<EvidenceDetails reply={exchange.reply} onOpenTransaction={onOpenTransaction} /></div></section>
+}
+
+function EvidenceDetails({ reply, onOpenTransaction }: { reply: AssistantReply; onOpenTransaction?: (id: string) => void }) {
+  const { evidence } = reply
+  const shown = evidence.transactions.length
+  const totalLabel = `${evidence.sourceCount} ledger source ${evidence.sourceCount === 1 ? 'record' : 'records'}`
+
+  return (
+    <details className="group mt-4 rounded-2xl border border-moss-200 bg-white/80 open:bg-white dark:border-night-border dark:bg-night-surface dark:open:bg-night-raised">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-2xl px-3 py-2 text-xs font-semibold text-moss-800 outline-none transition hover:bg-moss-50 focus-visible:ring-2 focus-visible:ring-moss-400 [&::-webkit-details-marker]:hidden">
+        <ReceiptText className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>How this was calculated</span>
+        <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <div className="border-t border-moss-100 px-3 pb-3 pt-3 text-xs leading-5 text-[#617068] tone-muted dark:border-night-border">
+        <p className="font-semibold text-ink">{evidence.period}</p>
+        <p className="mt-1">{evidence.basis}</p>
+        {evidence.sourceCount === 0
+          ? <p className="mt-2">No supporting ledger entries were needed for this answer.</p>
+          : <p className="mt-2">Showing {shown} of {totalLabel} in this recent sample.</p>}
+        {evidence.capped && <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">The ledger view reached its 1,000-entry safety limit; older entries may not be included.</p>}
+        {shown > 0 && (
+          <div className="mt-3">
+            <p className="mb-2 font-semibold text-ink">Recent supporting sample</p>
+            <ul className="space-y-2" aria-label="Recent supporting ledger entries">
+              {evidence.transactions.map((transaction) => (
+              <li key={transaction.id}>
+                {onOpenTransaction ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenTransaction(transaction.id)}
+                    aria-label={`Open ${transaction.label} from ${transaction.occurredOn}`}
+                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2 text-left transition hover:border-moss-300 hover:bg-moss-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400 dark:bg-night-surface dark:hover:bg-night-raised"
+                  >
+                    <span className="min-w-0"><span className="block truncate font-semibold text-ink">{transaction.label}</span><span className="block text-[11px]">{formatEvidenceDate(transaction.occurredOn)} · {formatEvidenceKind(transaction.kind)}</span></span>
+                    <span className="shrink-0 tabular-nums font-semibold text-ink">{formatMoney(transaction.amountPaise)}</span>
+                  </button>
+                ) : (
+                  <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2 dark:bg-night-surface">
+                    <span className="min-w-0"><span className="block truncate font-semibold text-ink">{transaction.label}</span><span className="block text-[11px]">{formatEvidenceDate(transaction.occurredOn)} · {formatEvidenceKind(transaction.kind)}</span></span>
+                    <span className="shrink-0 tabular-nums font-semibold text-ink">{formatMoney(transaction.amountPaise)}</span>
+                  </div>
+                )}
+              </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </details>
+  )
 }
 
 function Widget({ widget, onPick }: { widget: AssistantWidget; onPick: (value: string) => void }) {

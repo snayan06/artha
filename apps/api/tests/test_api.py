@@ -45,6 +45,38 @@ async def test_concurrent_demo_bootstrap_is_replay_safe(client: AsyncClient) -> 
     assert len(first.json()["transactions"]) == len(second.json()["transactions"]) == 2
 
 
+async def test_demo_transaction_detail_accepts_numeric_and_evidence_alias_ids(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    transactions = bootstrapped["transactions"]
+    assert isinstance(transactions, list)
+    transaction = transactions[0]
+    assert isinstance(transaction, dict)
+    transaction_id = int(transaction["id"])
+
+    numeric = await client.get(f"/api/v1/transactions/{transaction_id}")
+    evidence_alias = await client.get(f"/api/v1/transactions/tx-{transaction_id}")
+
+    assert numeric.status_code == 200
+    assert numeric.json() == transaction
+    assert evidence_alias.status_code == 200
+    assert evidence_alias.json() == transaction
+
+
+async def test_demo_transaction_detail_hides_unknown_and_invalid_ids(
+    client: AsyncClient, bootstrapped: dict[str, Any]
+) -> None:
+    assert bootstrapped["created"] is True
+
+    unknown = await client.get("/api/v1/transactions/tx-999999")
+    invalid = await client.get("/api/v1/transactions/tx-not-a-number")
+
+    assert unknown.status_code == 404
+    assert unknown.json() == {"detail": "transaction not found"}
+    assert invalid.status_code == 404
+    assert invalid.json() == {"detail": "transaction not found"}
+
+
 async def test_capture_context_is_owner_scoped_and_filters_archived_accounts(
     app: FastAPI,
     client: AsyncClient,
@@ -67,9 +99,7 @@ async def test_capture_context_is_owner_scoped_and_filters_archived_accounts(
     response = await client.get("/api/v1/capture-context")
 
     assert response.status_code == 200
-    assert [account["name"] for account in response.json()["accounts"]] == [
-        "Active bank"
-    ]
+    assert [account["name"] for account in response.json()["accounts"]] == ["Active bank"]
     assert response.json()["categories"]
     assert {category["kind"] for category in response.json()["categories"]} == {
         "expense",
@@ -90,9 +120,7 @@ async def test_seed_dashboard_respects_personal_share_and_account_movement(
     assert dashboard["income_paise"] == 350_000
     assert dashboard["net_cashflow_paise"] == 166_000
     assert dashboard["member_balances"][0]["balance_paise"] == 92_000
-    assert dashboard["spend_by_category"] == [
-        {"category": "Groceries", "amount_paise": 92_000}
-    ]
+    assert dashboard["spend_by_category"] == [{"category": "Groceries", "amount_paise": 92_000}]
     assert len(dashboard["monthly"]) == 6
     assert dashboard["monthly"][-1]["income_paise"] == 350_000
     assert dashboard["monthly"][-1]["spend_paise"] == 92_000
@@ -123,10 +151,7 @@ async def test_parser_handles_reference_quick_add(
         "destination_account_id": None,
         "settlement_direction": None,
         "occurred_at": None,
-        "notes": (
-            "Parsed from: Paid 1840 for groceries from HDFC UPI, "
-            "split equally with Avery"
-        ),
+        "notes": ("Parsed from: Paid 1840 for groceries from HDFC UPI, split equally with Avery"),
     }
 
 
@@ -414,9 +439,7 @@ async def test_member_paid_expense_has_no_user_account_movement(
             "paid_by_member_id": member_id(bootstrapped),
             "settlement_member_id": None,
             "personal_share_paise": 25_000,
-            "splits": [
-                {"member_id": member_id(bootstrapped), "amount_paise": 25_000}
-            ],
+            "splits": [{"member_id": member_id(bootstrapped), "amount_paise": 25_000}],
             "source_account_id": account_id(bootstrapped, "HDFC UPI"),
         },
     )
@@ -501,9 +524,7 @@ async def test_edit_rebuilds_ledger_and_soft_delete_removes_effects(
         json={
             "amount_paise": 100_000,
             "personal_share_paise": 50_000,
-            "splits": [
-                {"member_id": member_id(bootstrapped), "amount_paise": 50_000}
-            ],
+            "splits": [{"member_id": member_id(bootstrapped), "amount_paise": 50_000}],
         },
     )
     after_edit = (await client.get("/api/v1/dashboard")).json()
@@ -605,9 +626,9 @@ async def test_onboarding_supports_four_money_accounts_and_multiple_cards(
     assert response.status_code == 201
     assert len(response.json()["accounts"]) == 6
     assert len(response.json()["members"]) == 2
-    assert sum(
-        account["current_balance_paise"] for account in response.json()["accounts"]
-    ) == 560_000
+    assert (
+        sum(account["current_balance_paise"] for account in response.json()["accounts"]) == 560_000
+    )
 
 
 async def test_account_setup_rejects_duplicates_atomically(client: AsyncClient) -> None:
@@ -714,9 +735,7 @@ async def test_onboarding_and_multi_member_balances(client: AsyncClient) -> None
     onboarding = await client.post(
         "/api/v1/onboarding/setup",
         json={
-            "accounts": [
-                {"name": "Family Bank", "kind": "bank", "opening_balance_paise": 50_000}
-            ],
+            "accounts": [{"name": "Family Bank", "kind": "bank", "opening_balance_paise": 50_000}],
             "members": [{"name": "Maya"}, {"name": "Leo"}],
         },
     )
@@ -770,9 +789,10 @@ async def test_onboarding_and_multi_member_balances(client: AsyncClient) -> None
     assert member_paid.json()["member_balance_deltas"] == [
         {"member_id": leo_id, "amount_paise": -500}
     ]
-    assert {
-        item["member_name"]: item["balance_paise"] for item in balances.json()["balances"]
-    } == {"Maya": 300, "Leo": -200}
+    assert {item["member_name"]: item["balance_paise"] for item in balances.json()["balances"]} == {
+        "Maya": 300,
+        "Leo": -200,
+    }
 
 
 async def test_onboarding_rejects_member_duplicates_atomically(client: AsyncClient) -> None:
@@ -795,9 +815,7 @@ async def test_parser_builds_multi_member_split(client: AsyncClient) -> None:
     onboarding = await client.post(
         "/api/v1/onboarding/setup",
         json={
-            "accounts": [
-                {"name": "Family Bank", "kind": "bank", "opening_balance_paise": 0}
-            ],
+            "accounts": [{"name": "Family Bank", "kind": "bank", "opening_balance_paise": 0}],
             "members": [{"name": "Maya"}, {"name": "Leo"}],
         },
     )
@@ -806,8 +824,7 @@ async def test_parser_builds_multi_member_split(client: AsyncClient) -> None:
         "/api/v1/drafts/parse",
         json={
             "text": (
-                "Paid 900 for dinner from Family Bank, split equally with Maya and Leo "
-                "3 days ago"
+                "Paid 900 for dinner from Family Bank, split equally with Maya and Leo 3 days ago"
             ),
             "timezone": "Asia/Kolkata",
         },

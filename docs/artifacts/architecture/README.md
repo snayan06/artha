@@ -29,6 +29,7 @@ the same scene.
 
 - [Atomic account-transfer contract](v1-atomic-transfer.md)
 - [LLM usage map and safety boundary](v1-llm-usage-map.md)
+- [Artha Analyst bounded-agent and evaluation plan](2026-08-11-artha-analyst-agent-plan.md)
 - [Encrypted ledger recovery](v1-encrypted-ledger-recovery.md)
 - [Gemini provider evaluation and safety decision](2026-08-06-gemini-provider-evaluation.md)
 - [Private AI learning and evaluation ledger](private-ai-learning-eval-ledger.md)

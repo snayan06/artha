@@ -17,6 +17,7 @@ export function TransactionsPage({
   accounts = noAccounts,
   categories = noCategories,
   onSearch,
+  onFetchById,
   hasMore = false,
   onLoadMore,
   onUpdate,
@@ -28,6 +29,7 @@ export function TransactionsPage({
   accounts?: LedgerAccount[]
   categories?: CaptureCategory[]
   onSearch?: (query: string) => Promise<Transaction[]>
+  onFetchById?: (id: string) => Promise<Transaction>
   hasMore?: boolean
   onLoadMore?: () => Promise<void>
   onUpdate?: (id: string, draft: TransactionDraft, reason: string) => Promise<void>
@@ -41,6 +43,10 @@ export function TransactionsPage({
   const [searching, setSearching] = useState(false)
   const [searchIssue, setSearchIssue] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
+  const [fetchedTransaction, setFetchedTransaction] = useState<Transaction | null>(null)
+  const [loadingSelected, setLoadingSelected] = useState(false)
+  const [selectedIssue, setSelectedIssue] = useState('')
+  const [selectedAttempt, setSelectedAttempt] = useState(0)
   useEffect(() => {
     const query = search.trim()
     if (!query || !onSearch) {
@@ -72,6 +78,34 @@ export function TransactionsPage({
   const visibleTransactions = searchResults ?? transactions
   const selectedTransaction = visibleTransactions.find((transaction) => transaction.id === selectedId)
     ?? transactions.find((transaction) => transaction.id === selectedId)
+    ?? (fetchedTransaction?.id === selectedId ? fetchedTransaction : undefined)
+
+  useEffect(() => {
+    setSelectedId(selectedTransactionId)
+    setFetchedTransaction(null)
+    setSelectedIssue('')
+  }, [selectedTransactionId])
+
+  useEffect(() => {
+    if (!selectedId || selectedTransaction || !onFetchById) {
+      setLoadingSelected(false)
+      return
+    }
+    let current = true
+    setLoadingSelected(true)
+    setSelectedIssue('')
+    void onFetchById(selectedId)
+      .then((transaction) => {
+        if (current) setFetchedTransaction(transaction)
+      })
+      .catch(() => {
+        if (current) setSelectedIssue('Could not load this ledger entry. Check the connection and try again.')
+      })
+      .finally(() => {
+        if (current) setLoadingSelected(false)
+      })
+    return () => { current = false }
+  }, [onFetchById, selectedAttempt, selectedId, selectedTransaction])
   const accountOptions = useMemo(() => [...new Set(visibleTransactions.flatMap((transaction) => [transaction.account, transaction.destinationAccount].filter((name): name is string => Boolean(name))))].sort((left, right) => left.localeCompare(right)), [visibleTransactions])
   const filtered = useMemo(() => visibleTransactions.filter((transaction) => {
     const haystack = `${transaction.merchant} ${transaction.category} ${transaction.account} ${transaction.destinationAccount ?? ''} ${transaction.note ?? ''}`.toLowerCase()
@@ -112,6 +146,8 @@ export function TransactionsPage({
       </Card>
 
       <div className="mt-5 flex items-center justify-between px-1 text-xs text-[#748079] tone-muted"><span>{filtered.length} {filtered.length === 1 ? 'transaction' : 'transactions'}{searchResults && filtered.length === 200 ? ' (first 200 matches)' : ''}</span><span className="tabular-nums">Net <strong className={netPaise >= 0 ? 'text-moss-700' : 'text-ink'}>{formatMoney(netPaise, { sign: true })}</strong></span></div>
+      {loadingSelected && <p role="status" className="mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-[#66746d] tone-muted dark:bg-night-surface">Loading the supporting ledger entry…</p>}
+      {selectedIssue && <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"><span>{selectedIssue}</span><button type="button" onClick={() => setSelectedAttempt((current) => current + 1)} className="min-h-11 rounded-xl border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-800 dark:bg-night-raised dark:text-amber-200">Try loading entry again</button></div>}
       <Card className="mt-3 px-5 sm:px-6">
         {filtered.length ? <div className="divide-y divide-line">{filtered.map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} onSelect={() => setSelectedId(transaction.id)} />)}</div> : <div className="py-16 text-center"><Search className="mx-auto h-7 w-7 text-[#9aa49f] tone-subtle" aria-hidden="true" /><p className="mt-3 font-semibold">No matching transactions</p><p className="mt-1 text-sm text-[#7b8781] tone-muted">Try another search or filter.</p></div>}
       </Card>
@@ -121,7 +157,7 @@ export function TransactionsPage({
           transaction={selectedTransaction}
           accounts={accounts}
           categories={categories}
-          onClose={() => setSelectedId(undefined)}
+          onClose={() => { setSelectedId(undefined); setFetchedTransaction(null); setSelectedIssue('') }}
           onUpdate={onUpdate}
           onVoid={onVoid}
         />

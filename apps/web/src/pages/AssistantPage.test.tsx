@@ -6,6 +6,14 @@ import { AssistantPage } from './AssistantPage'
 
 vi.mock('../lib/api', () => ({ chatAssistant: vi.fn() }))
 
+const emptyEvidence = {
+  period: 'Current ledger view',
+  basis: 'Verified ledger entries only.',
+  sourceCount: 0,
+  capped: false,
+  transactions: []
+}
+
 describe('AssistantPage generated UI', () => {
   afterEach(() => {
     cleanup()
@@ -50,6 +58,7 @@ describe('AssistantPage generated UI', () => {
     vi.mocked(chatAssistant).mockResolvedValue({
       message: 'Here is your spending overview.',
       provider: 'Test provider',
+      evidence: { period: 'Current month', basis: 'Personal share; transfers excluded.', sourceCount: 2, capped: false, transactions: [] },
       widgets: [{
         type: 'bar_chart',
         title: 'Monthly spend',
@@ -68,10 +77,65 @@ describe('AssistantPage generated UI', () => {
     expect(within(dataTable).getByRole('cell', { name: '15000' })).toBeInTheDocument()
   })
 
+  it('shows calculation evidence and opens a supporting ledger entry', async () => {
+    const onOpenTransaction = vi.fn()
+    vi.mocked(chatAssistant).mockResolvedValue({
+      message: 'Here is your spending overview.',
+      provider: 'Gemini · gemini-3.5-flash-lite',
+      widgets: [],
+      evidence: {
+        period: 'Current month',
+        basis: 'Personal share; transfers excluded.',
+        sourceCount: 7,
+        capped: false,
+        transactions: [{ id: 'txn-1', occurredOn: '2026-08-09', label: 'Zomato', kind: 'expense', amountPaise: 184000 }]
+      }
+    })
+    const user = userEvent.setup()
+    render(<AssistantPage onOpenTransaction={onOpenTransaction} />)
+
+    await user.type(screen.getByLabelText('Ask Artha'), 'Why is food spending high?')
+    await user.click(screen.getByRole('button', { name: 'Send question' }))
+    await user.click(await screen.findByText('How this was calculated'))
+
+    expect(screen.getByText('Current month')).toBeVisible()
+    expect(screen.getByText('Recent supporting sample')).toBeVisible()
+    expect(screen.getByText('Showing 1 of 7 ledger source records in this recent sample.')).toBeVisible()
+    expect(screen.getByText('Personal share; transfers excluded.')).toBeVisible()
+    expect(screen.getByText('9 Aug 2026 · Expense')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: /Open Zomato from 2026-08-09/i }))
+    expect(onOpenTransaction).toHaveBeenCalledWith('txn-1')
+  })
+
+  it('states when the bounded ledger view may exclude older entries', async () => {
+    vi.mocked(chatAssistant).mockResolvedValue({
+      message: 'Here is your recent ledger activity.',
+      provider: 'Gemini · gemini-3.5-flash-lite',
+      widgets: [],
+      evidence: {
+        period: 'Latest activity',
+        basis: 'Confirmed ledger activity.',
+        sourceCount: 1_000,
+        capped: true,
+        transactions: []
+      }
+    })
+    const user = userEvent.setup()
+    render(<AssistantPage />)
+
+    await user.type(screen.getByLabelText('Ask Artha'), 'Show recent transactions')
+    await user.click(screen.getByRole('button', { name: 'Send question' }))
+    await user.click(await screen.findByText('How this was calculated'))
+
+    expect(screen.getByText(/reached its 1,000-entry safety limit/i)).toBeVisible()
+    expect(screen.getByText(/older entries may not be included/i)).toBeVisible()
+  })
+
   it('submits with Enter and documents Shift+Enter', async () => {
     vi.mocked(chatAssistant).mockResolvedValue({
       message: 'Here is your spending overview.',
       provider: 'Test provider',
+      evidence: emptyEvidence,
       widgets: []
     })
     const user = userEvent.setup()
@@ -99,6 +163,7 @@ describe('AssistantPage generated UI', () => {
     vi.mocked(chatAssistant).mockResolvedValue({
       message: 'Here is your recent ledger activity.',
       provider: 'Test provider',
+      evidence: emptyEvidence,
       widgets: [{ type: 'line_chart', title: 'Monthly trend', data: [] }]
     })
     const user = userEvent.setup()
@@ -114,6 +179,7 @@ describe('AssistantPage generated UI', () => {
     vi.mocked(chatAssistant).mockResolvedValue({
       message: 'Here is your current account overview.',
       provider: 'Gemini · gemini-3.5-flash-lite',
+      evidence: emptyEvidence,
       widgets: [{ type: 'metric', title: 'Available balance', value: '₹12,345' }]
     })
     const user = userEvent.setup()
@@ -135,6 +201,7 @@ describe('AssistantPage generated UI', () => {
       .mockResolvedValueOnce({
         message: 'Here is your current account overview.',
         provider: 'Ollama · qwen3:4b',
+        evidence: emptyEvidence,
         widgets: [{ type: 'metric', title: 'Available balance', value: '₹12,345' }]
       })
     const user = userEvent.setup()
@@ -166,6 +233,7 @@ describe('AssistantPage generated UI', () => {
       .mockResolvedValueOnce({
         message: 'Here is your current account overview.',
         provider: 'Gemini · gemini-3.5-flash-lite',
+        evidence: emptyEvidence,
         widgets: []
       })
       .mockRejectedValueOnce(new Error('API request failed (503)'))

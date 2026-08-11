@@ -5,7 +5,17 @@ from datetime import UTC, datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import ValidationError
 from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError
@@ -70,9 +80,7 @@ SessionDependency = Annotated[AsyncSession, Depends(get_session)]
 
 LOCAL_CAPTURE_CATEGORIES = (
     CaptureContextCategory(id="local-groceries", name="Groceries", kind="expense"),
-    CaptureContextCategory(
-        id="local-food-dining", name="Food & Dining", kind="expense"
-    ),
+    CaptureContextCategory(id="local-food-dining", name="Food & Dining", kind="expense"),
     CaptureContextCategory(id="local-housing", name="Housing", kind="expense"),
     CaptureContextCategory(id="local-transport", name="Transport", kind="expense"),
     CaptureContextCategory(id="local-shopping", name="Shopping", kind="expense"),
@@ -280,9 +288,7 @@ async def setup_accounts(
     return [await account_to_read(session, account) for account in accounts]
 
 
-async def merchant_rule_for_user(
-    session: AsyncSession, rule_id: int, user_id: str
-) -> MerchantRule:
+async def merchant_rule_for_user(session: AsyncSession, rule_id: int, user_id: str) -> MerchantRule:
     rule = await session.scalar(
         select(MerchantRule).where(
             MerchantRule.id == rule_id,
@@ -381,9 +387,7 @@ async def update_merchant_rule(
     rule = await merchant_rule_for_user(session, rule_id, auth.user_id)
     changes = payload.model_dump(exclude_unset=True)
     invalid_nulls = [
-        field
-        for field, value in changes.items()
-        if value is None and field != "account_id"
+        field for field, value in changes.items() if value is None and field != "account_id"
     ]
     if invalid_nulls:
         raise HTTPException(
@@ -636,6 +640,32 @@ async def active_transaction(
     return transaction
 
 
+def local_transaction_id(value: str) -> int:
+    numeric = value[3:] if value.startswith("tx-") else value
+    if not numeric.isascii() or not numeric.isdecimal():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "transaction not found")
+    transaction_id = int(numeric)
+    if transaction_id <= 0:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "transaction not found")
+    return transaction_id
+
+
+@router.get(
+    "/api/v1/transactions/{transaction_id}",
+    response_model=TransactionRead,
+    tags=["transactions"],
+)
+async def get_transaction(
+    transaction_id: Annotated[str, Path(min_length=1, max_length=64)],
+    session: SessionDependency,
+    auth: AuthDependency,
+) -> TransactionRead:
+    transaction = await active_transaction(
+        session, local_transaction_id(transaction_id), auth.user_id
+    )
+    return await transaction_to_read(session, transaction)
+
+
 @router.patch(
     "/api/v1/transactions/{transaction_id}",
     response_model=TransactionRead,
@@ -649,9 +679,7 @@ async def edit_transaction(
 ) -> TransactionRead:
     transaction = await active_transaction(session, transaction_id, auth.user_id)
     current = {
-        key: getattr(transaction, key)
-        for key in TransactionDraft.model_fields
-        if key != "splits"
+        key: getattr(transaction, key) for key in TransactionDraft.model_fields if key != "splits"
     }
     current["splits"] = list(
         (
@@ -760,9 +788,7 @@ async def member_balances(session: AsyncSession, user_id: str) -> list[MemberBal
     return balances
 
 
-@router.get(
-    "/api/v1/shared-balances", response_model=SharedBalancesResponse, tags=["dashboard"]
-)
+@router.get("/api/v1/shared-balances", response_model=SharedBalancesResponse, tags=["dashboard"])
 async def get_shared_balances(
     session: SessionDependency, auth: AuthDependency
 ) -> SharedBalancesResponse:
@@ -791,9 +817,7 @@ async def dashboard(session: SessionDependency, auth: AuthDependency) -> Dashboa
         )
         .group_by(category_label)
     )
-    category_totals = {
-        str(category): int(amount) for category, amount in category_result.all()
-    }
+    category_totals = {str(category): int(amount) for category, amount in category_result.all()}
     income = await session.scalar(
         select(func.coalesce(func.sum(Transaction.personal_share_paise), 0)).where(
             Transaction.user_id == auth.user_id,
@@ -871,9 +895,7 @@ async def dashboard(session: SessionDependency, auth: AuthDependency) -> Dashboa
     )
 
 
-@router.post(
-    "/api/v1/demo/bootstrap", response_model=BootstrapResponse, tags=["demo"]
-)
+@router.post("/api/v1/demo/bootstrap", response_model=BootstrapResponse, tags=["demo"])
 async def bootstrap_demo(
     session: SessionDependency,
     response: Response,

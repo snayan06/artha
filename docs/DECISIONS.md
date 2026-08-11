@@ -84,3 +84,56 @@ exclusions.
 from a small server-owned explicit-phrase catalog. Cross-transaction tag
 management and efficient metadata analytics remain backlog work and must not be
 claimed as current product behavior.
+
+## ADR-009: tiered Gemini model strategy for Artha Analyst
+
+**Decision date:** 11 August 2026
+
+**Decision:** Keep `gemini-3.5-flash-lite` as the production default for
+capture, auto-tagging, intent routing and the current fixed-intent assistant.
+Benchmark `gemini-3.6-flash` as the only initial challenger for the future
+bounded multi-tool Artha Analyst. Do not adopt `gemini-3.5-flash`,
+`gemini-3.1-flash-lite` or `gemini-3.1-pro-preview` without new evidence.
+
+**Rationale:** Both selected candidates are current stable GA models with
+function calling, structured output and thinking support. Google positions 3.5
+Flash-Lite for low-cost high-throughput structured execution and 3.6 Flash for
+more complex agentic workflows. The existing 3.5 Flash-Lite path has already
+passed Artha's capture, tagging, routing and assistant gates. Gemini 3.6 Flash
+has the same paid input price as 3.5 Flash and a lower paid output price while
+being the newer agentic model, so 3.5 Flash adds no useful first benchmark arm.
+The Pro model is preview-only, paid-only and unnecessary for the initial
+bounded three-tool analyst. The older 3.1 Flash-Lite is cheaper but would trade
+away recency after 3.5 Flash-Lite already met the fast-path gates.
+
+**Privacy consequence:** Google's current pricing page states that free-tier
+content is used to improve its products, while paid-tier content is not. Free
+tier therefore remains restricted to fictional/demo evaluation. Real personal
+finance text stays disabled until Artha has an explicitly approved paid data
+configuration in addition to `store=false`; model selection alone does not
+approve private-data processing.
+
+**Promotion gate:** The Analyst model is selected from versioned fictional
+planner, argument, calculation, evidence, follow-up, scenario, safety, latency,
+token and cost evaluations. No model is promoted solely because it is newer or
+scores better on a general benchmark. See the
+[Artha Analyst plan](artifacts/architecture/2026-08-11-artha-analyst-agent-plan.md).
+
+## ADR-010: Google ADK for the bounded analyst beta
+
+**Decision date:** 11 August 2026
+
+**Decision:** Use Google Agent Development Kit (ADK) for the demo/test-account
+Artha Analyst beta. Keep the August 13 production assistant on its existing
+direct Gemini path until ADK passes Artha's versioned tool, evidence, safety,
+latency and privacy evaluations.
+
+**Rationale:** ADK fits the existing Python, FastAPI and Gemini stack and adds
+typed tool orchestration, local trace inspection and agent trajectory
+evaluation without adopting a second model ecosystem. LangGraph is stronger
+when durable, provider-neutral, long-running graphs are the primary need; that
+is not the initial bounded two-turn, three-tool Artha workflow.
+
+**Guardrail:** ADK does not receive ledger-write tools, raw SQL or unrestricted
+database access. Framework adoption does not change Artha's human-confirmed
+writes or private-data approval requirements.

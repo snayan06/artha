@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, LogOut, RefreshCw } from 'lucide-react'
 import { Shell } from './components/Shell'
 import { demoDashboard, demoTransactions } from './data/demo'
-import { ApiError, bootstrapDemo, confirmDraft, createSettlement, getCaptureContext, getDashboard, getMembers, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding, updateTransaction, voidTransaction } from './lib/api'
+import { ApiError, bootstrapDemo, confirmDraft, createSettlement, getCaptureContext, getDashboard, getMembers, getTransactionById, getTransactions, getUserProfile, isOnboardingComplete, setupOnboarding, updateTransaction, voidTransaction } from './lib/api'
 import type { LedgerCursor } from './lib/api'
 import { isDemoMode, useAuth } from './lib/auth'
 import { useRouter } from './lib/router'
@@ -150,7 +150,7 @@ export default function App() {
 }
 
 function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEmail?: string; onSignOut?: () => Promise<void> }) {
-  const { path, state } = useRouter()
+  const { path, state, navigate } = useRouter()
   const localDemo = isDemoMode()
   const setupKey = userKey ? `${SETUP_KEY}.${userKey}` : SETUP_KEY
   const profileKey = userKey ? `${PROFILE_KEY}.${userKey}` : PROFILE_KEY
@@ -285,6 +285,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
       accounts={accounts}
       categories={categories}
       onSearch={searchTransactions}
+      onFetchById={getTransactionById}
       hasMore={transactionCursor !== null}
       onLoadMore={loadMoreTransactions}
       onUpdate={correctTransaction}
@@ -293,7 +294,7 @@ function LedgerApp({ userKey, userEmail, onSignOut }: { userKey?: string; userEm
   )
   if (path === '/shared') page = <SharedPage transactions={transactions} sharedBalancePaise={dashboard.sharedBalancePaise} memberBalances={dashboard.memberBalances} demoMode={demoMode} profile={profile} accounts={accounts} onSettle={settleBalance} />
   if (path === '/add') page = <QuickAddPage onConfirm={addTransaction} members={profile.members} />
-  if (path === '/assistant') page = <AssistantPage initialHandoff={state as { initialQuestion?: string; handoffId?: string } | null} />
+  if (path === '/assistant') page = <AssistantPage initialHandoff={state as { initialQuestion?: string; handoffId?: string } | null} onOpenTransaction={(id) => navigate('/transactions', { selectedTransactionId: id })} />
   if (path === '/settings') page = <SettingsPage />
 
   return <Shell userEmail={userEmail} onSignOut={onSignOut}>{page}</Shell>

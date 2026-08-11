@@ -10,6 +10,7 @@ reports and snapshots belong here.
 | --- | --- |
 | [`ui/`](ui/) | Sanitized mobile/desktop screenshots, mockups and interaction recordings |
 | [`architecture/`](architecture/) | Rendered diagrams, schema exports and API snapshots |
+| [`product/`](product/) | Product reviews, usability audits and implementation contracts |
 | [`qa/`](qa/) | Test summaries, responsive checks and release-verification reports |
 
 ## Naming
@@ -43,6 +44,8 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [Account activity filter](ui/v1-account-activity-filter.md)
 - [Atomic transfer contract](architecture/v1-atomic-transfer.md)
 - [LLM usage and safety map](architecture/v1-llm-usage-map.md)
+- [Artha Analyst bounded-agent and evaluation plan](architecture/2026-08-11-artha-analyst-agent-plan.md)
+- [Private WhatsApp history import plan](product/2026-08-11-private-whatsapp-history-import-plan.md)
 - [Sprint 2 Accounts & family product contract](architecture/sprint-2-accounts-family-contract.md)
 - [Accounts & family implementation architecture](architecture/v2-accounts-family-management.md)
 - [Transfer and parser test gate](qa/2026-08-04-transfer-parser-gate.md)
@@ -60,3 +63,4 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [Personal Vercel launch verification](qa/2026-08-04-personal-vercel.md)
 - [UI artifact guide](ui/README.md)
 - [Architecture artifact guide](architecture/README.md)
+- [Product artifact guide](product/README.md)

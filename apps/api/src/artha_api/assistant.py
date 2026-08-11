@@ -431,11 +431,30 @@ class AssistantStatus(StrictModel):
     is_demo: bool = False
 
 
+class AssistantEvidenceTransaction(StrictModel):
+    id: str = Field(min_length=1, max_length=80)
+    occurred_on: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    label: str = Field(min_length=1, max_length=80)
+    kind: Literal["expense", "income", "transfer", "settlement", "adjustment"]
+    amount_paise: int
+
+
+class AssistantEvidence(StrictModel):
+    period: str = Field(min_length=1, max_length=80)
+    basis: str = Field(min_length=1, max_length=180)
+    source_count: int = Field(ge=0)
+    capped: bool = False
+    transactions: list[AssistantEvidenceTransaction] = Field(
+        default_factory=list, max_length=8
+    )
+
+
 class AssistantChatResponse(StrictModel):
     provider: LlmProvider
     model: str | None
     mode: Literal["model"]
     result: AssistantCompletion
+    evidence: AssistantEvidence | None = None
 
 
 class TagCategory(StrictModel):
