@@ -1,6 +1,6 @@
 # Artha project checkpoint
 
-Updated: 10 August 2026
+Updated: 11 August 2026
 
 This is the first document to read when starting or resuming Artha work. It is
 the concise handoff between the user and Codex. Use the
@@ -20,7 +20,8 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: daily-use V1 is published on production `main` at `cc7934c` through
+**Status: daily-use V1 is published. The latest application/dependency release
+is production commit `906c0a6`, following
 PRs [#30](https://github.com/snayan06/artha/pull/30),
 [#31](https://github.com/snayan06/artha/pull/31) and
 [#32](https://github.com/snayan06/artha/pull/32). Complete-ledger search,
@@ -44,9 +45,9 @@ real-data guards.
 | Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
 | V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
-| Production `main` | `cc7934c`; daily-use feature PR #30 and live-fix PRs #31/#32 are merged |
-| GitHub checks | Main [CI run 31408304984](https://github.com/snayan06/artha/actions/runs/31408304984) and [CodeQL run 31408301066](https://github.com/snayan06/artha/actions/runs/31408301066) passed for `cc7934c` |
-| Vercel | Both production deployments completed for exact SHA `cc7934c`; the public web, all primary signed-in routes and API health passed |
+| Application/dependency release | `906c0a6`; daily-use PRs #30-#33 and reviewed dependency PRs #34/#35 are merged |
+| GitHub checks | Main [CI run 31467023384](https://github.com/snayan06/artha/actions/runs/31467023384) and [CodeQL run 31467023415](https://github.com/snayan06/artha/actions/runs/31467023415) passed for `906c0a6` |
+| Vercel | Both production deployments completed for exact SHA `906c0a6`; the public web and API health return `200` |
 | Supabase RPC catalog | The exact `artha-production` project now resolves balances, logical activity, encrypted export and atomic restore RPCs |
 | Public checks | API health and web return `200`; anonymous catalog probes resolve both required ledger RPCs without exposing ledger data |
 | Authenticated journey | New-user magic link, returning-user link, session persistence, sign-out and restored server-owned onboarding passed with fictional data |
@@ -207,6 +208,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 11 Aug 2026 | Reviewed and merged dependency PRs #35 (`github/codeql-action` 4.37.4 → 4.37.6) and #34 (Supabase JS 2.112.0 → 2.112.2, user-event 14.6.3 and PostCSS 8.5.26). The combined candidate passed 221 web + 288 API tests, production build, all SQL and 60/30/24/49 AI contracts. PR #34 was rebased after #35 and rechecked. Final main `906c0a6`, CI `31467023384`, CodeQL `31467023415`, exact-SHA web/API deployments and public health checks passed. The primary local checkout is synchronized; merged temporary worktrees/branches were removed while the unmerged model benchmark and archived pre-release work were preserved. |
 | 10 Aug 2026 | Published daily-use V1 through PRs #30-#32 as production `cc7934c`. Applied migration `20260810010000`, passed rollback SQL 007, 221 web + 288 API tests, main CI `31408304984`, CodeQL `31408301066` and exact-SHA web/API deployments. Signed-in fictional QA passed onboarding, capture/detail/correction/search, repayment, ledger visibility, Ask Artha and 390/1440 px checks. The settlement JSON-wire and owner-as-split-candidate defects found during live QA were fixed before sign-off; the disposable identity and its ledger were removed. |
 | 10 Aug 2026 | Merged account management PR #27 and conflict-guidance hotfix PR #28 as `41b53b8`. Applied and behavior-tested all account migrations against the exact production database, passed 208 web + 280 API local tests, main CI `31332275508`, CodeQL `31332275498`, both production deployments and signed-in duplicate/edit/reconciliation/mobile acceptance. |
 | 9 Aug 2026 | Merged combined PRs #23 and #24 as `e32b5b6`. Main CI `31278245585`, CodeQL `31278245587`, both exact-SHA Vercel deployments and public web/API smoke checks passed. Fresh local gate passed 206 web, 275 API and 60/30/24/49 AI contracts. Hosted intent routing reached 48/49 exact, 100% safety and zero false captures. Isolated fictional browser QA passed routed capture, routed Ask Artha and mixed-intent choice at 390 px and 1440 px; signed-in user acceptance of the new routing remains. |
