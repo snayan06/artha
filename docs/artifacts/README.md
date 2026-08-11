@@ -41,6 +41,7 @@ Use lowercase kebab-case and include the milestone or date when useful:
 - [Capture-hardening production acceptance](qa/2026-08-08-capture-hardening-production-acceptance.md)
 - [Message UX and structured metadata release evidence](qa/2026-08-09-message-metadata-release.md)
 - [Account management production release](qa/2026-08-10-account-management-production-release.md)
+- [Evidence-backed assistant production release](qa/2026-08-11-evidence-assistant-release.md)
 - [Account activity filter](ui/v1-account-activity-filter.md)
 - [Atomic transfer contract](architecture/v1-atomic-transfer.md)
 - [LLM usage and safety map](architecture/v1-llm-usage-map.md)

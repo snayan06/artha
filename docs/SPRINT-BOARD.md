@@ -32,11 +32,12 @@ Sprint 1 dependency.
 | ₹25k self-transfer flow | Production verified | `25k` mapped to ₹25,000 with ordered ICICI → HDFC accounts; totals remained unchanged |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
 | Structured Gemini features | Production verified | Grounded capture and read-only metric/chart responses passed; hosted fictional gates remain 50/50, 30/30 and 24/24 |
+| Evidence-backed Ask Artha | Deployed | PR #37 (`b61858c`) adds exact period/basis/source evidence, honest recent-sample/cap copy and owner-scoped ledger drill-down; main CI/CodeQL, exact-SHA deployments and production SQL 008 passed |
 | Parser evaluation dataset | Done | 60 fictional cases, including merchant/platform/context/tag scenarios, plus an automated contract checker are in the repository |
 | Private AI learning/eval ledger | Priority next | Audited private interactions, user corrections, token budgets and eval runs need RLS-backed storage, export/delete controls and sanitized dataset promotion |
 | Accounts & family | Owner maintenance deployed and accepted | PRs #27/#28 are merged at `41b53b8`; account/card maintenance, available credit, append-only balance reconciliation, production database behavior and signed-in mobile Settings acceptance passed |
 | Family email invitations | Sprint 2B | Permission model is defined; owner-only RLS hardening must land before any invited viewer |
-| Account-specific history | Done locally | The ledger filters banks/cards and includes both sides of a transfer |
+| Account-specific history | Deployed | The complete ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Done for owner | Add/edit, card details, zero-balance archive/restore and audited reconciliation are live; participant maintenance and invitations remain separate slices |
 | Daily-use transaction controls | Deployed and accepted | PR #30 (`1531968`) published stable keyset history, bounded database search, detail/correction/removal, post-confirm recovery and atomic shared repayments; live-fix PRs #31/#32 are deployed |
 | Production acceptance | Daily-use fictional QA passed | Exact-project migration, rollback SQL, main CI/CodeQL, exact-SHA deployments and signed-in mobile/desktop acceptance passed. Final-domain restore, second-identity persistence/isolation, provider-unavailable recovery and private-data AI approval remain |
@@ -79,7 +80,7 @@ acceptance checks.
 | 2 | Member-paid shared expenses | A family member can pay without moving the owner's account | Payable/receivable updates correctly; later repayment clears it without income/spend |
 | 3 | Participant maintenance | Real households change over time | Add/rename/deactivate with history preserved and no cross-household access |
 | 4 | Email invitations and **Shared with me** | Separate users need a safe, limited shared view | Invited user sees only shared items, never the owner's private accounts or balances |
-| 5 | Evidence-backed Ask Artha analytics | The assistant should explain numbers, not only return a card | Date range, source count and matching transactions accompany every answer |
+| 5 | Evidence-backed Ask Artha analytics — deployed | The assistant now explains its fixed-intent numbers | Date range, source count and matching transactions accompany every answer; exact drill-down is owner scoped |
 | 6 | Investments discovery | Mutual funds and stocks need portfolio-specific concepts | Product/schema brief for holdings, transactions, valuation and returns before implementation |
 
 Agentic follow-up is now specified in the

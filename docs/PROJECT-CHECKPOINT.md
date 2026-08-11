@@ -20,8 +20,9 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: daily-use V1 is published. The latest application/dependency release
-is production commit `906c0a6`, following
+**Status: daily-use V1 plus evidence-backed Ask Artha is published. The latest
+application feature release is `b61858c`, following
+PR [#37](https://github.com/snayan06/artha/pull/37) and the earlier
 PRs [#30](https://github.com/snayan06/artha/pull/30),
 [#31](https://github.com/snayan06/artha/pull/31) and
 [#32](https://github.com/snayan06/artha/pull/32). Complete-ledger search,
@@ -45,16 +46,17 @@ real-data guards.
 | Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
 | V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
-| Application/dependency release | `906c0a6`; daily-use PRs #30-#33 and reviewed dependency PRs #34/#35 are merged |
-| GitHub checks | Main [CI run 31467023384](https://github.com/snayan06/artha/actions/runs/31467023384) and [CodeQL run 31467023415](https://github.com/snayan06/artha/actions/runs/31467023415) passed for `906c0a6` |
-| Vercel | Both production deployments completed for exact SHA `906c0a6`; the public web and API health return `200` |
+| Evidence-backed Ask Artha | Deployed from `b61858c`; every answer has a bounded period/basis/source contract and recent supporting rows can open exact owner-scoped ledger activity |
+| Application/dependency release | `b61858c`; PR #37 plus daily-use PRs #30-#33 and reviewed dependency PRs #34/#35 are merged |
+| GitHub checks | Main [CI run 31518001200](https://github.com/snayan06/artha/actions/runs/31518001200) and [CodeQL run 31518001192](https://github.com/snayan06/artha/actions/runs/31518001192) passed for `b61858c` |
+| Vercel | Both production deployments completed for exact SHA `b61858c`; signed-in Home, Settings and Assistant shells load on the final web domain |
 | Supabase RPC catalog | The exact `artha-production` project now resolves balances, logical activity, encrypted export and atomic restore RPCs |
 | Public checks | API health and web return `200`; anonymous catalog probes resolve both required ledger RPCs without exposing ledger data |
 | Authenticated journey | New-user magic link, returning-user link, session persistence, sign-out and restored server-owned onboarding passed with fictional data |
 | Financial journey | Backdated split expense, `25k` income, `25k` transfer, card expense, filters and live dashboard/member updates passed |
 | Gemini production | Final-domain expense, `25k` income, `25k` transfer and read-only balance assistant were manually verified with fictional data after `c4ae0dc`; hosted fictional gates remain 50/50, 30/30 and 24/24 |
 | Responsive/theme | Home, Transactions, Quick Add, Shared, Assistant and Settings have no horizontal overflow at 320, 390 or 1440 CSS px; light/dark switching and mobile/desktop dark UI passed |
-| Remaining gate | Full browser-process reopen and second-identity isolation; final-domain restore; real provider-unavailable recovery; sanitized log/latency evidence; private-data AI approval; fresh hosted capture rerun |
+| Remaining gate | Private-data AI approval before real finance text; full browser-process reopen and second-identity isolation; final-domain restore; real provider-unavailable recovery; sanitized log/latency evidence; fresh hosted capture rerun |
 
 ## Resume checklist
 
@@ -93,6 +95,8 @@ real-data guards.
 - [x] Deploy and accept S2-01 through S2-04 owner account/card maintenance and audited reconciliation.
 - [x] Publish and accept the daily-use transaction controls, including the live
   settlement-wire and owner-as-split-candidate fixes.
+- [x] Publish evidence-backed Ask Artha through PR #37, apply the exact-detail
+  RPC to the exact production project and pass its rollback-only isolation test.
 
 ## Completed in the deployed release and local hardening follow-up
 
@@ -123,17 +127,17 @@ real-data guards.
 ## Verification checkpoint
 
 ```text
-Current production release web: 221 tests passed
-Current production release API: 288 tests passed
-Daily-use release: 221 web + 288 API tests, PWA build, 13 migrations, 7 SQL contracts and 60/30/24/49 keyless AI contracts pass
+Current production release web: 233 tests passed
+Current production release API: 311 tests passed
+Evidence assistant release: 233 web + 311 API tests, PWA build, 14 migrations, 8 SQL contracts and 60/30/30/24/49 keyless contracts pass
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
-SQL: 12 migrations, seed and 6 SQL contract tests parsed; runtime account behavior contracts passed locally, in PR CI and against production
-AI contracts: 60 capture, 30 auto-tag, 24 assistant and 49 intent-router cases valid
+SQL: 14 migrations, seed and 8 SQL contract tests parsed; runtime account and exact-detail behavior contracts passed locally, in PR CI and against production
+AI contracts: 60 capture, 30 bounded-analyst, 30 auto-tag, 24 assistant and 49 intent-router cases valid
 Fresh hosted Gemini gate: intent routing completed 49/49 with 48/49 exact, 100% safety accuracy and zero false captures; combined capture rerun remains
 Hardening recovery: focused automated Expense/Income/Transfer, category allow-list, context-retry and provider-unavailable tests pass; final-domain manual Expense/Income/Transfer recovery passed; real provider unavailability remains
 Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
-Production release: main is cc7934c; daily-use controls and both production hotfixes are published
+Production release: main is b61858c; daily-use controls, evidence-backed Ask Artha and the exact-detail RPC are published
 Release acceptance: signed-in fictional final-domain QA passed login/onboarding, capture/detail/correction/search, shared repayment, Ask Artha, Settings and 390/1440 px responsive checks
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
@@ -145,6 +149,7 @@ Gemini production: grounded ₹123 expense, 25k income, 25k transfer and exact-b
 ```
 
 Detailed evidence: [daily-use V1 release](artifacts/qa/2026-08-10-daily-use-v1-release.md),
+[evidence-backed assistant release](artifacts/qa/2026-08-11-evidence-assistant-release.md),
 [account management production release](artifacts/qa/2026-08-10-account-management-production-release.md),
 [unified-entry production release](artifacts/qa/2026-08-09-unified-entry-production-release.md),
 [capture-hardening production acceptance](artifacts/qa/2026-08-08-capture-hardening-production-acceptance.md)
@@ -208,6 +213,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 11 Aug 2026 | Published PR #37 as `b61858c`: compact AI/privacy status, source-backed Ask Artha answers, exact ledger drill-down, settlement-aware evidence, a 30-case bounded-analyst contract and the post-launch WhatsApp import plan. Fresh main CI/CodeQL and both exact-SHA Vercel deployments passed. Migration `20260811010000` and rollback SQL 008 passed on the exact production project with authenticated-only execution and no fictional rows left behind. Signed-in Home, Settings and Assistant smoke checks were non-mutating. |
 | 11 Aug 2026 | Reviewed and merged dependency PRs #35 (`github/codeql-action` 4.37.4 → 4.37.6) and #34 (Supabase JS 2.112.0 → 2.112.2, user-event 14.6.3 and PostCSS 8.5.26). The combined candidate passed 221 web + 288 API tests, production build, all SQL and 60/30/24/49 AI contracts. PR #34 was rebased after #35 and rechecked. Final main `906c0a6`, CI `31467023384`, CodeQL `31467023415`, exact-SHA web/API deployments and public health checks passed. The primary local checkout is synchronized; merged temporary worktrees/branches were removed while the unmerged model benchmark and archived pre-release work were preserved. |
 | 10 Aug 2026 | Published daily-use V1 through PRs #30-#32 as production `cc7934c`. Applied migration `20260810010000`, passed rollback SQL 007, 221 web + 288 API tests, main CI `31408304984`, CodeQL `31408301066` and exact-SHA web/API deployments. Signed-in fictional QA passed onboarding, capture/detail/correction/search, repayment, ledger visibility, Ask Artha and 390/1440 px checks. The settlement JSON-wire and owner-as-split-candidate defects found during live QA were fixed before sign-off; the disposable identity and its ledger were removed. |
 | 10 Aug 2026 | Merged account management PR #27 and conflict-guidance hotfix PR #28 as `41b53b8`. Applied and behavior-tested all account migrations against the exact production database, passed 208 web + 280 API local tests, main CI `31332275508`, CodeQL `31332275498`, both production deployments and signed-in duplicate/edit/reconciliation/mobile acceptance. |
