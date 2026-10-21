@@ -20,8 +20,10 @@ After every meaningful work batch:
 
 ## Current release state
 
-**Status: daily-use V1 plus evidence-backed Ask Artha is published. The latest
-application feature release is `b61858c`, following
+**Status: the clean daily-use start release is published. The latest
+application feature release is `a76b789` from
+PR [#53](https://github.com/snayan06/artha/pull/53), following
+the evidence-backed assistant release `b61858c` and
 PR [#37](https://github.com/snayan06/artha/pull/37) and the earlier
 PRs [#30](https://github.com/snayan06/artha/pull/30),
 [#31](https://github.com/snayan06/artha/pull/31) and
@@ -49,15 +51,15 @@ real-data guards.
 | Surface | Current state |
 | --- | --- |
 | Combined message, metadata and unified-entry release | Deployed from `e32b5b6`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, strict text-only intent routing, shared composer and one-time Ask Artha handoff are live |
-| Accounts and cards | Deployed per-account maintenance from `41b53b8`; a local candidate now adds one-screen dated reconciliation across all active banks/cards with positive card-outstanding input, review and audited per-account adjustments |
+| Accounts and cards | Deployed from `a76b789`; one-screen dated reconciliation covers all active banks/cards with positive card-outstanding input, review and audited per-account adjustments |
 | Daily-use transaction controls | Deployed and accepted from `1531968`; bounded database search, stable history paging, detail, atomic correction, audited removal, post-confirm recovery and atomic existing-participant repayment passed signed-in production QA |
 | Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
 | V1 capture hardening | PR [#21](https://github.com/snayan06/artha/pull/21) merged as `c4ae0dc`; server-owned capture context and complete manual Expense/Income/Transfer recovery are deployed and final-domain accepted |
 | Evidence-backed Ask Artha | Deployed from `b61858c`; every answer has a bounded period/basis/source contract and recent supporting rows can open exact owner-scoped ledger activity |
-| Application/dependency release | `b61858c`; PR #37 plus daily-use PRs #30-#33 and reviewed dependency PRs #34/#35 are merged |
-| GitHub checks | Main [CI run 31518001200](https://github.com/snayan06/artha/actions/runs/31518001200) and [CodeQL run 31518001192](https://github.com/snayan06/artha/actions/runs/31518001192) passed for `b61858c` |
-| Vercel | Both production deployments remain reachable and return `200`; the web accepted a live magic-link request after Supabase resumed |
+| Application/dependency release | `a76b789`; PR #53 plus PR #37, daily-use PRs #30-#33 and reviewed dependency PRs #34/#35 are merged |
+| GitHub checks | Main [CI run 39663523304](https://github.com/snayan06/artha/actions/runs/39663523304) and [CodeQL run 39663523267](https://github.com/snayan06/artha/actions/runs/39663523267) passed for `a76b789` |
+| Vercel | Both exact-main production deployments completed successfully; web/API return `200` and the live bundle contains the bulk reconciliation and safe-auth release |
 | Supabase RPC catalog | Project/Auth availability restored; repeat the exact RPC catalog and rollback-safe isolation checks before the next production sign-off |
 | Public checks | Web/API return `200`, Supabase DNS resolves and authenticated-key Auth health returns `200` |
 | Authenticated journey | New-user magic link, returning-user link, session persistence, sign-out and restored server-owned onboarding passed with fictional data |
@@ -71,7 +73,7 @@ real-data guards.
 - [x] Resume the exact Supabase production project; verify DNS, authenticated-key
   Auth health and one accepted final-domain magic-link request.
 - [ ] Open the newest sign-in email and complete callback/session acceptance.
-- [ ] Deploy the tested safe authentication outage/rate-limit messaging.
+- [x] Deploy the tested safe authentication outage/rate-limit messaging.
 - [ ] Follow the dated opening-snapshot and forward-tracking acceptance in the
   [daily-use test-drive plan](artifacts/product/2026-10-22-daily-use-test-drive-plan.md).
 
@@ -157,7 +159,7 @@ AI contracts: 60 capture, 30 bounded-analyst, 30 auto-tag, 24 assistant and 49 i
 Fresh hosted Gemini gate: intent routing completed 49/49 with 48/49 exact, 100% safety accuracy and zero false captures; combined capture rerun remains
 Hardening recovery: focused automated Expense/Income/Transfer, category allow-list, context-retry and provider-unavailable tests pass; final-domain manual Expense/Income/Transfer recovery passed; real provider unavailability remains
 Architecture artwork: no overflow and readable in a 736 px README-sized light/dark rendering; the full diagram fits at 390 px but dense labels require opening/zooming
-Production release: main is b61858c; daily-use controls, evidence-backed Ask Artha and the exact-detail RPC are published
+Production release: main is a76b789; the clean-start preparation, daily-use controls, evidence-backed Ask Artha and the exact-detail RPC are published
 Release acceptance: signed-in fictional final-domain QA passed login/onboarding, capture/detail/correction/search, shared repayment, Ask Artha, Settings and 390/1440 px responsive checks
 Public smoke: web root, transactions and assistant routes return 200; API health returns 200 from Mumbai
 Recovery: exact production project resolves all four required RPCs without a PGRST202 catalog miss
@@ -236,7 +238,7 @@ Only ask for these when the engineering work reaches the corresponding gate:
 | Date | Checkpoint |
 | --- | --- |
 | 22 Oct 2026 | Resumed the original Supabase project and verified DNS, Auth health and a final-domain magic-link request returning `200`. The first request failed while the project was becoming available; the accepted retry showed the normal same-browser email-link state. Full callback/session acceptance remains. |
-| 22 Oct 2026 | Added a local one-screen balance snapshot for every active bank/card. Cards accept positive outstanding amounts and convert to the ledger liability convention; only changed values create existing audited balance adjustments. Added the clean-start/automation/Voice sprint plan. Full gate passes with 238 web + 311 API tests; desktop and 390 px light/dark rendered QA have no console errors. Deployment remains. |
+| 22 Oct 2026 | Published PR #53 as `a76b789`. One-screen balance reconciliation, safe auth errors, reload-safe dated onboarding, exact paise and the clean-start/automation/Voice plan are on `main`. Local `make check` passed 238 web + 311 API tests; main CI `39663523304`, CodeQL `39663523267`, both Vercel production deployments and public bundle/health checks passed. Desktop and 390 px light/dark rendered QA had no console errors. Signed-in callback and financial mutation acceptance remain. |
 | 22 Oct 2026 | Reviewed a private local set of real bank/card statements and an existing reconciliation workbook to validate product modelling. No raw financial data or identifiers were committed or sent to an LLM. Added a sanitized statement-driven ledger/import contract and a separately gated Voice Capture epic. This is documentation/planning only; no application release state changed. |
 | 22 Oct 2026 | Diagnosed production sign-in failure as an unavailable Supabase project hostname (`NXDOMAIN`) while web/API health remain reachable. Implemented safe outage/rate-limit auth guidance, reload-safe opening setup, explicit posted-balance/pending-entry cutoff copy and exact paise display. Full local gate passes; deployment and signed-in acceptance remain blocked on Supabase restoration. |
 | 11 Aug 2026 | Published PR #37 as `b61858c`: compact AI/privacy status, source-backed Ask Artha answers, exact ledger drill-down, settlement-aware evidence, a 30-case bounded-analyst contract and the post-launch WhatsApp import plan. Fresh main CI/CodeQL and both exact-SHA Vercel deployments passed. Migration `20260811010000` and rollback SQL 008 passed on the exact production project with authenticated-only execution and no fictional rows left behind. Signed-in Home, Settings and Assistant smoke checks were non-mutating. |

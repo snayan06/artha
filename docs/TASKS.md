@@ -10,9 +10,10 @@ For the current ordered delivery view, blockers and user actions, see
 
 ## Live launch status
 
-**Current stage:** daily-use V1, AI-primary unified entry, owner account/card
-maintenance, transaction controls and evidence-backed Ask Artha are live on
-production `main` at `b61858c`. PR #37 passed main CI/CodeQL, exact-SHA
+**Current stage:** clean daily-use start, AI-primary unified entry, owner
+account/card maintenance, transaction controls and evidence-backed Ask Artha
+are live on production `main` at `a76b789`. PR #53 passed main CI/CodeQL and
+both deployments; PR #37 previously passed main CI/CodeQL, exact-SHA
 deployment, exact-project database acceptance and signed-in non-mutating
 production smoke checks. PRs #30-#32 previously passed signed-in
 fictional acceptance. Do not send real financial text to AI until the remaining
@@ -45,9 +46,9 @@ signed-in Settings acceptance are green.
 - [ ] Approve the real-data privacy configuration and re-run all fresh hosted
   fictional gates for the hardening follow-up.
 
-**Next action:** complete the live magic-link callback, deploy and accept the
-safer authentication/onboarding hardening plus bulk balance snapshot, then
-create the dated opening snapshot and begin the controlled forward-tracking pilot in the
+**Next action:** complete the live magic-link callback and signed-in bulk
+balance acceptance, then create the dated opening snapshot and begin the
+controlled forward-tracking pilot in the
 [daily-use test-drive plan](artifacts/product/2026-10-22-daily-use-test-drive-plan.md).
 
 ## Current execution queue
@@ -118,9 +119,10 @@ create the dated opening snapshot and begin the controlled forward-tracking pilo
   Income, Transfer and exact-text manual-recovery acceptance.
 - [x] Deploy and accept owner account/card maintenance, available credit,
   zero-balance archive/restore and audited balance reconciliation.
-- [ ] Deploy and accept a one-screen dated balance snapshot across every active
+- [x] Deploy a one-screen dated balance snapshot across every active
   bank/card; positive card outstanding is converted to the ledger's negative
-  liability convention and only changed balances create adjustments.
+  liability convention and only changed balances create adjustments. Signed-in
+  production mutation acceptance remains.
 - [ ] Build the safe **Start fresh** epic: encrypted backup, preview, cutoff,
   owner-only atomic retirement of stale live rows, new all-account snapshot and
   audit evidence. Never make this an unreviewed physical delete.
