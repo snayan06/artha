@@ -1,7 +1,7 @@
 # Clean start, assisted capture and Voice Capture sprint
 
 Date: 22 October 2026  
-Status: approved product plan; bulk balance snapshot is in implementation  
+Status: approved product plan; bulk balance snapshot is deployed  
 Scope: private personal use with friends/family split participants
 
 ## Outcome
@@ -29,7 +29,7 @@ and add transactions through text or voice without any silent ledger writes.
 | ID | Priority | Epic | Deliverable | Acceptance gate |
 | --- | --- | --- | --- | --- |
 | CS-01 | P0 | Account/card inventory | One checklist for active banks, cash, wallets and cards; add/rename/edit card limit/statement/due dates; archive unused zero-balance accounts | The owner can explain every active account and card before setting balances |
-| CS-02 | P0 | Bulk balance snapshot | One dated form for all posted bank balances and positive card outstanding amounts, followed by a single review and confirmation | Only changed balances create integer-paise audited adjustments; unchanged accounts are untouched |
+| CS-02 | Done | Bulk balance snapshot | One dated form for all posted bank balances and positive card outstanding amounts, followed by a single review and confirmation | Deployed with integer-paise audited adjustments for changed accounts only; unchanged accounts remain untouched |
 | CS-03 | P0 | Safe **Start fresh** | Preview stale rows, create/download an encrypted backup, choose cutoff date, enter all target balances and confirm with an explicit destructive-warning phrase | One atomic, idempotent owner-only operation removes old rows from live totals, records the new snapshot and writes an audit event; no physical deletion occurs |
 | CS-04 | P0 | Clean-start verification | Reopen the app, compare every displayed balance with source apps/statements and test card purchase plus card-bill transfer | Dashboard, accounts, search and assistant use only the new live period; the backup can still be previewed |
 | IM-01 | P1 | Missing-activity inbox | Stage CSV/PDF/WhatsApp/bank-alert candidates locally or server-side under the approved privacy policy; show duplicates and missing fields | Nothing reaches the ledger before review; replaying a source cannot duplicate a transaction |
@@ -92,4 +92,3 @@ The detailed voice evaluation requirements remain in
 4. Which stale accounts should be archived.
 5. Approval of the voice transcription/data-use choice after the fictional
    evaluation passes.
-
