@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff, release guard and exact resume sequence.
 
-Updated: 11 August 2026
+Updated: 22 October 2026
 Goal: make personal production use trustworthy before entering real financial data
 
 Current scope: a private personal ledger with expense splitting for friends and
@@ -26,8 +26,8 @@ Sprint 1 dependency.
 | V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
 | Message UX and metadata | Deployed | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are live from `e32b5b6` |
 | Public repository and CI | Done for current release | Main CI `31408304984` and CodeQL `31408301066` passed for production `cc7934c` |
-| Vercel and Supabase infrastructure | Done | Web, API and database are live on personal accounts |
-| Persistent production login | Production accepted with a disposable identity | Password login, persisted session and signed-in route hydration passed; full browser-process reopen remains |
+| Vercel and Supabase infrastructure | **Blocked: Supabase restore required** | Web and API return `200`, but the configured Supabase project hostname currently returns DNS `NXDOMAIN`; authentication and ledger access cannot work until the exact project is resumed or restored |
+| Persistent production login | Previously accepted; currently unavailable | Password login, persisted session and signed-in route hydration previously passed; the current Supabase outage blocks new authentication and the full browser-process reopen drill remains |
 | Server-owned onboarding/profile | Production accepted | Profile, household and split candidates returned from the server; PR #32 prevents the authenticated owner appearing as their own split candidate |
 | ₹25k self-transfer flow | Production verified | `25k` mapped to ₹25,000 with ordered ICICI → HDFC accounts; totals remained unchanged |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
@@ -40,7 +40,23 @@ Sprint 1 dependency.
 | Account-specific history | Deployed | The complete ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Done for owner | Add/edit, card details, zero-balance archive/restore and audited reconciliation are live; participant maintenance and invitations remain separate slices |
 | Daily-use transaction controls | Deployed and accepted | PR #30 (`1531968`) published stable keyset history, bounded database search, detail/correction/removal, post-confirm recovery and atomic shared repayments; live-fix PRs #31/#32 are deployed |
-| Production acceptance | Daily-use fictional QA passed | Exact-project migration, rollback SQL, main CI/CodeQL, exact-SHA deployments and signed-in mobile/desktop acceptance passed. Final-domain restore, second-identity persistence/isolation, provider-unavailable recovery and private-data AI approval remain |
+| Production acceptance | **Paused for infrastructure recovery** | Earlier fictional QA passed, but the current production database/auth endpoint is unavailable. Restore Supabase, redeploy only if the project reference changed, then repeat sign-in and the dated opening-snapshot acceptance before personal use |
+
+## Current test-drive execution
+
+The canonical sequence is the
+[daily-use test-drive plan](artifacts/product/2026-10-22-daily-use-test-drive-plan.md).
+Historical import, richer analytics, investments, invitations, agentic analysis
+and voice remain outside this release gate.
+
+| Order | Status | Task | Done when |
+| --- | --- | --- | --- |
+| 1 | **Blocked - user/provider action** | Resume or restore the exact `artha-production` Supabase project | The configured project hostname resolves and Supabase Auth health responds |
+| 2 | Done locally; deployment blocked | Publish safe outage/rate-limit sign-in messaging | Returned/thrown provider failures and rate limiting are covered without leaking provider details; production acceptance waits for Supabase |
+| 3 | Done locally; deployment blocked | Add dated opening-snapshot guidance and reload-safe onboarding | Cutoff meaning, posted balances, pending-entry warning, exact paise and current-tab refresh recovery passed automated and browser QA |
+| 4 | Next | Repeat fictional daily-capture and card lifecycle acceptance | Purchase, transfer, refund, shared expense, card payment, correction and search all reconcile |
+| 5 | Next | Create the real opening snapshot with the owner | Every starting balance is approved and activity after the cutoff begins at zero ambiguity |
+| 6 | Later | Four-week measured pilot and cycle reconciliation | At least 90% capture coverage and every remaining difference is explainable |
 
 ## Senior product audit — net-new additions
 
@@ -279,6 +295,24 @@ See [`artifacts/qa/2026-08-06-web-interface-guidelines-audit.md`](artifacts/qa/2
 - [ ] Pilot Telegram first; reassess current WhatsApp pricing and account requirements before committing.
 - [ ] Verify webhook signatures, sender mapping, replay protection, rate limits and consent.
 - [ ] Never confirm a ledger write from a message alone.
+
+### Voice capture (major epic after ledger/import validation)
+
+Voice reuses the unified typed-capture contract. It is not released until the
+statement-driven ledger/import slice and personal daily-use pilot are accepted.
+Detailed evidence and gates live in the
+[real-statement product validation](artifacts/product/2026-10-22-real-statement-product-validation.md).
+
+- [ ] Show an editable transcript before creating a draft; retain no audio by default.
+- [ ] Route the transcript through the same grounded, unsaved draft schema as typed input.
+- [ ] Support English/Hinglish, Indian-number phrases, account/card nicknames,
+  transfers, shared expenses, backdates and spoken corrections.
+- [ ] Add clear microphone permission, listening, processing, offline and retry states.
+- [ ] Ask one grounded clarification at a time and require explicit review and confirmation.
+- [ ] Pass critical-field, noisy-room, accent, code-switching, correction,
+  interruption, privacy, accessibility and responsive acceptance gates.
+- [ ] Keep cloud transcription behind explicit owner disclosure/consent; prefer
+  on-device transcription when its measured accuracy clears the release gate.
 
 ### Investments and liabilities (independent release gate)
 

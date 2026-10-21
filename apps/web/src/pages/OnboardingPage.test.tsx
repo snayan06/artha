@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OnboardingPage } from './OnboardingPage'
 
 describe('OnboardingPage', () => {
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    sessionStorage.clear()
+  })
   it('reviews and saves money plus credit-card opening balances', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn().mockResolvedValue(undefined)
@@ -41,6 +44,27 @@ describe('OnboardingPage', () => {
     expect(screen.queryByText(/fictional|pilot/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Explore sample demo' }))
     await waitFor(() => expect(onExploreDemo).toHaveBeenCalledWith({ displayName: 'You', householdName: 'My household', members: [], isDemo: true }))
+  })
+
+  it('explains the dated opening snapshot and preserves unfinished setup on refresh', async () => {
+    const user = userEvent.setup()
+    const firstRender = render(<OnboardingPage onSave={vi.fn()} onExploreDemo={vi.fn()} />)
+
+    expect(screen.getByText('Use posted balances, not pending activity.')).toBeVisible()
+    await user.clear(screen.getByLabelText('Your display name'))
+    await user.type(screen.getByLabelText('Your display name'), 'Ari')
+    await user.type(screen.getByLabelText('Money account 1 name'), 'Daily bank')
+    await user.type(screen.getByLabelText('Money account 1 current balance'), '1234.56')
+    firstRender.unmount()
+
+    render(<OnboardingPage onSave={vi.fn()} onExploreDemo={vi.fn()} />)
+    expect(screen.getByLabelText('Your display name')).toHaveValue('Ari')
+    expect(screen.getByLabelText('Money account 1 name')).toHaveValue('Daily bank')
+    expect(screen.getByLabelText('Money account 1 current balance')).toHaveValue(1234.56)
+
+    await user.click(screen.getByRole('button', { name: 'Review setup' }))
+    expect(screen.getByText(/add only later activity after saving/i)).toBeVisible()
+    expect(screen.getAllByText('₹1,234.56').length).toBeGreaterThan(0)
   })
 
   it('rejects duplicate names across money accounts and credit cards before review', async () => {

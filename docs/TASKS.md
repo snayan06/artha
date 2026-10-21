@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff and release guard.
 
-Updated: 11 August 2026
+Updated: 22 October 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
@@ -30,6 +30,9 @@ signed-in Settings acceptance are green.
 - [x] Personal Vercel account created under the intended owner.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
 - [x] Create the fresh `artha-production` Supabase project in Mumbai.
+- [ ] Resume or restore the exact `artha-production` project after its hostname
+  began returning DNS `NXDOMAIN` on 22 October 2026; if its reference changes,
+  reapply migrations and update both Vercel deployments plus Auth redirect URLs.
 - [x] Apply all migrations and pass hosted catalog/RLS schema assertions.
 - [x] Complete anonymous-denial and rollback-only two-household behavioural isolation on the hosted database.
 - [x] Create and configure the `artha-api` and `artha-web` Vercel projects.
@@ -42,9 +45,10 @@ signed-in Settings acceptance are green.
 - [ ] Approve the real-data privacy configuration and re-run all fresh hosted
   fictional gates for the hardening follow-up.
 
-**Next action:** approve the private-data AI mode or keep private capture manual,
-repeat encrypted restore through the final-domain UI, then complete the
-second-identity/browser-process isolation and provider-unavailable drills.
+**Next action:** restore the exact Supabase production project, deploy and
+accept the safer authentication-outage messaging, then create the dated opening
+snapshot and begin the controlled forward-tracking pilot in the
+[daily-use test-drive plan](artifacts/product/2026-10-22-daily-use-test-drive-plan.md).
 
 ## Current execution queue
 
@@ -58,6 +62,8 @@ second-identity/browser-process isolation and provider-unavailable drills.
    - [x] Confirm the personal Supabase account and organization are owned by the intended user.
    - [x] Permanently remove the two explicitly approved unrelated projects from that organization.
    - [x] Create a fresh Artha project under the correct personal account.
+   - [ ] Restore the currently unavailable project and verify its Auth endpoint
+     before repeating any sign-in or ledger acceptance.
    - [x] Apply all versioned migrations from an empty database.
    - [x] Pass hosted schema lint and catalog/RLS assertions.
    - [ ] Re-run anonymous-denial and two-household isolation tests.
@@ -68,6 +74,8 @@ second-identity/browser-process isolation and provider-unavailable drills.
    - [x] Configure exact CORS origins and Supabase magic-link redirects.
    - Done when: health, login, onboarding and confirmed capture work on final URLs.
 4. **Complete authentication acceptance.**
+   - [x] Classify returned/thrown provider outages and rate limiting into safe,
+     actionable messages without exposing provider details.
    - [x] Verify magic-link login, navigation/reload persistence, sign-out and returning-user sign-in.
    - [ ] Verify two different users can independently onboard and see only their own households.
    - [ ] Keep same-household member invitations disabled until the V2 authorization flow is complete.
@@ -160,6 +168,12 @@ work. Full rationale and acceptance criteria:
 **Later, after daily capture is proven:**
 
 - [ ] Add an optional missing-transaction reminder and weekly ledger review.
+- [ ] Build **Voice Capture** as a major, independently gated capture surface
+  after statement/import validation and the personal daily-use pilot. Reuse the
+  typed unsaved-draft path; show and edit the transcript; support English,
+  Hinglish, Indian-number phrases, account names, dates and corrections; retain
+  no audio by default; require explicit confirmation; and pass the
+  [real-statement voice gate](artifacts/product/2026-10-22-real-statement-product-validation.md).
 
 ### P2 — expansion after production acceptance
 

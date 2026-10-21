@@ -24,18 +24,29 @@ interface CardRow {
 
 interface MemberRow { id: number; name: string }
 
+interface StoredOnboardingDraft {
+  displayName: string
+  householdName: string
+  moneyRows: Array<Omit<MoneyRow, 'id'>>
+  cardRows: Array<Omit<CardRow, 'id'>>
+  memberRows: Array<Omit<MemberRow, 'id'>>
+}
+
 let nextRowId = 1
+const ONBOARDING_DRAFT_KEY = 'artha.onboarding-draft.v1'
 const newMoneyRow = (): MoneyRow => ({ id: nextRowId++, name: '', kind: 'bank', balance: '' })
 const newCardRow = (): CardRow => ({ id: nextRowId++, name: '', outstanding: '', limit: '', statementDay: '', paymentDueDay: '' })
 const newMemberRow = (): MemberRow => ({ id: nextRowId++, name: '' })
 
 export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = true }: { onSave: (accounts: AccountSetupInput[], profile: UserProfile) => Promise<void>; onExploreDemo: (profile: UserProfile) => Promise<void>; onRestored?: () => Promise<void>; allowDemo?: boolean }) {
+  const restoredDraft = useRef(readOnboardingDraft())
   const [step, setStep] = useState<'accounts' | 'review'>('accounts')
-  const [moneyRows, setMoneyRows] = useState<MoneyRow[]>(() => [newMoneyRow()])
-  const [cardRows, setCardRows] = useState<CardRow[]>([])
-  const [displayName, setDisplayName] = useState('You')
-  const [householdName, setHouseholdName] = useState('My household')
-  const [memberRows, setMemberRows] = useState<MemberRow[]>([])
+  const [moneyRows, setMoneyRows] = useState<MoneyRow[]>(() => restoredDraft.current?.moneyRows.map((row) => ({ ...row, id: nextRowId++ })) ?? [newMoneyRow()])
+  const [cardRows, setCardRows] = useState<CardRow[]>(() => restoredDraft.current?.cardRows.map((row) => ({ ...row, id: nextRowId++ })) ?? [])
+  const [displayName, setDisplayName] = useState(restoredDraft.current?.displayName ?? 'You')
+  const [householdName, setHouseholdName] = useState(restoredDraft.current?.householdName ?? 'My household')
+  const [memberRows, setMemberRows] = useState<MemberRow[]>(() => restoredDraft.current?.memberRows.map((row) => ({ ...row, id: nextRowId++ })) ?? [])
+  const [snapshotPreparedAt, setSnapshotPreparedAt] = useState<Date | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [demoLoading, setDemoLoading] = useState(false)
@@ -44,6 +55,16 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
   useEffect(() => {
     if (error) errorRef.current?.focus()
   }, [error])
+
+  useEffect(() => {
+    writeOnboardingDraft({
+      displayName,
+      householdName,
+      moneyRows: moneyRows.map(({ name, kind, balance }) => ({ name, kind, balance })),
+      cardRows: cardRows.map(({ name, outstanding, limit, statementDay, paymentDueDay }) => ({ name, outstanding, limit, statementDay, paymentDueDay })),
+      memberRows: memberRows.map(({ name }) => ({ name }))
+    })
+  }, [cardRows, displayName, householdName, memberRows, moneyRows])
 
   const preparedAccounts = useMemo<AccountSetupInput[]>(() => [
     ...moneyRows.map((row) => ({
@@ -102,7 +123,10 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
   }
 
   function continueToReview() {
-    if (validate()) setStep('review')
+    if (validate()) {
+      setSnapshotPreparedAt(new Date())
+      setStep('review')
+    }
   }
 
   async function save() {
@@ -111,6 +135,7 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
     setError('')
     try {
       await onSave(preparedAccounts, { displayName: displayName.trim() || 'You', householdName: householdName.trim() || 'My household', members: memberRows.map((member) => ({ id: `draft-${member.id}`, name: member.name.trim() })), isDemo: false })
+      clearOnboardingDraft()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Setup could not be saved. Try again or explore the sample demo.')
     } finally {
@@ -123,6 +148,7 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
     setError('')
     try {
       await onExploreDemo({ displayName: displayName.trim() || 'You', householdName: householdName.trim() || 'My household', members: memberRows.map((member) => ({ id: `draft-${member.id}`, name: member.name.trim() })).filter((member) => member.name), isDemo: true })
+      clearOnboardingDraft()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The demo could not be prepared. Please try again.')
     } finally {
@@ -146,10 +172,15 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
             <div className="mt-10 sm:mt-14">
               <div className="flex items-center gap-2 text-sm font-semibold text-moss-700"><Sparkles className="h-4 w-4" aria-hidden="true" /> Let’s set up your starting point</div>
               <h1 className="font-display mt-3 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Where does your money live?</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-[#6e7b74] tone-muted">Add today’s balances. Artha stores them as opening entries, then keeps the total updated from confirmed transactions.</p>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-[#6e7b74] tone-muted">Choose one clean starting point. Enter each account’s posted balance and each card’s current outstanding, then add only activity that happens after you save.</p>
             </div>
 
-            {onRestored && <div className="mt-7"><RecoveryRestorePanel onRestored={onRestored} /></div>}
+            <div className="mt-5 rounded-2xl border border-moss-200 bg-moss-50 px-4 py-3 text-sm leading-6 text-moss-900">
+              <strong className="block">Use posted balances, not pending activity.</strong>
+              <span className="mt-1 block">If a card or bank payment is still pending, wait for it to settle or add it after setup. Your unfinished setup is kept in this browser tab if you refresh.</span>
+            </div>
+
+            {onRestored && <div className="mt-7"><RecoveryRestorePanel onRestored={async () => { await onRestored(); clearOnboardingDraft() }} /></div>}
 
             {onRestored && <div className="my-7 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#819088] tone-subtle"><span className="h-px flex-1 bg-line" />or create a new ledger<span className="h-px flex-1 bg-line" /></div>}
 
@@ -229,7 +260,7 @@ export function OnboardingPage({ onSave, onExploreDemo, onRestored, allowDemo = 
         ) : (
           <div className="mt-10 sm:mt-14">
             <button onClick={() => { setStep('accounts'); setError('') }} className="inline-flex min-h-11 items-center gap-2 rounded-xl pr-3 text-sm font-semibold text-[#66736d] tone-muted transition hover:text-moss-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-moss-400"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Edit accounts</button>
-            <div className="mt-4"><p className="text-sm font-semibold text-moss-700">Almost ready</p><h1 className="font-display mt-2 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Review your starting balances.</h1><p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">These become your ledger’s opening entries. Credit-card outstanding is shown as money owed.</p></div>
+            <div className="mt-4"><p className="text-sm font-semibold text-moss-700">Almost ready</p><h1 className="font-display mt-2 text-balance text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Review your starting balances.</h1><p className="mt-3 text-sm leading-6 text-[#6e7b74] tone-muted">These become your ledger’s opening entries when you save. Credit-card outstanding is shown as money owed.</p>{snapshotPreparedAt && <p className="mt-2 text-xs font-semibold text-moss-800">Prepared {formatSnapshotTime(snapshotPreparedAt)} · add only later activity after saving.</p>}</div>
 
             <Card className="mt-7 p-4"><p className="text-xs text-[#748079] tone-muted">Household</p><p className="mt-1 font-semibold">{householdName.trim() || 'My household'}</p><p className="mt-1 text-xs text-[#748079] tone-muted">{memberRows.length ? memberRows.map((member) => member.name).join(', ') : 'Personal ledger · no shared members'}</p></Card>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -264,6 +295,52 @@ function isSupportedMoney(value: string): boolean {
   if (value.trim() === '') return false
   const rupees = Number(value)
   return Number.isFinite(rupees) && Number.isSafeInteger(Math.round(rupees * 100))
+}
+
+function readOnboardingDraft(): StoredOnboardingDraft | null {
+  try {
+    const raw = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY)
+    if (!raw) return null
+    const value: unknown = JSON.parse(raw)
+    if (!isStoredOnboardingDraft(value)) return null
+    return value
+  } catch {
+    return null
+  }
+}
+
+function writeOnboardingDraft(draft: StoredOnboardingDraft) {
+  try {
+    window.sessionStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // Setup still works when storage is unavailable.
+  }
+}
+
+function clearOnboardingDraft() {
+  try {
+    window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY)
+  } catch {
+    // Nothing else is required when storage is unavailable.
+  }
+}
+
+function isStoredOnboardingDraft(value: unknown): value is StoredOnboardingDraft {
+  if (!value || typeof value !== 'object') return false
+  const draft = value as Partial<StoredOnboardingDraft>
+  return typeof draft.displayName === 'string'
+    && typeof draft.householdName === 'string'
+    && Array.isArray(draft.moneyRows)
+    && Array.isArray(draft.cardRows)
+    && Array.isArray(draft.memberRows)
+}
+
+function formatSnapshotTime(value: Date): string {
+  return new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Kolkata'
+  }).format(value)
 }
 
 function SetupField({ label, ariaLabel, prefix, ...inputProps }: { label: string; ariaLabel: string; prefix?: string; value: string; placeholder: string; inputMode?: 'decimal' | 'numeric'; onChange: (value: string) => void }) {
