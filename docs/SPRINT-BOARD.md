@@ -52,9 +52,9 @@ and voice remain outside this release gate.
 | Order | Status | Task | Done when |
 | --- | --- | --- | --- |
 | 1 | Done | Resume the exact `artha-production` Supabase project | The configured project hostname resolves, Auth health responds and a magic-link request is accepted |
-| 2 | Done locally; deploy next | Publish safe outage/rate-limit sign-in messaging | Returned/thrown provider failures and rate limiting are covered without leaking provider details |
-| 3 | Done locally; deploy next | Add dated opening-snapshot guidance and reload-safe onboarding | Cutoff meaning, posted balances, pending-entry warning, exact paise and current-tab refresh recovery passed automated and browser QA |
-| 4 | In progress | Add one-screen bank/card balance snapshot | All active accounts can be reviewed together; cards accept positive outstanding amounts; only changed balances create audited adjustments |
+| 2 | Deployed | Publish safe outage/rate-limit sign-in messaging | Returned/thrown provider failures and rate limiting are covered without leaking provider details |
+| 3 | Deployed | Add dated opening-snapshot guidance and reload-safe onboarding | Cutoff meaning, posted balances, pending-entry warning, exact paise and current-tab refresh recovery passed automated and browser QA |
+| 4 | Deployed; signed-in mutation check pending | Add one-screen bank/card balance snapshot | All active accounts can be reviewed together; cards accept positive outstanding amounts; only changed balances create audited adjustments |
 | 5 | Next | Complete the live sign-in callback and repeat fictional daily-capture/card acceptance | Purchase, transfer, refund, shared expense, card payment, correction and search all reconcile |
 | 6 | Next | Create the real opening snapshot with the owner | Every starting balance is approved and activity after the cutoff begins at zero ambiguity |
 | 7 | Later | Four-week measured pilot and cycle reconciliation | At least 90% capture coverage and every remaining difference is explainable |
