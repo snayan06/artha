@@ -26,8 +26,8 @@ Sprint 1 dependency.
 | V1 capture hardening | Deployed and accepted | PR #21 merged as `c4ae0dc`; manual Expense/Income/Transfer recovery, grounded category/account context and the AI notice passed final-domain fictional QA plus 170 web + 223 API + 50/30/24 AI contracts |
 | Message UX and metadata | Deployed | Safe composer behavior, grounded continuation, case-insensitive canonical merchant/platform/category/context/tags, progress messages, editable architecture pack and 60 capture cases are live from `e32b5b6` |
 | Public repository and CI | Done for current release | Main CI `31408304984` and CodeQL `31408301066` passed for production `cc7934c` |
-| Vercel and Supabase infrastructure | **Blocked: Supabase restore required** | Web and API return `200`, but the configured Supabase project hostname currently returns DNS `NXDOMAIN`; authentication and ledger access cannot work until the exact project is resumed or restored |
-| Persistent production login | Previously accepted; currently unavailable | Password login, persisted session and signed-in route hydration previously passed; the current Supabase outage blocks new authentication and the full browser-process reopen drill remains |
+| Vercel and Supabase infrastructure | **Recovered; acceptance in progress** | The exact production project resolves again, Auth health returns `200`, and a live magic-link request was accepted with `200`; the signed-in callback and ledger journey still need completion |
+| Persistent production login | Sign-in email accepted; callback pending | Password login, persisted session and signed-in route hydration previously passed; complete the newest magic-link callback and full browser-process reopen drill |
 | Server-owned onboarding/profile | Production accepted | Profile, household and split candidates returned from the server; PR #32 prevents the authenticated owner appearing as their own split candidate |
 | ₹25k self-transfer flow | Production verified | `25k` mapped to ₹25,000 with ordered ICICI → HDFC accounts; totals remained unchanged |
 | First-request reliability | Deployed | API now runs Mumbai → Mumbai; authenticated cold/warm measurement remains |
@@ -40,7 +40,7 @@ Sprint 1 dependency.
 | Account-specific history | Deployed | The complete ledger filters banks/cards and includes both sides of a transfer |
 | Accounts/cards management after onboarding | Done for owner | Add/edit, card details, zero-balance archive/restore and audited reconciliation are live; participant maintenance and invitations remain separate slices |
 | Daily-use transaction controls | Deployed and accepted | PR #30 (`1531968`) published stable keyset history, bounded database search, detail/correction/removal, post-confirm recovery and atomic shared repayments; live-fix PRs #31/#32 are deployed |
-| Production acceptance | **Paused for infrastructure recovery** | Earlier fictional QA passed, but the current production database/auth endpoint is unavailable. Restore Supabase, redeploy only if the project reference changed, then repeat sign-in and the dated opening-snapshot acceptance before personal use |
+| Production acceptance | **Resumed; signed-in recheck pending** | Supabase and the public web/API are reachable again. Complete the magic-link callback, publish the local auth/onboarding hardening and repeat the dated opening-snapshot acceptance before personal use |
 
 ## Current test-drive execution
 
@@ -51,12 +51,17 @@ and voice remain outside this release gate.
 
 | Order | Status | Task | Done when |
 | --- | --- | --- | --- |
-| 1 | **Blocked - user/provider action** | Resume or restore the exact `artha-production` Supabase project | The configured project hostname resolves and Supabase Auth health responds |
-| 2 | Done locally; deployment blocked | Publish safe outage/rate-limit sign-in messaging | Returned/thrown provider failures and rate limiting are covered without leaking provider details; production acceptance waits for Supabase |
-| 3 | Done locally; deployment blocked | Add dated opening-snapshot guidance and reload-safe onboarding | Cutoff meaning, posted balances, pending-entry warning, exact paise and current-tab refresh recovery passed automated and browser QA |
-| 4 | Next | Repeat fictional daily-capture and card lifecycle acceptance | Purchase, transfer, refund, shared expense, card payment, correction and search all reconcile |
-| 5 | Next | Create the real opening snapshot with the owner | Every starting balance is approved and activity after the cutoff begins at zero ambiguity |
-| 6 | Later | Four-week measured pilot and cycle reconciliation | At least 90% capture coverage and every remaining difference is explainable |
+| 1 | Done | Resume the exact `artha-production` Supabase project | The configured project hostname resolves, Auth health responds and a magic-link request is accepted |
+| 2 | Done locally; deploy next | Publish safe outage/rate-limit sign-in messaging | Returned/thrown provider failures and rate limiting are covered without leaking provider details |
+| 3 | Done locally; deploy next | Add dated opening-snapshot guidance and reload-safe onboarding | Cutoff meaning, posted balances, pending-entry warning, exact paise and current-tab refresh recovery passed automated and browser QA |
+| 4 | In progress | Add one-screen bank/card balance snapshot | All active accounts can be reviewed together; cards accept positive outstanding amounts; only changed balances create audited adjustments |
+| 5 | Next | Complete the live sign-in callback and repeat fictional daily-capture/card acceptance | Purchase, transfer, refund, shared expense, card payment, correction and search all reconcile |
+| 6 | Next | Create the real opening snapshot with the owner | Every starting balance is approved and activity after the cutoff begins at zero ambiguity |
+| 7 | Later | Four-week measured pilot and cycle reconciliation | At least 90% capture coverage and every remaining difference is explainable |
+
+The follow-up work for stale data, missing activity, assisted automation and
+Voice Capture is ordered in the
+[clean start, assisted capture and Voice Capture sprint](artifacts/product/2026-10-22-clean-start-automation-voice-sprint.md).
 
 ## Senior product audit — net-new additions
 
@@ -92,12 +97,14 @@ acceptance checks.
 
 | Order | Product slice | Why it is next | Acceptance gate |
 | --- | --- | --- | --- |
-| 1 | Private-data AI approval and owner control | Real financial text must never enter unpaid/sample-only AI processing | Paid-service data terms, explicit owner control, export/delete and hosted privacy verification |
-| 2 | Member-paid shared expenses | A family member can pay without moving the owner's account | Payable/receivable updates correctly; later repayment clears it without income/spend |
-| 3 | Participant maintenance | Real households change over time | Add/rename/deactivate with history preserved and no cross-household access |
-| 4 | Email invitations and **Shared with me** | Separate users need a safe, limited shared view | Invited user sees only shared items, never the owner's private accounts or balances |
-| 5 | Evidence-backed Ask Artha analytics — deployed | The assistant now explains its fixed-intent numbers | Date range, source count and matching transactions accompany every answer; exact drill-down is owner scoped |
-| 6 | Investments discovery | Mutual funds and stocks need portfolio-specific concepts | Product/schema brief for holdings, transactions, valuation and returns before implementation |
+| 1 | Safe clean-start reset | The present ledger contains stale/incomplete activity | Mandatory encrypted backup, preview, owner-only atomic reset and a new dated snapshot; no physical deletion |
+| 2 | Missing-activity review inbox | A balance-only correction cannot explain missing purchases and refunds | Staged rows are deduplicated, reviewed and explicitly confirmed before writing |
+| 3 | Voice Capture | Daily capture should be faster without bypassing review | Editable transcript feeds the existing grounded draft; no audio retention by default and zero direct writes |
+| 4 | Assisted bank-alert capture discovery | Repeated manual entry remains the largest daily-use gap | Email-first provider/privacy/cost/revocation design passes before implementation |
+| 5 | Private-data AI approval and owner control | Real financial text must never enter an unapproved AI configuration | Data terms, explicit owner control, export/delete and hosted privacy verification |
+| 6 | Member-paid shared expenses and participant maintenance | A family member can pay and household membership changes over time | Correct payable/receivable behavior and preserved historical splits |
+| 7 | Email invitations and **Shared with me** | Separate users need a safe, limited shared view | Invited user sees only shared items, never the owner's private accounts or balances |
+| 8 | Investments discovery | Mutual funds and stocks need portfolio-specific concepts | Product/schema brief for holdings, transactions, valuation and returns before implementation |
 
 Agentic follow-up is now specified in the
 [Artha Analyst plan](artifacts/architecture/2026-08-11-artha-analyst-agent-plan.md).

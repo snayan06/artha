@@ -30,12 +30,13 @@ transaction detail/correction/removal, post-confirm recovery, shared repayments
 and concise privacy status passed signed-in final-domain acceptance with
 disposable fictional data.**
 
-**Current incident (22 October 2026):** the web and API deployments return
-`200`, but the configured Supabase project hostname returns DNS `NXDOMAIN`.
-Magic-link authentication and ledger access are therefore unavailable until
-the exact `artha-production` project is resumed or restored. A local auth
-hardening change now distinguishes provider outage and rate limiting without
-exposing provider details; it is tested but not deployed.
+**Infrastructure recovery (22 October 2026):** the original
+`artha-production` project is resumed. Its hostname resolves, authenticated-key
+Auth health returns `200`, and a final-domain magic-link request was accepted
+with `200`. The user still needs to open the newest link to complete the
+callback/session check. A local auth hardening change distinguishes provider
+outage and rate limiting without exposing provider details; it is tested but
+not deployed.
 
 Do not send real financial text to AI yet. New and returning login, onboarding,
 financial flows, Gemini capture/assistant behavior, encrypted export, manual
@@ -48,7 +49,7 @@ real-data guards.
 | Surface | Current state |
 | --- | --- |
 | Combined message, metadata and unified-entry release | Deployed from `e32b5b6`; safe Enter behavior, grounded continuation, reviewed merchant/platform/category/context/tags, progress messages, strict text-only intent routing, shared composer and one-time Ask Artha handoff are live |
-| Accounts and cards | Deployed and accepted from `41b53b8`; add/edit, card details, zero-balance archive/restore, available credit and append-only audited balance reconciliation passed signed-in production acceptance |
+| Accounts and cards | Deployed per-account maintenance from `41b53b8`; a local candidate now adds one-screen dated reconciliation across all active banks/cards with positive card-outstanding input, review and audited per-account adjustments |
 | Daily-use transaction controls | Deployed and accepted from `1531968`; bounded database search, stable history paging, detail, atomic correction, audited removal, post-confirm recovery and atomic existing-participant repayment passed signed-in production QA |
 | Architecture pack | Provider-neutral **LLM service** boundaries in the overview, capture, Ask Artha and deployment views; Gemini is identified only as the current production provider |
 | AI-primary production release | PR [#20](https://github.com/snayan06/artha/pull/20) merged as `69e44a8`; model-only production capture/assistant behavior and honest failure boundaries are published |
@@ -56,9 +57,9 @@ real-data guards.
 | Evidence-backed Ask Artha | Deployed from `b61858c`; every answer has a bounded period/basis/source contract and recent supporting rows can open exact owner-scoped ledger activity |
 | Application/dependency release | `b61858c`; PR #37 plus daily-use PRs #30-#33 and reviewed dependency PRs #34/#35 are merged |
 | GitHub checks | Main [CI run 31518001200](https://github.com/snayan06/artha/actions/runs/31518001200) and [CodeQL run 31518001192](https://github.com/snayan06/artha/actions/runs/31518001192) passed for `b61858c` |
-| Vercel | Both production deployments remain reachable and return `200`; application authentication is blocked by the unavailable Supabase project |
-| Supabase RPC catalog | **Unavailable:** the exact project hostname currently returns DNS `NXDOMAIN`; prior production acceptance remains historical evidence only until restoration |
-| Public checks | Web and API health return `200`; Supabase DNS/auth health currently fails |
+| Vercel | Both production deployments remain reachable and return `200`; the web accepted a live magic-link request after Supabase resumed |
+| Supabase RPC catalog | Project/Auth availability restored; repeat the exact RPC catalog and rollback-safe isolation checks before the next production sign-off |
+| Public checks | Web/API return `200`, Supabase DNS resolves and authenticated-key Auth health returns `200` |
 | Authenticated journey | New-user magic link, returning-user link, session persistence, sign-out and restored server-owned onboarding passed with fictional data |
 | Financial journey | Backdated split expense, `25k` income, `25k` transfer, card expense, filters and live dashboard/member updates passed |
 | Gemini production | Final-domain expense, `25k` income, `25k` transfer and read-only balance assistant were manually verified with fictional data after `c4ae0dc`; hosted fictional gates remain 50/50, 30/30 and 24/24 |
@@ -67,8 +68,9 @@ real-data guards.
 
 ## Resume checklist
 
-- [ ] Resume or restore the exact Supabase production project; verify DNS and
-  Auth health before any application acceptance.
+- [x] Resume the exact Supabase production project; verify DNS, authenticated-key
+  Auth health and one accepted final-domain magic-link request.
+- [ ] Open the newest sign-in email and complete callback/session acceptance.
 - [ ] Deploy the tested safe authentication outage/rate-limit messaging.
 - [ ] Follow the dated opening-snapshot and forward-tracking acceptance in the
   [daily-use test-drive plan](artifacts/product/2026-10-22-daily-use-test-drive-plan.md).
@@ -143,10 +145,11 @@ real-data guards.
 Current production release web: 233 tests passed
 Current production release API: 311 tests passed
 Evidence assistant release: 233 web + 311 API tests, PWA build, 14 migrations, 8 SQL contracts and 60/30/30/24/49 keyless contracts pass
-Current local test-drive candidate: 237 web + 311 API tests, lint, strict
+Current local test-drive candidate: 238 web + 311 API tests, lint, strict
 TypeScript/mypy, production PWA build, 14 migrations, 8 SQL contracts and all
 keyless eval contracts pass. Desktop/mobile browser QA verified the dated
-opening snapshot, current-tab refresh recovery and exact paise display.
+opening snapshot, current-tab refresh recovery, exact paise display and the
+bulk bank/card balance review in 390 px light/dark plus desktop layout.
 Quality: ESLint, TypeScript, Ruff and strict mypy passed
 Build: production PWA passed without the previous bundle-size warning
 SQL: 14 migrations, seed and 8 SQL contract tests parsed; runtime account and exact-detail behavior contracts passed locally, in PR CI and against production
@@ -205,12 +208,14 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 ## Next engineering priorities
 
-1. Finish two-owner isolation and final-domain restore acceptance.
-2. Exercise real provider-unavailable recovery without losing the submitted text.
-3. Record sanitized browser/API log redaction and authenticated cold/warm latency.
-4. Obtain real-data privacy approval and re-run the fresh hosted fictional gates.
-5. Verify full browser-process reopen, then build S2-01 through S2-05 only after
-   the V1 acceptance gate passes.
+1. Complete the newest magic-link callback and returning-session acceptance.
+2. Publish the auth/onboarding hardening and one-screen balance snapshot, then
+   create the approved dated opening snapshot.
+3. Design and implement the safe clean-start reset before repairing stale data.
+4. Build the missing-activity inbox, then Voice Capture on the existing typed
+   draft path; keep assisted bank-alert capture behind privacy/cost discovery.
+5. Finish restore/isolation, real provider-unavailable recovery and real-data
+   privacy approval before entering private family-finance text into AI.
 
 ## Source-of-truth map
 
@@ -230,6 +235,8 @@ Only ask for these when the engineering work reaches the corresponding gate:
 
 | Date | Checkpoint |
 | --- | --- |
+| 22 Oct 2026 | Resumed the original Supabase project and verified DNS, Auth health and a final-domain magic-link request returning `200`. The first request failed while the project was becoming available; the accepted retry showed the normal same-browser email-link state. Full callback/session acceptance remains. |
+| 22 Oct 2026 | Added a local one-screen balance snapshot for every active bank/card. Cards accept positive outstanding amounts and convert to the ledger liability convention; only changed values create existing audited balance adjustments. Added the clean-start/automation/Voice sprint plan. Full gate passes with 238 web + 311 API tests; desktop and 390 px light/dark rendered QA have no console errors. Deployment remains. |
 | 22 Oct 2026 | Reviewed a private local set of real bank/card statements and an existing reconciliation workbook to validate product modelling. No raw financial data or identifiers were committed or sent to an LLM. Added a sanitized statement-driven ledger/import contract and a separately gated Voice Capture epic. This is documentation/planning only; no application release state changed. |
 | 22 Oct 2026 | Diagnosed production sign-in failure as an unavailable Supabase project hostname (`NXDOMAIN`) while web/API health remain reachable. Implemented safe outage/rate-limit auth guidance, reload-safe opening setup, explicit posted-balance/pending-entry cutoff copy and exact paise display. Full local gate passes; deployment and signed-in acceptance remain blocked on Supabase restoration. |
 | 11 Aug 2026 | Published PR #37 as `b61858c`: compact AI/privacy status, source-backed Ask Artha answers, exact ledger drill-down, settlement-aware evidence, a 30-case bounded-analyst contract and the post-launch WhatsApp import plan. Fresh main CI/CodeQL and both exact-SHA Vercel deployments passed. Migration `20260811010000` and rollback SQL 008 passed on the exact production project with authenticated-only execution and no fictional rows left behind. Signed-in Home, Settings and Assistant smoke checks were non-mutating. |
