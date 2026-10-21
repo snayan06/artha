@@ -146,6 +146,43 @@ describe('SettingsPage', () => {
     expect(within(region).getByRole('button', { name: /Set actual balance for Salary Bank/i })).toBeVisible()
   })
 
+  it('reviews and updates bank and card balances from one dated snapshot', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'false')
+    vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({ configured: true, provider: 'gemini', model: 'test', available: true, dataPolicy: 'private_approved', personalDataEnabled: true, isDemo: false })
+    const bank = {
+      id: 'account-bank', name: 'Salary Bank', kind: 'bank' as const, currency: 'INR',
+      openingBalancePaise: 100_000, currentBalancePaise: 125_000,
+      creditLimitPaise: null, statementDay: null, paymentDueDay: null, isArchived: false
+    }
+    const card = {
+      id: 'account-card', name: 'Travel Card', kind: 'credit_card' as const, currency: 'INR',
+      openingBalancePaise: -20_000, currentBalancePaise: -24_000,
+      creditLimitPaise: 500_000, statementDay: 5, paymentDueDay: 25, isArchived: false
+    }
+    vi.spyOn(api, 'getManagedAccounts').mockResolvedValue([bank, card])
+    const reconcile = vi.spyOn(api, 'reconcileAccountBalance').mockImplementation(async (id, input) => ({
+      ...(id === bank.id ? bank : card),
+      currentBalancePaise: input.actualBalancePaise
+    }))
+
+    render(<RouterProvider><SettingsPage /></RouterProvider>)
+    const region = await screen.findByRole('region', { name: /Accounts & cards/i })
+    fireEvent.click(within(region).getByRole('button', { name: 'Update all balances' }))
+    fireEvent.change(within(region).getByLabelText('Balance for Salary Bank'), { target: { value: '2000' } })
+    fireEvent.change(within(region).getByLabelText('Outstanding for Travel Card'), { target: { value: '500' } })
+    fireEvent.click(within(region).getByRole('button', { name: 'Review balance changes' }))
+
+    const bulkForm = within(region).getByText('Reconcile all balances').closest('form')
+    expect(within(bulkForm as HTMLElement).getByText(/₹1,250/)).toHaveTextContent('₹1,250 → ₹2,000')
+    expect(within(bulkForm as HTMLElement).getByText(/₹240 outstanding/)).toHaveTextContent('₹240 outstanding → ₹500 outstanding')
+    fireEvent.click(within(region).getByRole('button', { name: 'Confirm 2 updates' }))
+
+    await waitFor(() => expect(reconcile).toHaveBeenCalledTimes(2))
+    expect(reconcile).toHaveBeenCalledWith(bank.id, expect.objectContaining({ actualBalancePaise: 200_000, reason: 'Balance snapshot reconciliation' }))
+    expect(reconcile).toHaveBeenCalledWith(card.id, expect.objectContaining({ actualBalancePaise: -50_000, reason: 'Balance snapshot reconciliation' }))
+    await waitFor(() => expect(within(region).queryByText('Reconcile all balances')).not.toBeInTheDocument())
+  })
+
   it('keeps account input and shows a recoverable create error', async () => {
     vi.stubEnv('VITE_DEMO_MODE', 'false')
     vi.spyOn(api, 'getAssistantStatus').mockResolvedValue({ configured: true, provider: 'gemini', model: 'test', available: true, dataPolicy: 'private_approved', personalDataEnabled: true, isDemo: false })

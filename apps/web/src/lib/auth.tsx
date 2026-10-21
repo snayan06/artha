@@ -49,6 +49,23 @@ function authConfiguration(): { url: string; anonKey: string } | null {
   return url && anonKey ? { url, anonKey } : null
 }
 
+function magicLinkFailureMessage(error: unknown): string {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : ''
+  const normalized = message.toLowerCase()
+
+  if (/rate.?limit|too many requests|request.*too often|429/.test(normalized)) {
+    return 'Too many sign-in links were requested. Wait a minute, then request one fresh link.'
+  }
+  if (/failed to fetch|fetch failed|network|timeout|timed out|service unavailable|temporarily unavailable/.test(normalized)) {
+    return 'Artha\u2019s secure sign-in service is temporarily unavailable. Your account and ledger are safe. Please try again in a few minutes.'
+  }
+  return 'The sign-in link could not be sent. Please try again.'
+}
+
 function getSupabaseClient(): SupabaseClient | null {
   const configuration = authConfiguration()
   if (!configuration) return null
@@ -199,11 +216,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithMagicLink: async (email: string) => {
       const client = getSupabaseClient()
       if (!client) throw new Error('Supabase authentication is not configured.')
-      const { error: signInError } = await client.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin }
-      })
-      if (signInError) throw new Error('The sign-in link could not be sent. Please try again.')
+      let signInError: unknown
+      try {
+        const response = await client.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: window.location.origin }
+        })
+        signInError = response.error
+      } catch (caught) {
+        signInError = caught
+      }
+      if (signInError) throw new Error(magicLinkFailureMessage(signInError))
       setRecovery(null)
     },
     signInWithPassword: async (email: string, password: string) => {

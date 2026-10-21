@@ -16,3 +16,6 @@ directory.
 - [Senior product usability audit](2026-08-08-senior-product-usability-audit.md)
 - [Daily-use V1 senior product review](2026-08-10-daily-use-v1-senior-product-review.md)
 - [Private WhatsApp history import plan](2026-08-11-private-whatsapp-history-import-plan.md)
+- [Real-statement product validation and Voice Capture gate](2026-10-22-real-statement-product-validation.md)
+- [Daily-use test-drive plan](2026-10-22-daily-use-test-drive-plan.md)
+- [Clean start, assisted capture and Voice Capture sprint](2026-10-22-clean-start-automation-voice-sprint.md)

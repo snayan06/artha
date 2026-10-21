@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createManagedAccount, getManagedAccounts, reconcileAccountBalance, setManagedAccountArchived, updateManagedAccount } from '../lib/api'
 import { formatMoney, rupeesToPaise } from '../lib/money'
 import type { EntityId, ManagedAccount } from '../types'
@@ -13,6 +13,7 @@ export function AccountManagementPanel() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
+  const [showBulkReconciliation, setShowBulkReconciliation] = useState(false)
   const [manageId, setManageId] = useState<EntityId | null>(null)
 
   async function load() {
@@ -57,15 +58,36 @@ export function AccountManagementPanel() {
     try { replace(await setManagedAccountArchived(account.id, archived)) } catch (caught) { setError(caught instanceof Error ? caught.message : 'Artha could not update this account.') } finally { setSaving(false) }
   }
 
+  async function reconcile(account: ManagedAccount, actualBalancePaise: number, occurredAt: string, adjustmentReason: string) {
+    const updated = await reconcileAccountBalance(account.id, {
+      actualBalancePaise,
+      reason: adjustmentReason,
+      occurredAt
+    })
+    replace(updated)
+    return updated
+  }
+
+  const activeAccounts = accounts.filter((account) => !account.isArchived)
+
   return (
     <section aria-labelledby="accounts-cards-heading" aria-label="Accounts & cards" className="mt-7 rounded-[24px] border border-line bg-white p-4 shadow-card dark:border-night-border dark:bg-night-surface sm:p-6">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-moss-700">Money sources</p>
       <h2 id="accounts-cards-heading" className="font-display mt-1 text-xl font-bold">Accounts & cards</h2>
       <p className="mt-2 text-sm leading-6 text-[#66746d] tone-muted">Keep each displayed balance aligned with its latest statement. Reconciliation adds an audited correction; it never rewrites your opening balance or spending history.</p>
-      <button type="button" onClick={() => setShowAdd((value) => !value)} className="mt-4 min-h-11 rounded-xl bg-moss-900 px-4 text-sm font-semibold text-white">{showAdd ? 'Cancel new account' : 'Add account or card'}</button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" onClick={() => { setShowAdd((value) => !value); setShowBulkReconciliation(false) }} className="min-h-11 rounded-xl bg-moss-900 px-4 text-sm font-semibold text-white">{showAdd ? 'Cancel new account' : 'Add account or card'}</button>
+        {activeAccounts.length > 0 && <button type="button" onClick={() => { setShowBulkReconciliation((value) => !value); setShowAdd(false); setEditingId(null); setManageId(null) }} className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-moss-800 dark:border-night-border dark:text-moss-200">{showBulkReconciliation ? 'Cancel balance update' : 'Update all balances'}</button>}
+      </div>
       {showAdd && <AccountEditor onCancel={() => setShowAdd(false)} onSave={async (input) => { replace(await createManagedAccount(input)); setShowAdd(false) }} />}
+      {showBulkReconciliation && <BulkBalanceReconciliation
+        accounts={activeAccounts}
+        onCancel={() => setShowBulkReconciliation(false)}
+        onReconcile={reconcile}
+        onComplete={() => setShowBulkReconciliation(false)}
+      />}
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-      {loading ? <p role="status" className="mt-5 text-sm text-[#66746d] tone-muted">Loading accounts…</p> : accounts.filter((account) => !account.isArchived).length === 0 ? <p className="mt-5 text-sm text-[#66746d] tone-muted">No active accounts found.</p> : <div className="mt-5 space-y-3">{accounts.filter((account) => !account.isArchived).map((account) => {
+      {loading ? <p role="status" className="mt-5 text-sm text-[#66746d] tone-muted">Loading accounts…</p> : activeAccounts.length === 0 ? <p className="mt-5 text-sm text-[#66746d] tone-muted">No active accounts found.</p> : <div className="mt-5 space-y-3">{activeAccounts.map((account) => {
         const isCard = account.kind === 'credit_card'
         const availableCredit = isCard && account.creditLimitPaise !== null ? account.creditLimitPaise + account.currentBalancePaise : null
         return <article key={String(account.id)} className="rounded-2xl border border-line p-4 dark:border-night-border">
@@ -83,6 +105,108 @@ export function AccountManagementPanel() {
       {!loading && <button type="button" onClick={() => void load()} className="mt-4 min-h-11 rounded-xl px-3 text-sm font-semibold text-moss-800">Refresh accounts</button>}
     </section>
   )
+}
+
+function dateInIndia() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date())
+}
+
+function bulkInputValue(account: ManagedAccount) {
+  const paise = account.kind === 'credit_card' ? Math.abs(account.currentBalancePaise) : account.currentBalancePaise
+  return String(paise / 100)
+}
+
+function intendedBalance(account: ManagedAccount, value: string) {
+  const paise = rupeesToPaise(Number(value))
+  return account.kind === 'credit_card' ? -Math.abs(paise) : paise
+}
+
+function describedBalance(account: ManagedAccount, paise: number) {
+  return account.kind === 'credit_card' ? `${formatMoney(Math.abs(paise))} outstanding` : formatMoney(paise)
+}
+
+function BulkBalanceReconciliation({
+  accounts,
+  onCancel,
+  onReconcile,
+  onComplete
+}: {
+  accounts: ManagedAccount[]
+  onCancel: () => void
+  onReconcile: (account: ManagedAccount, actualBalancePaise: number, occurredAt: string, reason: string) => Promise<ManagedAccount>
+  onComplete: () => void
+}) {
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(accounts.map((account) => [String(account.id), bulkInputValue(account)])))
+  const [date, setDate] = useState(dateInIndia)
+  const [reason, setReason] = useState('Balance snapshot reconciliation')
+  const [reviewing, setReviewing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const changes = useMemo(() => accounts.flatMap((account) => {
+    const value = values[String(account.id)] ?? ''
+    if (!value.trim() || !Number.isFinite(Number(value)) || (account.kind === 'credit_card' && Number(value) < 0)) return []
+    const nextBalancePaise = intendedBalance(account, value)
+    return nextBalancePaise === account.currentBalancePaise ? [] : [{ account, nextBalancePaise }]
+  }), [accounts, values])
+
+  const valuesAreValid = accounts.every((account) => {
+    const value = values[String(account.id)] ?? ''
+    return value.trim() && Number.isFinite(Number(value)) && (account.kind !== 'credit_card' || Number(value) >= 0)
+  })
+
+  function review(event: FormEvent) {
+    event.preventDefault()
+    setError('')
+    if (!date || !reason.trim() || !valuesAreValid) {
+      setError('Enter a valid balance for every account, plus the date and reason.')
+      return
+    }
+    if (changes.length === 0) {
+      setError('Nothing changed. Update at least one balance before continuing.')
+      return
+    }
+    setReviewing(true)
+  }
+
+  async function confirm() {
+    setSaving(true)
+    setError('')
+    const occurredAt = new Date(`${date}T12:00:00+05:30`).toISOString()
+    const results = await Promise.allSettled(changes.map(({ account, nextBalancePaise }) => onReconcile(account, nextBalancePaise, occurredAt, reason.trim())))
+    const failed = results.filter((result) => result.status === 'rejected')
+    setSaving(false)
+    if (failed.length > 0) {
+      setReviewing(false)
+      setError(`${results.length - failed.length} ${results.length - failed.length === 1 ? 'balance was' : 'balances were'} updated; ${failed.length} could not be updated. Refresh the accounts and retry the remaining balance.`)
+      return
+    }
+    onComplete()
+  }
+
+  return <form onSubmit={review} className="mt-4 rounded-2xl border border-moss-200 bg-moss-50 p-4 dark:border-night-border dark:bg-night-raised">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div><h3 className="font-display text-lg font-bold">Reconcile all balances</h3><p className="mt-1 max-w-2xl text-sm leading-6 text-[#66746d] tone-muted">Enter every bank’s posted balance and every card’s current outstanding for the same date. Artha records only the differences as audited adjustments—it does not erase transactions or rewrite history.</p></div>
+      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-moss-800 dark:bg-night-surface dark:text-moss-200">{accounts.length} {accounts.length === 1 ? 'account' : 'accounts'}</span>
+    </div>
+    {error && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
+    {!reviewing ? <>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">{accounts.map((account) => {
+        const isCard = account.kind === 'credit_card'
+        return <label key={String(account.id)} className="text-xs font-semibold">{account.name} · {isCard ? 'outstanding' : 'available balance'} (₹)<input aria-label={`${isCard ? 'Outstanding' : 'Balance'} for ${account.name}`} value={values[String(account.id)] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [String(account.id)]: event.target.value }))} type="number" min={isCard ? '0' : undefined} step="0.01" required className="mt-1 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm tabular-nums dark:border-night-border dark:bg-night-surface" /><span className="mt-1 block font-normal text-[#718078] tone-muted">Currently {describedBalance(account, account.currentBalancePaise)}</span></label>
+      })}</div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Snapshot date<input aria-label="Balance snapshot date" value={date} onChange={(event) => setDate(event.target.value)} type="date" required className="mt-1 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm dark:border-night-border dark:bg-night-surface" /></label><label className="text-xs font-semibold">Reason<input aria-label="Balance update reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} required className="mt-1 min-h-11 w-full rounded-xl border border-line bg-white px-3 text-sm dark:border-night-border dark:bg-night-surface" /></label></div>
+      <div className="mt-4 flex flex-wrap gap-2"><button className="min-h-11 rounded-xl bg-moss-900 px-4 text-sm font-semibold text-white">Review balance changes</button><button type="button" onClick={onCancel} className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold dark:border-night-border">Cancel</button></div>
+    </> : <>
+      <div className="mt-4 rounded-xl border border-line bg-white p-3 dark:border-night-border dark:bg-night-surface"><p className="text-xs font-semibold uppercase tracking-[0.1em] text-moss-700">Review · {date}</p><div className="mt-2 divide-y divide-line dark:divide-night-border">{changes.map(({ account, nextBalancePaise }) => <div key={String(account.id)} className="flex items-center justify-between gap-3 py-3 text-sm"><span className="font-semibold">{account.name}</span><span className="text-right tabular-nums text-[#66746d] tone-muted">{describedBalance(account, account.currentBalancePaise)} → <strong className="text-ink">{describedBalance(account, nextBalancePaise)}</strong></span></div>)}</div><p className="mt-2 text-xs leading-5 text-[#66746d] tone-muted">Only these {changes.length} changed {changes.length === 1 ? 'balance' : 'balances'} will create adjustment entries. Unchanged accounts are untouched.</p></div>
+      <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={saving} onClick={() => void confirm()} className="min-h-11 rounded-xl bg-moss-900 px-4 text-sm font-semibold text-white disabled:opacity-60">{saving ? 'Updating balances…' : `Confirm ${changes.length} ${changes.length === 1 ? 'update' : 'updates'}`}</button><button type="button" disabled={saving} onClick={() => setReviewing(false)} className="min-h-11 rounded-xl border border-line px-4 text-sm font-semibold disabled:opacity-60 dark:border-night-border">Back to edit</button></div>
+    </>}
+  </form>
 }
 
 function AccountEditor({ account, onSave, onCancel }: { account?: ManagedAccount; onSave: (input: import('../types').AccountSetupInput) => Promise<void>; onCancel: () => void }) {

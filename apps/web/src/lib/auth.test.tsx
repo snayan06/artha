@@ -115,6 +115,49 @@ describe('Supabase auth provider', () => {
     expect(screen.getByRole('status')).toHaveTextContent('sign-in is not complete yet')
   })
 
+  it('turns a returned provider network failure into safe recovery guidance', async () => {
+    const user = userEvent.setup()
+    supabase.signInWithOtp.mockResolvedValueOnce({
+      data: {},
+      error: { message: 'Failed to fetch https://private-project-reference.supabase.co/auth/v1/otp' }
+    })
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    await user.type(await screen.findByLabelText('Email address'), 'ari@example.com')
+    await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('secure sign-in service is temporarily unavailable')
+    expect(screen.getByRole('alert')).toHaveTextContent('account and ledger are safe')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('private-project-reference')
+  })
+
+  it('turns a thrown fetch failure into the same safe recovery guidance', async () => {
+    const user = userEvent.setup()
+    supabase.signInWithOtp.mockRejectedValueOnce(new TypeError('Failed to fetch secret-provider-url'))
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    await user.type(await screen.findByLabelText('Email address'), 'ari@example.com')
+    await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('secure sign-in service is temporarily unavailable')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('secret-provider-url')
+  })
+
+  it('gives actionable guidance without exposing provider rate-limit details', async () => {
+    const user = userEvent.setup()
+    supabase.signInWithOtp.mockResolvedValueOnce({
+      data: {},
+      error: { message: 'email rate limit exceeded for provider tenant private-id' }
+    })
+    render(<AuthProvider><RouterProvider><App /></RouterProvider></AuthProvider>)
+
+    await user.type(await screen.findByLabelText('Email address'), 'ari@example.com')
+    await user.click(screen.getByRole('button', { name: 'Email me a sign-in link' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Wait a minute, then request one fresh link')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('private-id')
+  })
+
   it('signs in with a password without persisting or echoing the password', async () => {
     const user = userEvent.setup()
     render(<AuthProvider><PasswordProbe /></AuthProvider>)

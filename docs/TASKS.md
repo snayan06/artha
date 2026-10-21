@@ -3,7 +3,7 @@
 Start with [`PROJECT-CHECKPOINT.md`](PROJECT-CHECKPOINT.md) for the current
 handoff and release guard.
 
-Updated: 11 August 2026
+Updated: 22 October 2026
 
 For the current ordered delivery view, blockers and user actions, see
 [`SPRINT-BOARD.md`](SPRINT-BOARD.md). This file remains the complete backlog.
@@ -30,6 +30,9 @@ signed-in Settings acceptance are green.
 - [x] Personal Vercel account created under the intended owner.
 - [x] Personal Supabase account and organization confirmed; the explicitly approved legacy projects `inventory_management` and `VectorDb` were permanently deleted.
 - [x] Create the fresh `artha-production` Supabase project in Mumbai.
+- [x] Resume the exact `artha-production` project after its hostname returned
+  DNS `NXDOMAIN`; the original reference resolves again and Auth accepts live
+  magic-link requests. Complete the callback/session acceptance before sign-off.
 - [x] Apply all migrations and pass hosted catalog/RLS schema assertions.
 - [x] Complete anonymous-denial and rollback-only two-household behavioural isolation on the hosted database.
 - [x] Create and configure the `artha-api` and `artha-web` Vercel projects.
@@ -42,9 +45,10 @@ signed-in Settings acceptance are green.
 - [ ] Approve the real-data privacy configuration and re-run all fresh hosted
   fictional gates for the hardening follow-up.
 
-**Next action:** approve the private-data AI mode or keep private capture manual,
-repeat encrypted restore through the final-domain UI, then complete the
-second-identity/browser-process isolation and provider-unavailable drills.
+**Next action:** complete the live magic-link callback, deploy and accept the
+safer authentication/onboarding hardening plus bulk balance snapshot, then
+create the dated opening snapshot and begin the controlled forward-tracking pilot in the
+[daily-use test-drive plan](artifacts/product/2026-10-22-daily-use-test-drive-plan.md).
 
 ## Current execution queue
 
@@ -58,6 +62,8 @@ second-identity/browser-process isolation and provider-unavailable drills.
    - [x] Confirm the personal Supabase account and organization are owned by the intended user.
    - [x] Permanently remove the two explicitly approved unrelated projects from that organization.
    - [x] Create a fresh Artha project under the correct personal account.
+   - [x] Resume the project and verify DNS plus authenticated-key Auth health;
+     a production magic-link request now returns `200`.
    - [x] Apply all versioned migrations from an empty database.
    - [x] Pass hosted schema lint and catalog/RLS assertions.
    - [ ] Re-run anonymous-denial and two-household isolation tests.
@@ -68,6 +74,8 @@ second-identity/browser-process isolation and provider-unavailable drills.
    - [x] Configure exact CORS origins and Supabase magic-link redirects.
    - Done when: health, login, onboarding and confirmed capture work on final URLs.
 4. **Complete authentication acceptance.**
+   - [x] Classify returned/thrown provider outages and rate limiting into safe,
+     actionable messages without exposing provider details.
    - [x] Verify magic-link login, navigation/reload persistence, sign-out and returning-user sign-in.
    - [ ] Verify two different users can independently onboard and see only their own households.
    - [ ] Keep same-household member invitations disabled until the V2 authorization flow is complete.
@@ -110,6 +118,14 @@ second-identity/browser-process isolation and provider-unavailable drills.
   Income, Transfer and exact-text manual-recovery acceptance.
 - [x] Deploy and accept owner account/card maintenance, available credit,
   zero-balance archive/restore and audited balance reconciliation.
+- [ ] Deploy and accept a one-screen dated balance snapshot across every active
+  bank/card; positive card outstanding is converted to the ledger's negative
+  liability convention and only changed balances create adjustments.
+- [ ] Build the safe **Start fresh** epic: encrypted backup, preview, cutoff,
+  owner-only atomic retirement of stale live rows, new all-account snapshot and
+  audit evidence. Never make this an unreviewed physical delete.
+- [ ] Build a missing-activity review inbox with source deduplication and
+  explicit confirmation before ledger writes.
 - [ ] Exercise real provider-unavailable recovery on the final domain.
 - [ ] Add authenticated invitations, roles and removal for multiple logins in one household.
 - [x] Add safe Enter/Shift+Enter/IME composer behavior without keyboard confirmation.
@@ -160,6 +176,15 @@ work. Full rationale and acceptance criteria:
 **Later, after daily capture is proven:**
 
 - [ ] Add an optional missing-transaction reminder and weekly ledger review.
+- [ ] Build **Voice Capture** as a major, independently gated capture surface
+  after statement/import validation and the personal daily-use pilot. Reuse the
+  typed unsaved-draft path; show and edit the transcript; support English,
+  Hinglish, Indian-number phrases, account names, dates and corrections; retain
+  no audio by default; require explicit confirmation; and pass the
+  [real-statement voice gate](artifacts/product/2026-10-22-real-statement-product-validation.md).
+- [ ] Execute the ordered
+  [clean start, assisted capture and Voice Capture sprint](artifacts/product/2026-10-22-clean-start-automation-voice-sprint.md),
+  with clean-start correctness before voice or automatic capture.
 
 ### P2 — expansion after production acceptance
 

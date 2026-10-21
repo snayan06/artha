@@ -59,7 +59,7 @@ describe('local capture parser', () => {
 describe('money helpers', () => {
   it('converts at the display boundary and formats Indian rupees', () => {
     expect(rupeesToPaise(1840.25)).toBe(184_025)
-    expect(formatMoney(184_025)).toBe('₹1,840')
+    expect(formatMoney(184_025)).toBe('₹1,840.25')
   })
 
   it('rejects non-finite and unsafe browser amounts at the input boundary', () => {
